@@ -12,9 +12,9 @@ LudumDare60.Game.Browser ──► LudumDare60.Game ──► LudumDare60.Engine
 | --- | --- | --- |
 | `src/engine/LudumDare60.Engine.Platform` | `Microsoft.NET.Sdk` | Platform contracts: `IPlatform`, `IFrameSink`. No dependencies. |
 | `src/engine/LudumDare60.Engine` | `Microsoft.NET.Sdk` | `GameEngine`, `IGame`, `FrameContext`. Depends only on the platform contracts. |
-| `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `Microsoft.NET.Sdk.StaticWebAssets` | `BrowserPlatform : IPlatform` and its JS (`wwwroot/frame-loop.js`). Its `wwwroot/` ships with the app under `_content/LudumDare60.Engine.Platform.Browser/`. |
+| `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `Microsoft.NET.Sdk.StaticWebAssets` | `BrowserPlatform : IPlatform` and its JS: `wwwroot/boot.js` (runtime start) and `wwwroot/frame-loop.js`. Its `wwwroot/` ships with the app under `_content/LudumDare60.Engine.Platform.Browser/`. |
 | `src/game/LudumDare60.Game` | `Microsoft.NET.Sdk` | `LudumDare60Game : IGame`. No platform dependency. |
-| `src/game/LudumDare60.Game.Browser` | `Microsoft.NET.Sdk.WebAssembly` | Entry point and host page. Only wires the game and the browser platform together. |
+| `src/game/LudumDare60.Game.Browser` | `Microsoft.NET.Sdk.WebAssembly` | Entry point, host page and `main.js`. Only wires the game and the browser platform together. |
 
 The engine and the game never reference a concrete platform. Only the entry-point project chooses one:
 
@@ -42,6 +42,18 @@ Inside `GameEngine.Update(dt)`:
    far the current time is between the last fixed step and the next one. Use it to interpolate render state.
 
 `GameEngine.Render()` forwards to `IGame.Render()`.
+
+### Browser startup
+
+1. `index.html` loads the app's `main.js`, which imports `boot.js` from
+   `_content/LudumDare60.Engine.Platform.Browser/` and calls `boot('./_framework/')`.
+2. `boot(frameworkRoot)` resolves `dotnet.js` in `frameworkRoot` against the page URL (`document.baseURI`), imports
+   it with `import()`, calls `dotnet.create()` and then `runMain()`. The root is a parameter so an app can ship
+   several runtime builds (for example single- and multi-threaded) and pick one at startup; today there is one.
+   The root is resolved against the page, not against `boot.js`, so the resulting URL matches the import map key
+   and loads the fingerprinted file.
+3. `runMain()` runs `Program.Main`, which picks the game and the platform:
+   `GameEngine.RunAsync(new LudumDare60Game(), new BrowserPlatform())`.
 
 ### Browser frame loop
 

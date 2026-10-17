@@ -1,4 +1,3 @@
-import { dotnet } from './_framework/dotnet.js';
+import { boot } from './_content/LudumDare60.Engine.Platform.Browser/boot.js';
 
-const { runMain } = await dotnet.create();
-await runMain();
+await boot('./_framework/');

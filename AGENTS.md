@@ -23,7 +23,7 @@ itch.io as an HTML5 build and is pushed with `butler`.
 | --- | --- |
 | `src/engine/LudumDare60.Engine.Platform` | Platform contracts (`IPlatform`, `IFrameSink`). No dependencies. |
 | `src/engine/LudumDare60.Engine` | Engine: `GameEngine` (fixed-step frame loop), `IGame`, `FrameContext`. Depends only on the platform contracts. Never references the game or a concrete platform. |
-| `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `BrowserPlatform : IPlatform` (StaticWebAssets SDK, so it can ship JS under `_content/`). |
+| `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `BrowserPlatform : IPlatform` and its JS: `boot.js` starts the .NET runtime, `frame-loop.js` drives frames (StaticWebAssets SDK, shipped under `_content/`). |
 | `src/game/LudumDare60.Game` | Game class library: `LudumDare60Game : IGame`, rules, content, state. No platform dependency. |
 | `src/game/LudumDare60.Game.Browser` | `wasmbrowser` entry point and host page. Wires the game to `BrowserPlatform` and nothing else. |
 | `tests/` | C# test projects (`*.Tests`, xUnit v3 on Microsoft.Testing.Platform) and `tests/js/` (Node test runner). |
