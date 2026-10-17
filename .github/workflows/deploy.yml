@@ -33,7 +33,7 @@ env:
 jobs:
   plan:
     name: Plan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       target: ${{ steps.plan.outputs.target }}
@@ -81,7 +81,7 @@ jobs:
   publish:
     name: Publish (Release AOT)
     needs: [plan, ci]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
@@ -119,7 +119,7 @@ jobs:
   push:
     name: Push to itch.io (${{ needs.plan.outputs.target }})
     needs: [plan, publish]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     # The environment holds BUTLER_API_KEY, so only this job sees it. Add required reviewers to "itch" to approve
     # each release by hand.
