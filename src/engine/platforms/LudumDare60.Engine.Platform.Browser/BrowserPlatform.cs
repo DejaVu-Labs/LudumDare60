@@ -50,6 +50,14 @@ public sealed class BrowserPlatform(
     /// <remarks>WebGL2 on the canvas. <see cref="RunAsync"/> creates the context before the first frame.</remarks>
     public IGraphicsBackend Graphics => _graphics;
 
+    private readonly BrowserAudio _audio = new();
+
+    /// <inheritdoc />
+    /// <remarks>Web Audio. <see cref="RunAsync"/> creates the context before the first frame. Browsers keep it
+    /// suspended until the player's first click or key press, and the platform suspends it while the page is
+    /// hidden.</remarks>
+    public IAudioBackend Audio => _audio;
+
     /// <inheritdoc />
     /// <remarks>The returned task completes only if a frame throws; it then faults with that exception. It also faults
     /// before the first frame if the browser has no WebGL2. Input listeners are attached before the first frame and
@@ -59,6 +67,7 @@ public sealed class BrowserPlatform(
         ArgumentNullException.ThrowIfNull(frameSink);
 
         await _graphics.InitializeAsync(canvasId);
+        await _audio.InitializeAsync();
         await FrameLoopInterop.ImportAsync();
         await InputInterop.ImportAsync();
 

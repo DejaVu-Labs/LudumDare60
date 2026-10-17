@@ -1,0 +1,54 @@
+{
+  "version": 2,
+  "dependencies": {
+    "net10.0": {
+      "Meziantou.Analyzer": {
+        "type": "Direct",
+        "requested": "[3.0.303, )",
+        "resolved": "3.0.303",
+        "contentHash": "IBcDi9Gq15J7F7Akw/KCVrxMsms13e7rgA6ssVhoqn+3BWDvCg3RAhzPMK8foJapDMgz5tG4cDHO/JImrnn1cw=="
+      },
+      "Microsoft.NET.ILLink.Tasks": {
+        "type": "Direct",
+        "requested": "[10.0.13, )",
+        "resolved": "10.0.13",
+        "contentHash": "40yrBMsLEcjixBR4G+FiUaBPvxXIPSKJ2OgSrbOZcmSDBda4Sb0k7BWrfDpIvn3IvvDzwOL/tEPa6gDQfh6aRw=="
+      },
+      "Microsoft.NET.Sdk.WebAssembly.Pack": {
+        "type": "Direct",
+        "requested": "[10.0.13, )",
+        "resolved": "10.0.13",
+        "contentHash": "ubHnmRGy11HvoU/sIjtAWm4JOsqYcgvU+AKsWcebHo4vhi/qozAMMBCeN1URpdjwSdbUBzgD1spXak7oKOql7A=="
+      },
+      "ludumdare60.engine": {
+        "type": "Project",
+        "dependencies": {
+          "LudumDare60.Engine.Platform": "[1.0.0, )",
+          "StbImageSharp": "[2.30.16, )"
+        }
+      },
+      "ludumdare60.engine.platform": {
+        "type": "Project"
+      },
+      "ludumdare60.engine.platform.browser": {
+        "type": "Project",
+        "dependencies": {
+          "LudumDare60.Engine.Platform": "[1.0.0, )"
+        }
+      },
+      "ludumdare60.samples.soundboard": {
+        "type": "Project",
+        "dependencies": {
+          "LudumDare60.Engine": "[1.0.0, )"
+        }
+      },
+      "StbImageSharp": {
+        "type": "CentralTransitive",
+        "requested": "[2.30.16, )",
+        "resolved": "2.30.16",
+        "contentHash": "qg1i+NHihXVKLKYacGKrauhSQIGL31eBWcTC4Vc7jnGmBFj87LkRuCdXB5aDZisWMRnB6x2mcfwYXQxMWEG/lw=="
+      }
+    },
+    "net10.0/browser-wasm": {}
+  }
+}

@@ -2,6 +2,7 @@ using LudumDare60.Engine;
 using LudumDare60.Engine.Assets;
 using LudumDare60.Engine.Platform;
 using LudumDare60.Engine.Rendering;
+using LudumDare60.Engine.Sounds;
 
 namespace LudumDare60.Samples.InputMonitor;
 
@@ -27,7 +28,7 @@ public sealed class InputMonitorGame(ITextDisplay display) : IGame
 
     public InputTracker Tracker { get; } = new();
 
-    public void Initialize(AssetManager assets, Graphics graphics)
+    public void Initialize(AssetManager assets, Graphics graphics, Audio audio)
     {
     }
 

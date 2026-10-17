@@ -16,6 +16,10 @@ internal sealed class ControlledPlatform : IPlatform
 
     public IGraphicsBackend Graphics => Backend;
 
+    public FakeAudioBackend AudioBackend { get; } = new();
+
+    public IAudioBackend Audio => AudioBackend;
+
     public Task RunAsync(IFrameSink frameSink) => _stopped.Task;
 
     public void Stop() => _stopped.SetResult();

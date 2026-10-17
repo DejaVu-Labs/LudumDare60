@@ -1,6 +1,7 @@
 using LudumDare60.Engine.Assets;
 using LudumDare60.Engine.Platform;
 using LudumDare60.Engine.Rendering;
+using LudumDare60.Engine.Sounds;
 
 namespace LudumDare60.Engine;
 
@@ -17,7 +18,9 @@ public interface IGame
     /// unloads everything when the run ends.</param>
     /// <param name="graphics">The run's texture factory. Keep it: textures can be created from the first frame on, not
     /// here, and the engine destroys the remaining ones when the run ends.</param>
-    void Initialize(AssetManager assets, Graphics graphics);
+    /// <param name="audio">The run's sound player. Keep it: sounds can be created from the first frame on, not here,
+    /// and the engine destroys the remaining ones when the run ends.</param>
+    void Initialize(AssetManager assets, Graphics graphics, Audio audio);
 
     /// <summary>
     /// Advances the simulation by one fixed step (<see cref="GameEngine.FixedDeltaTime"/>). Called zero or more times per frame.

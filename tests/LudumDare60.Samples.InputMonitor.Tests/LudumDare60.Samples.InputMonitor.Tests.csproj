@@ -5,6 +5,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Shared\FakeAudioBackend.cs" Link="Shared\FakeAudioBackend.cs" />
     <Compile Include="..\Shared\FakeGraphicsBackend.cs" Link="Shared\FakeGraphicsBackend.cs" />
     <Compile Include="..\Shared\ManualPlatform.cs" Link="Shared\ManualPlatform.cs" />
   </ItemGroup>

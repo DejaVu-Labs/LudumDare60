@@ -22,6 +22,10 @@ internal sealed class ScriptedPlatform : IPlatform
 
     public IGraphicsBackend Graphics => Backend;
 
+    public FakeAudioBackend AudioBackend { get; } = new();
+
+    public IAudioBackend Audio => AudioBackend;
+
     /// <summary>
     /// One frame per delta time, without input.
     /// </summary>

@@ -5,7 +5,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Shared\FakeAudioBackend.cs" Link="Shared\FakeAudioBackend.cs" />
     <Compile Include="..\Shared\FakeGraphicsBackend.cs" Link="Shared\FakeGraphicsBackend.cs" />
+    <!-- Shared with tests/js/webaudio.test.mjs. -->
+    <None Include="..\fixtures\audio-frame.json" Link="fixtures\audio-frame.json" CopyToOutputDirectory="PreserveNewest" />
     <!-- Shared with tests/js/webgl2.test.mjs. -->
     <None Include="..\fixtures\render-frame.json" Link="fixtures\render-frame.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

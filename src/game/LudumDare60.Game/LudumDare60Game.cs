@@ -4,6 +4,7 @@ using LudumDare60.Engine.Assets;
 using LudumDare60.Engine.Input;
 using LudumDare60.Engine.Platform;
 using LudumDare60.Engine.Rendering;
+using LudumDare60.Engine.Sounds;
 
 namespace LudumDare60.Game;
 
@@ -44,7 +45,7 @@ public sealed class LudumDare60Game : IGame
     /// </summary>
     public bool IsHolding { get; private set; }
 
-    public void Initialize(AssetManager assets, Graphics graphics) => _graphics = graphics;
+    public void Initialize(AssetManager assets, Graphics graphics, Audio audio) => _graphics = graphics;
 
     public void FixedUpdate(in FrameContext context)
     {

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LD60 sound board</title>
+  <style>
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #14171c;
+    }
+
+    #screen {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Overlays the canvas without taking its pointer events. */
+    #legend {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      margin: 0;
+      padding: 12px 16px;
+      pointer-events: none;
+      color: #c8d0dc;
+      font: 14px/1.4 ui-monospace, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+    }
+  </style>
+  <link rel="preload" id="webassembly" />
+  <script type="importmap"></script>
+  <script type="module" src="main#[.{fingerprint}].js"></script>
+</head>
+
+<body>
+  <canvas id="screen"></canvas>
+  <pre id="legend">Click or press a key once to start audio.
+1-7  effects (click, clink, squeak, ratchet, drop, spring, dry fire), random pitch, panned by the pointer
+L    rain loop on/off; pointer x pans it, pointer y sets its volume
+Q W  music track A / B with a 2 s crossfade     S  stop music     M  mute</pre>
+</body>
+
+</html>

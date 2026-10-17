@@ -21,12 +21,12 @@ stream. It ships to itch.io as an HTML5 build and is pushed with `butler`.
 
 | Path | Contents |
 | --- | --- |
-| `src/engine/LudumDare60.Engine.Platform` | Platform contracts (`IPlatform`, `IFrameSink`, `RawInputEvent`, `IAssetSource`, `IGraphicsBackend`, `SpriteInstance`). No dependencies. |
-| `src/engine/LudumDare60.Engine` | Engine: `GameEngine` (fixed-step frame loop), `IGame`, `FrameContext`, `AssetManager`, asset loaders, `Rendering/` (`Graphics`, `SpriteBatch`, `PixelViewport`). Depends only on the platform contracts and managed decoder packages (StbImageSharp). Never references the game or a concrete platform. |
-| `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `BrowserPlatform : IPlatform` and its JS: `boot.js` starts the .NET runtime, `frame-loop.js` drives frames, `input.js` queues raw input, `assets.js` fetches asset files, `webgl2.js` renders (StaticWebAssets SDK, shipped under `_content/`). |
+| `src/engine/LudumDare60.Engine.Platform` | Platform contracts (`IPlatform`, `IFrameSink`, `RawInputEvent`, `IAssetSource`, `IGraphicsBackend`, `SpriteInstance`, `IAudioBackend`, `AudioCommandKind`). No dependencies. |
+| `src/engine/LudumDare60.Engine` | Engine: `GameEngine` (fixed-step frame loop), `IGame`, `FrameContext`, `AssetManager`, asset loaders, `Rendering/` (`Graphics`, `SpriteBatch`, `PixelViewport`), `Sounds/` (`Audio`, `Sound`, `Voice`). Depends only on the platform contracts and managed decoder packages (StbImageSharp). Never references the game or a concrete platform. |
+| `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `BrowserPlatform : IPlatform` and its JS: `boot.js` starts the .NET runtime, `frame-loop.js` drives frames, `input.js` queues raw input, `assets.js` fetches asset files, `webgl2.js` renders, `webaudio.js` plays sound (StaticWebAssets SDK, shipped under `_content/`). |
 | `src/game/LudumDare60.Game` | Game class library: `LudumDare60Game : IGame`, rules, content, state. No platform dependency. |
 | `src/game/LudumDare60.Game.Browser` | `wasmbrowser` entry point and host page. Wires the game to `BrowserPlatform` and nothing else. |
-| `tests/` | C# test projects (`*.Tests`, xUnit v3 on Microsoft.Testing.Platform), `tests/Shared/` (fakes linked into several test projects: `FakeGraphicsBackend`, `ManualPlatform`), `tests/fixtures/` (byte fixtures shared by C# and JS tests) and `tests/js/` (Node test runner). |
+| `tests/` | C# test projects (`*.Tests`, xUnit v3 on Microsoft.Testing.Platform), `tests/Shared/` (fakes linked into several test projects: `FakeGraphicsBackend`, `FakeAudioBackend`, `ManualPlatform`), `tests/fixtures/` (byte fixtures shared by C# and JS tests) and `tests/js/` (Node test runner). |
 | `samples/` | Small runnable experiments (renderer backends, interop spikes). Same rules as `src/`. |
 | `docs/tech/` | Technical docs: architecture, build and deploy, guidelines. |
 | `docs/gamedesign/` | Game design: concept, mechanics, levels, art and audio direction. |
@@ -65,14 +65,17 @@ All shared settings live in the root files. Project files should hold only what 
 
 Read [docs/tech/architecture.md](docs/tech/architecture.md) for the project graph, the frame loop, input and
 rendering. The platform drives `GameEngine` through `IFrameSink.Update(dt, events)` and `IFrameSink.Render()`, where
-`events` are the frame's raw input events. Before the first frame, the engine calls `IGame.Initialize(assets, graphics)`
-with the run's `AssetManager` and `Graphics` (the texture factory). Each frame, the engine applies finished asset reads
+`events` are the frame's raw input events. Before the first frame, the engine calls `IGame.Initialize(assets, graphics, audio)`
+with the run's `AssetManager`, `Graphics` (the texture factory) and `Audio` (sounds and their playback). Each frame, the engine applies finished asset reads
 (`AssetManager.Update`), resize events (`FrameContext.Viewport`) and input (`FrameContext.Input`, routed to the
 fixed step each event happened in), then calls `IGame.FixedUpdate` (zero or more times, 1/60 s each), then
 `IGame.Update` (with the raw events), then `IGame.PrepareRender(alpha)`, and finally
-`IGame.Render(batch)`, after which it submits the frame's `SpriteBatch` to the GPU in one call. Assets are requested
+`IGame.Render(batch)`, after which it submits the frame's `SpriteBatch` to the GPU in one call and the frame's audio
+commands to the sound device in another. Assets are requested
 by path, never block, and are reference counted; see [Assets](docs/tech/architecture.md#assets). Textures are created
 from loaded images, one per file, from the first frame on; see [Rendering](docs/tech/architecture.md#rendering).
+Sounds are created the same way from `byte[]` assets and decoded by the platform; see
+[Audio](docs/tech/architecture.md#audio).
 
 ## Code guidelines
 

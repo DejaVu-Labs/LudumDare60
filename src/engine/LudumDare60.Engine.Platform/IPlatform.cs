@@ -17,6 +17,11 @@ public interface IPlatform
     IGraphicsBackend Graphics { get; }
 
     /// <summary>
+    /// The sound output. Usable from the first frame on, like <see cref="Graphics"/>.
+    /// </summary>
+    IAudioBackend Audio { get; }
+
+    /// <summary>
     /// Drives <paramref name="frameSink"/> until the platform shuts down.
     /// </summary>
     /// <returns>A task that completes when the platform stops producing frames.</returns>

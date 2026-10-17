@@ -38,8 +38,20 @@ memory, so parsing happens in C#.
 - Aseprite animations: parse `.aseprite` directly (pixels are zlib-compressed, `ZLibStream` works in WASM). No export
   to PNG + JSON, because one asset is one file.
 - Fonts (TTF): glyph outlines or a baked atlas, depending on the text renderer.
-- Sounds: decoding in C# or a WebAudio path; decide together with the audio backend.
 - JSON configs: `System.Text.Json` with `[JsonSerializable]` source generation, no reflection.
+
+## Audio follow-ups
+
+Deferred when the audio system shipped (see [docs/tech/architecture.md](tech/architecture.md#audio)):
+
+- Loop points (an intro played once, then a looped section): `AudioBufferSourceNode.loopStart` and `loopEnd`.
+- Streaming long music through `<audio>` and `MediaElementAudioSourceNode` if decoded tracks take too much memory.
+- Effects and ducking: a filter or reverb per bus, music ducking under dialogue or phone buzzes.
+- Positional (3D) sound. Pan covers the 2D screen today.
+- Sample-accurate timing: schedule sounds by `RawInputEvent.Time` on `AudioContext.currentTime` instead of playing them
+  when the frame's commands arrive.
+- Remember the player's volume and mute between sessions (`localStorage`), together with the
+  [platform commands](#platform-commands-game-to-platform).
 
 ## Asset manager follow-ups
 

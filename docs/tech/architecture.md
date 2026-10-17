@@ -10,9 +10,9 @@ LudumDare60.Game.Browser ──► LudumDare60.Game ──► LudumDare60.Engine
 
 | Project | SDK | Role |
 | --- | --- | --- |
-| `src/engine/LudumDare60.Engine.Platform` | `Microsoft.NET.Sdk` | Platform contracts: `IPlatform`, `IFrameSink`, raw input (`RawInputEvent`, `RawInputEventKind`, `Key`, `PointerType`), asset reads (`IAssetSource`, `AssetLoadException`), the GPU (`IGraphicsBackend`, `RenderCommandKind`, `SpriteInstance`, `Color`). No dependencies. |
-| `src/engine/LudumDare60.Engine` | `Microsoft.NET.Sdk` | `GameEngine`, `IGame`, `FrameContext`, `Input/` (`InputState`, `PointerButton`), `Assets/` (`AssetManager` and loaders), `Rendering/` (`PixelViewport`, `Graphics`, `Texture`, `SpriteBatch`, `SpriteOptions`, `IntRect`). Depends only on the platform contracts and the managed `StbImageSharp` package (image decoding). |
-| `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `Microsoft.NET.Sdk.StaticWebAssets` | `BrowserPlatform : IPlatform` and its JS: `wwwroot/boot.js` (runtime start), `wwwroot/frame-loop.js`, `wwwroot/input.js`, `wwwroot/assets.js` and `wwwroot/webgl2.js` (renderer, shaders in `wwwroot/shaders/`). Its `wwwroot/` ships with the app under `_content/LudumDare60.Engine.Platform.Browser/`. |
+| `src/engine/LudumDare60.Engine.Platform` | `Microsoft.NET.Sdk` | Platform contracts: `IPlatform`, `IFrameSink`, raw input (`RawInputEvent`, `RawInputEventKind`, `Key`, `PointerType`), asset reads (`IAssetSource`, `AssetLoadException`), the GPU (`IGraphicsBackend`, `RenderCommandKind`, `SpriteInstance`, `Color`), sound output (`IAudioBackend`, `AudioCommandKind`, `AudioBus`, `AudioEvent`, `AudioEventKind`, `AudioLimits`). No dependencies. |
+| `src/engine/LudumDare60.Engine` | `Microsoft.NET.Sdk` | `GameEngine`, `IGame`, `FrameContext`, `Input/` (`InputState`, `PointerButton`), `Assets/` (`AssetManager` and loaders), `Rendering/` (`PixelViewport`, `Graphics`, `Texture`, `SpriteBatch`, `SpriteOptions`, `IntRect`), `Sounds/` (`Audio`, `Sound`, `SoundState`, `Voice`, `SoundOptions`). Depends only on the platform contracts and the managed `StbImageSharp` package (image decoding). |
+| `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `Microsoft.NET.Sdk.StaticWebAssets` | `BrowserPlatform : IPlatform` and its JS: `wwwroot/boot.js` (runtime start), `wwwroot/frame-loop.js`, `wwwroot/input.js`, `wwwroot/assets.js`, `wwwroot/webgl2.js` (renderer, shaders in `wwwroot/shaders/`) and `wwwroot/webaudio.js` (sound). Its `wwwroot/` ships with the app under `_content/LudumDare60.Engine.Platform.Browser/`. |
 | `src/game/LudumDare60.Game` | `Microsoft.NET.Sdk` | `LudumDare60Game : IGame`. No platform dependency. |
 | `src/game/LudumDare60.Game.Browser` | `Microsoft.NET.Sdk.WebAssembly` | Entry point, host page and `main.js`. Only wires the game and the browser platform together. |
 
@@ -24,10 +24,11 @@ await new GameEngine(640, 360).RunAsync(new LudumDare60Game(), new BrowserPlatfo
 
 ## Frame loop
 
-`GameEngine.RunAsync(game, platform)` stores the game, creates an `AssetManager` on `platform.Assets` and a `Graphics`
-on `platform.Graphics`, calls `IGame.Initialize(assets, graphics)` and awaits `platform.RunAsync(engine)`. When the run
-ends, it unloads every asset and destroys every texture. If the run failed, the run's exception is the one rethrown,
-even when a loader or the GPU also throws while cleaning up. The
+`GameEngine.RunAsync(game, platform)` stores the game, creates an `AssetManager` on `platform.Assets`, a `Graphics`
+on `platform.Graphics` and an `Audio` on `platform.Audio`, calls `IGame.Initialize(assets, graphics, audio)` and awaits
+`platform.RunAsync(engine)`. When the run ends, it unloads every asset and destroys every texture and sound. If the run
+failed, the run's exception is the one rethrown, even when a loader, the GPU or the audio device also throws while
+cleaning up. The
 engine is the platform's `IFrameSink`. The platform owns timing (in the browser: `requestAnimationFrame`) and calls, once per
 frame:
 
@@ -47,9 +48,11 @@ Inside `GameEngine.Update(dt, events)`:
    copying. `FixedUpdate` gets no events.
 5. `IGame.PrepareRender(alpha)` runs last, with `alpha = accumulator / FixedDeltaTime` in `[0, 1)`. It tells how
    far the current time is between the last fixed step and the next one. Use it to interpolate render state.
+   From here to the end of the frame, recording audio commands throws.
 
 `GameEngine.Render()` calls `IGame.Render(batch)` and then submits the recorded frame to the GPU (see
-[Rendering](#rendering)).
+[Rendering](#rendering)). Last, it submits the frame's audio commands and applies the decode results the platform
+reports (see [Audio](#audio)).
 
 ### Browser startup
 
@@ -70,7 +73,8 @@ Inside `GameEngine.Update(dt, events)`:
 
 ### Browser frame loop
 
-`BrowserPlatform.RunAsync(sink)` creates the WebGL2 context (see [Browser renderer](#browser-renderer)), imports
+`BrowserPlatform.RunAsync(sink)` creates the WebGL2 context (see [Browser renderer](#browser-renderer)) and the
+`AudioContext` (see [Browser audio](#browser-audio)), imports
 `frame-loop.js` and `input.js` with `JSHost.ImportAsync`, attaches input
 (see [Browser input](#browser-input)) and calls `run(onFrame)` through `[JSImport]`. `onFrame` is an
 `Action<double, double>` (`FrameDispatcher.OnFrame`) that drains input, then calls `sink.Update(dt, events)` and
@@ -126,8 +130,9 @@ public void Update(in FrameContext context, ReadOnlySpan<RawInputEvent> events)
 - **Loaders.** `IAssetLoader<T>.Load(path, data)` turns the file bytes into a `T` and owns the array. Register them
   explicitly with `Register<T>`; there is no reflection. `RawBytesLoader` (`byte[]`, the file itself) is registered
   in every manager. `ImageLoader` (`Image`, see [Images](#images)) is not: register it when the game has images.
-  Parsers for Aseprite files, fonts, sounds and JSON are not written yet (see
-  [docs/backlog.md](../backlog.md#asset-parsers)). One asset is one file: a loader cannot depend on other assets.
+  Parsers for Aseprite files, fonts and JSON are not written yet (see
+  [docs/backlog.md](../backlog.md#asset-parsers)). Sounds need no loader: request the file as `byte[]` and hand it to
+  `Audio.CreateSound` (see [Audio](#audio)). One asset is one file: a loader cannot depend on other assets.
 - **Errors.** A failed read or a throwing loader moves the asset to `Failed`. `GetError` returns an
   `AssetLoadException` with the path, the HTTP status (0 without a response) and the original error as
   `InnerException`. Failures are not cached: the next `Request` of that path reads again, for every handle.
@@ -405,3 +410,101 @@ the first frame. Each frame is one `submit(commands, instances)` interop call; t
 
 WebGPU is not implemented yet (see [docs/backlog.md](../backlog.md#webgpu-backend)). It will consume the same command
 stream and instance layout.
+
+## Audio
+
+Sound goes through one class, `Audio` (in `LudumDare60.Engine.Sounds`), which the engine passes to `IGame.Initialize`.
+The platform decodes the files, and the game only holds handles. Calls record commands into a preallocated buffer.
+At the end of the frame, after the render commands, the engine hands the buffer to `IAudioBackend.Submit` in one call,
+which also returns what the platform reports (decode results).
+
+```csharp
+public void Initialize(AssetManager assets, Graphics graphics, Audio audio)
+{
+    _audio = audio;
+    _clickFile = assets.Request<byte[]>(AssetPaths.CylinderClick);     // a sound is a byte[] asset
+}
+
+public void Update(in FrameContext context, ReadOnlySpan<RawInputEvent> events)
+{
+    if (!_hasClick && _assets.TryGet(_clickFile, out var bytes))
+    {
+        _click = _audio.CreateSound(bytes);                            // one interop call; the platform decodes it
+        _assets.Release(_clickFile);                                   // the platform keeps its own copy
+        _hasClick = true;
+    }
+
+    if (_hasClick && context.Input.IsPressed(PointerButton.Primary))
+    {
+        _audio.Play(_click, AudioBus.Sfx, new SoundOptions { Pitch = 0.95f + (0.1f * _random.NextSingle()) });
+    }
+}
+```
+
+- **Sounds.** `Audio.CreateSound(bytes)` returns a `Sound` handle (id and generation, like `Texture`). The platform
+  decodes asynchronously. `GetState` is `Decoding`, then `Ready` or `Failed` (a corrupt file or an unsupported
+  format; the platform logs why). The state changes only at the end of a frame. Sounds can be created from the first
+  frame on; in `Initialize` it throws, like textures. `DestroySound` stops every voice of the sound, and the engine
+  destroys the remaining sounds when the run ends.
+- **One-shots.** `Play(sound, bus, options)` is fire and forget. It is skipped while the sound is not `Ready`. The
+  platform drops it while audio is locked (before the player's first click or key press) and when
+  `AudioLimits.MaxVoices` (32) voices already play on Sfx and Ambience. Vary `Pitch` a little per play, so repeated
+  effects do not sound mechanical.
+- **Loops.** `PlayLoop(sound, bus, options, fadeIn)` returns a `Voice`. `SetVoice` changes its volume, pitch and pan,
+  and it is cheap enough to call every frame (for example to follow the pointer speed). `Stop(voice, fadeOut)` fades
+  it out. A stopped voice is stale, and using it throws. A loop of a sound that is still decoding starts once the
+  sound is ready. Loops are never dropped, and a loop started before the unlock plays once audio unlocks.
+- **Music.** `PlayMusic(sound, crossfade, volume)` loops one track on the Music bus. A new track crossfades with the
+  old one, and the same track again does nothing. `StopMusic(fade)` fades it out, and `Music` is the current track.
+  Music does not count against the voice limit.
+- **Buses.** Every voice plays on `Sfx`, `Ambience` or `Music`, and the three feed `Master`. `SetBusVolume(bus,
+  volume)` sets one, and setting `Master` to 0 mutes everything. Bus volumes go back to 1 when the run ends.
+- **Units.** Volume is a linear gain (at least 0). Pitch is a playback rate in `(0, 16]`, so 2 is an octave up and
+  twice as fast. Pan runs from -1 (left) to 1 (right). Changes to a playing voice or a bus are smoothed over about
+  10 ms, so they never click. `default(SoundOptions)` has zero volume and pitch: start from `new SoundOptions { ... }`.
+- **When.** Commands may be recorded in `Initialize`, `FixedUpdate` and `Update`. In `PrepareRender` and `Render` they
+  throw, because those only draw. A sound plays as soon as the frame's commands reach the platform, so it lands up to
+  one frame (about 16 ms) after its input event. Nothing is scheduled by event time.
+- **Files.** Ship short effects as 16-bit mono WAV (22 or 44 kHz): every browser decodes WAV, it loops without a gap,
+  and itch.io gzips `.wav`. Ship music and ambience loops as OGG Vorbis. MP3 and AAC add encoder padding, which
+  leaves a gap at the loop point. Safari decodes Ogg only from 18.4 on, so older Safari plays the game without music
+  and ambience, but with effects. Keep the file count low (itch.io allows at most 1000 files). A decoded sound takes
+  `seconds x rate x channels x 4` bytes of JS memory: a minute of 44.1 kHz stereo is about 21 MB.
+
+`samples/SoundBoard` plays every kind of sound with test files synthesized by its `generate-sounds.py`.
+
+### Command stream
+
+| Command | Arguments (32-bit, little-endian) |
+| --- | --- |
+| `Play` (1) | Sound id, bus, volume, pitch, pan. |
+| `PlayLoop` (2) | Voice id, sound id, bus, volume, pitch, pan, fade-in seconds. |
+| `SetVoice` (3) | Voice id, volume, pitch, pan. |
+| `StopVoice` (4) | Voice id, fade-out seconds. The id is free again once the command runs. |
+| `SetBusVolume` (5) | Bus, volume. |
+
+Ids and buses are `int32`, everything else is `float32`. The engine chooses voice ids, so a loop costs no reply.
+`IAudioBackend.Submit` writes `AudioEvent`s (8 bytes: kind, sound id) into a span: `SoundReady` (1) or
+`SoundFailed` (2). Sounds are created and destroyed through their own calls (`CreateSound`, `DestroySound`),
+outside the stream, because the file bytes would not fit in it. A destroy reaches the platform after the frame's
+commands, so commands recorded before it in the same frame still see the sound.
+`tests/fixtures/audio-frame.json` holds one encoded frame that both `AudioTests` (C# must write these bytes) and
+`tests/js/webaudio.test.mjs` (the backend must run them) check.
+
+### Browser audio
+
+`BrowserPlatform.Audio` is a `BrowserAudio` on `wwwroot/webaudio.js`. `RunAsync` imports the module and calls `init()`
+before the first frame. `init()` creates the `AudioContext`, the four bus `GainNode`s and the listeners. Without
+Web Audio the module stays silent: every sound reports `SoundFailed`, and commands are dropped.
+
+- **Graph.** A voice is `AudioBufferSourceNode -> GainNode -> StereoPannerNode -> bus gain -> master gain ->
+  destination`. One-shots create their nodes when they play and disconnect them on `ended`. Changes use
+  `setTargetAtTime`, fades use `linearRampToValueAtTime`, and a stop without a fade still ramps over 10 ms.
+- **Decoding.** `createSound` copies the bytes out of WASM memory and calls `decodeAudioData`. The result is queued as
+  an event for the next `submit`. A result for a sound destroyed in the meantime is dropped.
+- **Unlock.** Browsers start an `AudioContext` suspended. The first `pointerdown`, `keydown` or `touchend` on the window
+  calls `resume()`. Until then one-shots are dropped, because a suspended context would play them late, all at once.
+  Loops are created anyway and play once the context runs. On itch.io, *Click to play* provides that first gesture.
+- **Hidden page.** `visibilitychange` to hidden calls `suspend()`, because frames stop in a background tab and loops
+  would play on without the game. Back to visible calls `resume()`, but only after the unlock. Losing focus alone does
+  not suspend anything.

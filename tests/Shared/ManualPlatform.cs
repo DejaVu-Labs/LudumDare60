@@ -4,18 +4,23 @@ namespace LudumDare60.Engine.Testing;
 
 /// <summary>
 /// A platform whose frames the test drives: start <see cref="GameEngine.RunAsync"/> with it, call
-/// <see cref="Frame"/> as often as needed, then <see cref="Stop"/>. It has no asset files.
+/// <see cref="Frame"/> as often as needed, then <see cref="Stop"/>. It has no asset files unless a test sets
+/// <see cref="Assets"/>.
 /// </summary>
 internal sealed class ManualPlatform : IPlatform
 {
     private readonly TaskCompletionSource _stopped = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private IFrameSink? _frameSink;
 
-    public IAssetSource Assets { get; } = new NoAssets();
+    public IAssetSource Assets { get; init; } = new NoAssets();
 
     public FakeGraphicsBackend Backend { get; } = new();
 
     public IGraphicsBackend Graphics => Backend;
+
+    public FakeAudioBackend AudioBackend { get; } = new();
+
+    public IAudioBackend Audio => AudioBackend;
 
     public Task RunAsync(IFrameSink frameSink)
     {

@@ -2,6 +2,7 @@ using LudumDare60.Engine.Assets;
 using LudumDare60.Engine.Input;
 using LudumDare60.Engine.Platform;
 using LudumDare60.Engine.Rendering;
+using LudumDare60.Engine.Sounds;
 
 namespace LudumDare60.Engine;
 
@@ -26,6 +27,7 @@ public sealed class GameEngine : IFrameSink
     private IGame? _game;
     private AssetManager? _assets;
     private Graphics? _graphics;
+    private Audio? _audio;
     private SpriteBatch? _batch;
     private readonly InputRouter _input = new();
     private PixelViewport _viewport;
@@ -57,9 +59,9 @@ public sealed class GameEngine : IFrameSink
     /// <summary>
     /// Runs <paramref name="game"/> on <paramref name="platform"/> until the platform stops. Frame counters and
     /// accumulated time start from zero on every run. Each run gets a new <see cref="AssetManager"/> on
-    /// <see cref="IPlatform.Assets"/> and a new <see cref="Graphics"/> on <see cref="IPlatform.Graphics"/>: both are
-    /// passed to <see cref="IGame.Initialize"/> before the first frame, and everything they hold is unloaded or
-    /// destroyed when the run ends.
+    /// <see cref="IPlatform.Assets"/>, a new <see cref="Graphics"/> on <see cref="IPlatform.Graphics"/> and a new
+    /// <see cref="Audio"/> on <see cref="IPlatform.Audio"/>: all three are passed to <see cref="IGame.Initialize"/>
+    /// before the first frame, and everything they hold is unloaded or destroyed when the run ends.
     /// </summary>
     /// <exception cref="InvalidOperationException">The engine is already running a game.</exception>
     public async Task RunAsync(IGame game, IPlatform platform)
@@ -74,9 +76,11 @@ public sealed class GameEngine : IFrameSink
 
         var assets = new AssetManager(platform.Assets);
         var graphics = new Graphics(platform.Graphics);
+        var audio = new Audio(platform.Audio);
         _game = game;
         _assets = assets;
         _graphics = graphics;
+        _audio = audio;
         _batch = new SpriteBatch(graphics);
         _viewport = PixelViewport.Fit(VirtualWidth, VirtualHeight, VirtualWidth, VirtualHeight, 1);
         _input.Reset(in _viewport);
@@ -86,16 +90,16 @@ public sealed class GameEngine : IFrameSink
         _fixedStepIndex = 0;
         try
         {
-            game.Initialize(assets, graphics);
+            game.Initialize(assets, graphics, audio);
             await platform.RunAsync(this);
         }
         catch
         {
-            EndRun(assets, graphics, runFailed: true);
+            EndRun(assets, graphics, audio, runFailed: true);
             throw;
         }
 
-        EndRun(assets, graphics, runFailed: false);
+        EndRun(assets, graphics, audio, runFailed: false);
     }
 
     /// <summary>
@@ -112,6 +116,7 @@ public sealed class GameEngine : IFrameSink
     {
         var game = GetRunningGame();
         _graphics!.BeginFrame();
+        _audio!.BeginFrame();
         _assets!.Update();
         ApplyResize(events);
 
@@ -136,12 +141,14 @@ public sealed class GameEngine : IFrameSink
         game.Update(in context, events);
         _frameIndex++;
 
+        _audio.BeginRender();
         game.PrepareRender(_accumulator / FixedDeltaTime);
     }
 
     /// <summary>
     /// Lets <see cref="IGame.Render"/> record the frame's sprites, then submits them to the GPU in one call and deletes
-    /// the textures destroyed during the frame.
+    /// the textures destroyed during the frame. Then submits the frame's audio commands in one call, applies the
+    /// platform's decode results and deletes the sounds destroyed during the frame.
     /// </summary>
     /// <exception cref="InvalidOperationException">No game is running.</exception>
     public void Render()
@@ -152,17 +159,19 @@ public sealed class GameEngine : IFrameSink
         game.Render(batch);
         batch.End();
         _graphics!.EndFrame();
+        _audio!.EndFrame();
     }
 
     /// <summary>
-    /// Stops accepting frames, unloads the run's assets and destroys its textures. After a failed run, a failing unload
-    /// or destroy is dropped, so the caller sees the exception that ended the run, not a later one.
+    /// Stops accepting frames, unloads the run's assets and destroys its textures and sounds. After a failed run, a
+    /// failing unload or destroy is dropped, so the caller sees the exception that ended the run, not a later one.
     /// </summary>
-    private void EndRun(AssetManager assets, Graphics graphics, bool runFailed)
+    private void EndRun(AssetManager assets, Graphics graphics, Audio audio, bool runFailed)
     {
         _game = null;
         _assets = null;
         _graphics = null;
+        _audio = null;
         _batch = null;
         try
         {
@@ -174,7 +183,14 @@ public sealed class GameEngine : IFrameSink
         }
         finally
         {
-            DestroyTextures(graphics, runFailed);
+            try
+            {
+                DestroyTextures(graphics, runFailed);
+            }
+            finally
+            {
+                DestroySounds(audio, runFailed);
+            }
         }
     }
 
@@ -187,6 +203,18 @@ public sealed class GameEngine : IFrameSink
         catch (AggregateException) when (runFailed)
         {
             // Every texture is destroyed anyway (see Graphics.DestroyAll); the run's exception is rethrown.
+        }
+    }
+
+    private static void DestroySounds(Audio audio, bool runFailed)
+    {
+        try
+        {
+            audio.DestroyAll();
+        }
+        catch (AggregateException) when (runFailed)
+        {
+            // Every sound is destroyed anyway (see Audio.DestroyAll); the run's exception is rethrown.
         }
     }
 

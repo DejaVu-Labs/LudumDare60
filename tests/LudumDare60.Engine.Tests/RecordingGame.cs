@@ -1,6 +1,7 @@
 using LudumDare60.Engine.Assets;
 using LudumDare60.Engine.Platform;
 using LudumDare60.Engine.Rendering;
+using LudumDare60.Engine.Sounds;
 
 namespace LudumDare60.Engine.Tests;
 
@@ -39,6 +40,11 @@ internal sealed class RecordingGame : IGame
     public Graphics? Graphics { get; private set; }
 
     /// <summary>
+    /// The audio passed to <see cref="Initialize"/>.
+    /// </summary>
+    public Audio? Audio { get; private set; }
+
+    /// <summary>
     /// Runs inside <see cref="Initialize"/>, after the call is recorded.
     /// </summary>
     public Action<AssetManager, Graphics>? OnInitialize { get; set; }
@@ -63,12 +69,34 @@ internal sealed class RecordingGame : IGame
     /// </summary>
     public Action<SpriteBatch>? OnRender { get; set; }
 
-    public void Initialize(AssetManager assets, Graphics graphics)
+    /// <summary>
+    /// Runs inside <see cref="Initialize"/>, after <see cref="OnInitialize"/>.
+    /// </summary>
+    public Action<Audio>? OnInitializeAudio { get; set; }
+
+    /// <summary>
+    /// Runs inside <see cref="Update"/>, after <see cref="OnUpdateContext"/>.
+    /// </summary>
+    public Action<Audio>? OnUpdateAudio { get; set; }
+
+    /// <summary>
+    /// Runs inside <see cref="PrepareRender"/>, after the call is recorded.
+    /// </summary>
+    public Action<Audio>? OnPrepareRenderAudio { get; set; }
+
+    /// <summary>
+    /// Runs inside <see cref="Render"/>, after <see cref="OnRender"/>.
+    /// </summary>
+    public Action<Audio>? OnRenderAudio { get; set; }
+
+    public void Initialize(AssetManager assets, Graphics graphics, Audio audio)
     {
         Record(nameof(Initialize));
         Assets = assets;
         Graphics = graphics;
+        Audio = audio;
         OnInitialize?.Invoke(assets, graphics);
+        OnInitializeAudio?.Invoke(audio);
     }
 
     public void FixedUpdate(in FrameContext context)
@@ -85,18 +113,21 @@ internal sealed class RecordingGame : IGame
         UpdateEvents.Add(events.ToArray());
         OnUpdate?.Invoke(Graphics!);
         OnUpdateContext?.Invoke(context);
+        OnUpdateAudio?.Invoke(Audio!);
     }
 
     public void PrepareRender(double alpha)
     {
         Record(nameof(PrepareRender));
         Alphas.Add(alpha);
+        OnPrepareRenderAudio?.Invoke(Audio!);
     }
 
     public void Render(SpriteBatch batch)
     {
         Record(nameof(Render));
         OnRender?.Invoke(batch);
+        OnRenderAudio?.Invoke(Audio!);
     }
 
     private void Record(string call)

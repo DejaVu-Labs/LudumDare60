@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using LudumDare60.Engine.Assets;
 using LudumDare60.Engine.Platform;
 using LudumDare60.Engine.Rendering;
+using LudumDare60.Engine.Sounds;
 
 namespace LudumDare60.Engine.Tests;
 
@@ -374,7 +375,7 @@ public sealed class GameEngineTests
     {
         public bool SawPlatformMemory { get; private set; }
 
-        public void Initialize(AssetManager assets, Graphics graphics)
+        public void Initialize(AssetManager assets, Graphics graphics, Audio audio)
         {
         }
 
@@ -410,7 +411,7 @@ public sealed class GameEngineTests
 
         public List<AssetState> FixedUpdateStates { get; } = [];
 
-        public void Initialize(AssetManager assets, Graphics graphics)
+        public void Initialize(AssetManager assets, Graphics graphics, Audio audio)
         {
             Assets = assets;
             assets.Register(Loader);
