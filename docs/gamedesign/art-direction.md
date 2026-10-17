@@ -1,6 +1,6 @@
 # Art direction
 
-Art direction for *Six Chambers* (see [concepts.md](concepts.md)). Status: draft, before concept art.
+Art direction for *Six Chambers* (see [concepts.md](concepts.md)). Status: draft; the palette comes from the first concept art.
 
 ## Format
 
@@ -17,9 +17,9 @@ Art direction for *Six Chambers* (see [concepts.md](concepts.md)). Status: draft
 
 The palette is split by meaning, not only by material:
 
-- **The modern world is cool:** night-city blue from the shop window, white LED light, gray plastic.
-- **The antique objects are warm:** brass, walnut, blued steel with warm highlights, yellowed paper.
-- **The cutting mat is green** with a lighter grid. It has the strongest contrast on screen, so that every
+- **The modern world is cool:** night-city blue from the shop window and the rain, the glow of a phone screen.
+- **The antique objects are warm:** brass, walnut, steel gone warm-gray with rust, yellowed paper.
+- **The cutting mat is teal** with a lighter grid. It has the strongest contrast on screen, so that every
   part reads against it.
 
 The eye goes to the warm objects first, and those are what the player works with.
@@ -27,22 +27,26 @@ The eye goes to the warm objects first, and those are what the player works with
 Palette swaps carry variety: grip material, customer skin and clothes, and time of day in the shop window
 (evening, night with rain, morning).
 
-## Palette (draft)
+## Palette
 
-29 colors. Trim to about 24 after the first concept sprites: merge steps that never appear next to each other.
+32 colors, taken from the main screen concept: `art/palette/six-chambers.gpl` (Aseprite: Load Palette) and
+`six-chambers.png` (one pixel per color), in the order below. The 640x360 underlays in `art/reference/` come as they
+are and reduced to the palette (nearest color in OKLab, no dithering).
 
 | Group | Colors |
 | --- | --- |
-| Ink | `#0e0f17` |
-| Modern, cool | `#1a2233` `#2a3a52` `#44607f` `#7a9cbc` `#c4d8e8` `#f2f7fa` |
-| Plastic | `#5e636e` `#9aa0aa` |
-| Cutting mat | `#173a30` `#245c48` `#3f8466` `#5fa585` (grid) |
-| Brass | `#6b4a1f` `#a8782b` `#d9ab45` `#f5dc8a` |
-| Walnut | `#3f2419` `#6e3f2a` `#9c6340` |
-| Blued steel | `#23262f` `#444a57` (highlights reuse `#7a9cbc` and `#f5dc8a`) |
-| Rust | `#8e3b1f` `#c45f2a` |
-| Paper | `#e2d3b0` `#fff3d6` |
-| Skin | `#8a5a44` `#c98e6b` `#f0c7a0` |
+| Ink | `#0d0a0a` `#0c171e` (cool) |
+| Steel, warm gray | `#2c201b` `#453a30` `#5f5247` `#b3a99b` |
+| Walnut, rust, copper (dark to light) | `#1e0d09` `#2b120b` `#402219` `#4c291e` `#622a14` `#6c3721` `#823d1e` `#944f2d` `#a1603b` `#b37149` `#d2834a` |
+| Brass, paper, warm light | `#e2ad5f` `#fbe099` `#faebbc` |
+| Cutting mat | `#054440` `#0b4f45` `#165a4a` `#306d59` (grid) `#4b6e43` (lit by the lamp) |
+| Modern, cool | `#0d222c` `#16303f` `#243a5a` `#2e4a70` `#3c608c` `#5479a1` `#8da9cc` |
+
+- There is no separate skin or plastic ramp: skin uses the warm ramp (`#b37149` to `#e2ad5f`), plastic the cool one.
+- The steel grays cover few pixels of a background, but they are the main colors of the revolver parts. Do not merge
+  them away.
+- Keep 32 colors for now. Trim (towards 24) only after the first sprites, by merging steps that never appear next to
+  each other.
 
 ## Concept art prompts
 
@@ -55,7 +59,7 @@ Put the style block before every prompt so the screens look like one game.
 **Style block:**
 
 ```text
-Pixel art game screen, strict pixel grid at 640x360 resolution upscaled with nearest neighbor, every pixel the same size, no anti-aliasing, no blur, no mixed pixel sizes, no gradients, limited palette of about 24 colors, clean readable shapes, cozy quiet mood. Setting: a small present-day city shop of a restorer of antique 19th-century revolvers. Color logic: the modern world is cool (night-city blue, white LED light, gray plastic), the antique objects are warm (brass, walnut wood, blued steel with warm highlights, yellowed paper). No visible text or letters, no logos, no blood, no violence.
+Pixel art game screen, strict pixel grid at 640x360 resolution upscaled with nearest neighbor, every pixel the same size, no anti-aliasing, no blur, no mixed pixel sizes, no gradients, limited palette of about 32 colors, clean readable shapes, cozy quiet mood. Setting: a small present-day city shop of a restorer of antique 19th-century revolvers. Color logic: the modern world is cool (night-city blue, white LED light, gray plastic), the antique objects are warm (brass, walnut wood, blued steel with warm highlights, yellowed paper). No visible text or letters, no logos, no blood, no violence.
 ```
 
 **Main screen (counter and bench):**

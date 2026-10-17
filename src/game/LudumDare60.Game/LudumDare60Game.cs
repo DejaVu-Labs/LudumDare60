@@ -9,9 +9,9 @@ using LudumDare60.Engine.Sounds;
 namespace LudumDare60.Game;
 
 /// <summary>
-/// The Ludum Dare 60 game. For now a placeholder scene that exercises the renderer and input: the cutting mat color, a
-/// sprite that follows the pointer and grows while the primary button is down, a rotating tinted one and a flipped,
-/// scaled one. It goes away once the real art arrives.
+/// The Ludum Dare 60 game. For now the bench background (the cutting mat color until it loads) under a placeholder
+/// scene that exercises the renderer and input: a sprite that follows the pointer and grows while the primary button
+/// is down, a rotating tinted one and a flipped, scaled one. The placeholders go away once the real art arrives.
 /// </summary>
 public sealed class LudumDare60Game : IGame
 {
@@ -24,13 +24,16 @@ public sealed class LudumDare60Game : IGame
     public const int VirtualHeight = 360;
 
     /// <summary>
-    /// The cutting mat, the background of the bench.
+    /// The cutting mat, the screen color until the background is loaded.
     /// </summary>
-    public static readonly Color MatColor = Color.FromRgb(0x245c48);
+    public static readonly Color MatColor = Color.FromRgb(0x0b4f45);
 
     private static readonly Color s_brassTint = Color.FromRgb(0xd9ab45).WithAlpha(200);
 
+    private AssetManager? _assets;
     private Graphics? _graphics;
+    private AssetHandle<Image> _benchImage;
+    private Texture _bench;
     private Texture _placeholder;
     private bool _hasPlaceholder;
     private float _time;
@@ -45,7 +48,19 @@ public sealed class LudumDare60Game : IGame
     /// </summary>
     public bool IsHolding { get; private set; }
 
-    public void Initialize(AssetManager assets, Graphics graphics, Audio audio) => _graphics = graphics;
+    /// <summary>
+    /// Whether the bench background is loaded and drawn.
+    /// </summary>
+    public bool HasBackground { get; private set; }
+
+    public void Initialize(AssetManager assets, Graphics graphics, Audio audio)
+    {
+        ArgumentNullException.ThrowIfNull(assets);
+        _assets = assets;
+        _graphics = graphics;
+        assets.Register(new ImageLoader());
+        _benchImage = assets.Request<Image>(AssetPaths.Bench);
+    }
 
     public void FixedUpdate(in FrameContext context)
     {
@@ -58,6 +73,14 @@ public sealed class LudumDare60Game : IGame
             // Textures can be created from the first frame on.
             _placeholder = _graphics!.CreateTexture(PlaceholderSprite.Create());
             _hasPlaceholder = true;
+        }
+
+        if (!HasBackground && _assets!.TryGet(_benchImage, out var bench))
+        {
+            // The texture keeps no copy of the pixels, and nothing reads them back, so the image can go.
+            _bench = _graphics!.CreateTexture(bench);
+            _assets.Release(_benchImage);
+            HasBackground = true;
         }
 
         PointerPosition = context.Input.PointerPosition;
@@ -73,6 +96,11 @@ public sealed class LudumDare60Game : IGame
     {
         ArgumentNullException.ThrowIfNull(batch);
         batch.Clear(MatColor);
+        if (HasBackground)
+        {
+            batch.Draw(_bench, Vector2.Zero);
+        }
+
         if (!_hasPlaceholder)
         {
             return;

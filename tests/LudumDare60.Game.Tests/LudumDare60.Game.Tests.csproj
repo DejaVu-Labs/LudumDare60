@@ -10,4 +10,9 @@
     <Compile Include="..\Shared\ManualPlatform.cs" Link="Shared\ManualPlatform.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The shipped asset files, so tests load the real background. -->
+    <None Include="..\..\src\game\LudumDare60.Game.Browser\wwwroot\assets\**" LinkBase="assets" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

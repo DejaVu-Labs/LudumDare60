@@ -28,7 +28,7 @@ public sealed class LudumDare60GameTests
         var frame = Assert.Single(_platform.Backend.Frames);
         var commands = frame.Decode();
         Assert.Equal(RenderCommandKind.Clear, commands[1].Kind);
-        Assert.Equal(BitConverter.ToInt32([0x24, 0x5c, 0x48, 0xff]), commands[1].Arguments[0]);
+        Assert.Equal(BitConverter.ToInt32([0x0b, 0x4f, 0x45, 0xff]), commands[1].Arguments[0]);
         Assert.Equal(3, frame.Instances.Length);
         Assert.Equal(new RenderCommand(RenderCommandKind.DrawSprites, [0, 0, 3]), commands[2]);
     }
@@ -70,5 +70,75 @@ public sealed class LudumDare60GameTests
 
         Assert.Single(_platform.Backend.Textures);
         Assert.Equal(2, _platform.Backend.Frames.Count);
+    }
+
+    [Fact]
+    public void FirstFrame_NoBackgroundFile_DrawsMatAndPlaceholdersOnly()
+    {
+        _platform.Frame(0);
+
+        Assert.False(_game.HasBackground);
+        Assert.Single(_platform.Backend.Textures);
+    }
+
+    [Fact]
+    public void FirstFrame_BackgroundFileShipped_CreatesScreenSizedTexture()
+    {
+        var (platform, game) = StartWithShippedAssets();
+
+        platform.Frame(0);
+
+        Assert.True(game.HasBackground);
+        Assert.Contains($"create 1 {LudumDare60Game.VirtualWidth}x{LudumDare60Game.VirtualHeight}", platform.Backend.Calls, StringComparer.Ordinal);
+    }
+
+    [Fact]
+    public void Render_BackgroundLoaded_DrawsItFirstAtTheOrigin()
+    {
+        var (platform, _) = StartWithShippedAssets();
+
+        platform.Frame(0);
+
+        var frame = Assert.Single(platform.Backend.Frames);
+        Assert.Equal(4, frame.Instances.Length);
+        var background = frame.Instances[0];
+        Assert.Equal(Vector2.Zero, background.Position);
+        Assert.Equal(LudumDare60Game.VirtualWidth, background.SourceWidth);
+        Assert.Equal(LudumDare60Game.VirtualHeight, background.SourceHeight);
+        var commands = frame.Decode();
+        Assert.Equal(RenderCommandKind.Clear, commands[1].Kind);
+        Assert.Equal(new RenderCommand(RenderCommandKind.DrawSprites, [1, 0, 1]), commands[2]);
+        Assert.Equal(new RenderCommand(RenderCommandKind.DrawSprites, [0, 1, 3]), commands[3]);
+    }
+
+    [Fact]
+    public void Frames_BackgroundLoaded_CreatesItsTextureOnce()
+    {
+        var (platform, _) = StartWithShippedAssets();
+
+        platform.Frame(0);
+        platform.Frame(0.01);
+
+        Assert.Equal(2, platform.Backend.Textures.Count);
+        Assert.Equal(4, platform.Backend.Frames[1].Instances.Length);
+    }
+
+    private static (ManualPlatform Platform, LudumDare60Game Game) StartWithShippedAssets()
+    {
+        var platform = new ManualPlatform { Assets = new ShippedAssets() };
+        var game = new LudumDare60Game();
+        _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(game, platform);
+        return (platform, game);
+    }
+
+    /// <summary>
+    /// Reads the files of <c>wwwroot/assets/</c>, copied next to the test assembly.
+    /// </summary>
+    private sealed class ShippedAssets : IAssetSource
+    {
+        // Reads finish at once, so a file requested in Initialize is loaded in the first frame.
+        public Task<byte[]> ReadAsync(string path) => Task.FromResult(Read(path));
+
+        private static byte[] Read(string path) => File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "assets", path));
     }
 }
