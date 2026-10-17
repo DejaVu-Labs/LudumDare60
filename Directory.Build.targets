@@ -1,5 +1,21 @@
 <Project>
 
-  <!-- Intentionally empty: shared targets go here when needed. -->
+  <!--
+    Static web assets libraries (LudumDare60.Engine.Platform.Browser) add their development manifests,
+    <name>.staticwebassets.runtime.json and <name>.staticwebassets.endpoints.json, as content, so they are copied into
+    the output of every project that references them. `dotnet run` on the browser game starts WasmAppHost, which does
+    not pick the manifests named after the app when several sit next to it: with the library's manifests present it
+    returned 404 for index.html, .pdb and .dat files. The app's own manifests already list the library's assets, so the
+    library copies are not needed. Runs before GetCopyToOutputDirectoryItems, after the targets that add the items.
+  -->
+  <Target Name="RemoveLibraryStaticWebAssetsManifests"
+          BeforeTargets="GetCopyToOutputDirectoryItems"
+          DependsOnTargets="AddStaticWebAssetsManifest;AddStaticWebAssetEndpointsBuildManifest"
+          Condition="'$(UsingMicrosoftNETSdkStaticWebAssets)' == 'true' and '$(OutputType)' == 'Library'">
+    <ItemGroup>
+      <ContentWithTargetPath Remove="$(StaticWebAssetDevelopmentManifestPath)" />
+      <ContentWithTargetPath Remove="$(StaticWebAssetEndpointsBuildManifestPath)" />
+    </ItemGroup>
+  </Target>
 
 </Project>
