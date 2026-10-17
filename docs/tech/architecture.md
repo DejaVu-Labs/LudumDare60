@@ -11,7 +11,7 @@ LudumDare60.Game.Browser ──► LudumDare60.Game ──► LudumDare60.Engine
 | Project | SDK | Role |
 | --- | --- | --- |
 | `src/engine/LudumDare60.Engine.Platform` | `Microsoft.NET.Sdk` | Platform contracts: `IPlatform`, `IFrameSink`, raw input (`RawInputEvent`, `RawInputEventKind`, `Key`, `PointerType`), asset reads (`IAssetSource`, `AssetLoadException`). No dependencies. |
-| `src/engine/LudumDare60.Engine` | `Microsoft.NET.Sdk` | `GameEngine`, `IGame`, `FrameContext`, `Assets/` (`AssetManager` and loaders), `Rendering/` (`PixelViewport`). Depends only on the platform contracts. |
+| `src/engine/LudumDare60.Engine` | `Microsoft.NET.Sdk` | `GameEngine`, `IGame`, `FrameContext`, `Assets/` (`AssetManager` and loaders), `Rendering/` (`PixelViewport`). Depends only on the platform contracts and the managed `StbImageSharp` package (image decoding). |
 | `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `Microsoft.NET.Sdk.StaticWebAssets` | `BrowserPlatform : IPlatform` and its JS: `wwwroot/boot.js` (runtime start), `wwwroot/frame-loop.js`, `wwwroot/input.js` and `wwwroot/assets.js`. Its `wwwroot/` ships with the app under `_content/LudumDare60.Engine.Platform.Browser/`. |
 | `src/game/LudumDare60.Game` | `Microsoft.NET.Sdk` | `LudumDare60Game : IGame`. No platform dependency. |
 | `src/game/LudumDare60.Game.Browser` | `Microsoft.NET.Sdk.WebAssembly` | Entry point, host page and `main.js`. Only wires the game and the browser platform together. |
@@ -119,7 +119,8 @@ public void Update(in FrameContext context, ReadOnlySpan<RawInputEvent> events)
   are unloaded too, and the failures are thrown afterwards as one `AggregateException`.
 - **Loaders.** `IAssetLoader<T>.Load(path, data)` turns the file bytes into a `T` and owns the array. Register them
   explicitly with `Register<T>`; there is no reflection. `RawBytesLoader` (`byte[]`, the file itself) is registered
-  in every manager. Parsers for images, Aseprite files, fonts, sounds and JSON are not written yet (see
+  in every manager. `ImageLoader` (`Image`, see [Images](#images)) is not: register it when the game has images.
+  Parsers for Aseprite files, fonts, sounds and JSON are not written yet (see
   [docs/backlog.md](../backlog.md#asset-parsers)). One asset is one file: a loader cannot depend on other assets.
 - **Errors.** A failed read or a throwing loader moves the asset to `Failed`. `GetError` returns an
   `AssetLoadException` with the path, the HTTP status (0 without a response) and the original error as
@@ -127,6 +128,29 @@ public void Update(in FrameContext context, ReadOnlySpan<RawInputEvent> events)
 - **Paths** are checked by `AssetPath.IsValid` before anything is read: relative, `/` separators, segments of
   lowercase ASCII letters, digits, `-`, `_` and `.`, and no empty, `.` or `..` segment. Upper case is rejected on
   purpose: itch.io file names are case-sensitive, and the desktop tests catch the mistake.
+
+### Images
+
+`ImageLoader` decodes image files with [StbImageSharp](https://github.com/StbSharp/StbImageSharp), a managed C# port
+of `stb_image.h` (no native code, no reflection, marked trimmable). It is not built into `AssetManager`, so a game that
+never registers it does not ship the decoder.
+
+```csharp
+assets.Register(new ImageLoader());
+_revolver = assets.Request<Image>(AssetPaths.Revolver);
+```
+
+- **Format.** `Image` holds 8-bit RGBA pixels, row by row from the top-left corner, rows tightly packed
+  (`Stride = Width * 4`), straight alpha. This is the `rgba8unorm` texture layout, so the pixels upload as they are.
+  Every file is expanded to it: gray goes to red, green and blue, and a missing alpha channel is opaque. Pixels are
+  not premultiplied and rows are not flipped; a WebGL2 upload that wants bottom-up rows flips at upload time.
+- **Files.** Ship PNG. The decoder also reads JPEG, BMP, TGA, PSD, HDR (reduced to 8 bits) and the first frame of a
+  GIF, but JPEG artifacts ruin pixel art, and Aseprite files get their own parser.
+- **Memory.** Decoding allocates the pixel array once, at load time in `AssetManager.Update`, and `Image` keeps it.
+  `Image.Pixels` is a `ReadOnlySpan<byte>`: one loaded image is shared by every handle to its path. Unloading drops the
+  array for the GC.
+- **Errors.** An empty, corrupt or unsupported file throws `InvalidOperationException` with stb's reason
+  (`unknown image type`, `bad png sig`, ...), and the asset becomes `Failed` like any other parse failure.
 
 ### Browser assets
 

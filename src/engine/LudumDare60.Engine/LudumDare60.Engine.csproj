@@ -4,4 +4,8 @@
     <ProjectReference Include="..\LudumDare60.Engine.Platform\LudumDare60.Engine.Platform.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="StbImageSharp" />
+  </ItemGroup>
+
 </Project>

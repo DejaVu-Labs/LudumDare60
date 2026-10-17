@@ -44,7 +44,6 @@ interpolated simulation state. Try the `desynchronized` canvas context hint and 
 `IAssetLoader<T>` implementations for the types the game needs. The asset manager keeps every file as bytes in WASM
 memory, so parsing happens in C#.
 
-- Images (PNG): decode to RGBA for texture upload.
 - Aseprite animations: parse `.aseprite` directly (pixels are zlib-compressed, `ZLibStream` works in WASM). No export
   to PNG + JSON, because one asset is one file.
 - Fonts (TTF): glyph outlines or a baked atlas, depending on the text renderer.
