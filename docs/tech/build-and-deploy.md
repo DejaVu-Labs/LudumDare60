@@ -27,8 +27,8 @@ Game projects use `Sdk="Microsoft.NET.Sdk.WebAssembly"`. The root `Directory.Bui
 Release publish:
 
 ```bash
-dotnet publish src/<Game> -c Release
-# output: artifacts/publish/<Game>/release/wwwroot/
+dotnet publish src/game/LudumDare60.Game.Browser -c Release
+# output: artifacts/publish/LudumDare60.Game.Browser/release/wwwroot/
 ```
 
 Reference point, measured on 2026-10-17 with SDK 10.0.402: an empty `wasmbrowser` app published in Release with
@@ -69,7 +69,7 @@ Source: <https://itch.io/docs/creators/html5> (checked 2026-10-17).
 Source: <https://itch.io/docs/butler/pushing.html>.
 
 ```bash
-butler push artifacts/publish/<Game>/release/wwwroot <user>/<game>:html5 --userversion 0.1.0 --if-changed
+butler push artifacts/publish/LudumDare60.Game.Browser/release/wwwroot <user>/<game>:html5 --userversion 0.1.0 --if-changed
 butler status <user>/<game>:html5
 ```
 

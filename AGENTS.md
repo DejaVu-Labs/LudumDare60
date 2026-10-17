@@ -21,7 +21,9 @@ itch.io as an HTML5 build and is pushed with `butler`.
 
 | Path | Contents |
 | --- | --- |
-| `src/` | Shipping projects: the game, the engine and platform code, JS glue in each project's `wwwroot/`. |
+| `src/engine/LudumDare60.Engine` | Engine class library: math, simulation core, renderer abstraction. Never references the game. |
+| `src/game/LudumDare60.Game` | Game class library: rules, content, state. References the engine and has no browser dependency. |
+| `src/game/LudumDare60.Game.Browser` | `wasmbrowser` app and entry point: JS interop, WebGPU and WebGL2 backends, `wwwroot/`. References the game. |
 | `tests/` | C# test projects (`*.Tests`, xUnit v3 on Microsoft.Testing.Platform) and `tests/js/` (Node test runner). |
 | `samples/` | Small runnable experiments (renderer backends, interop spikes). Same rules as `src/`. |
 | `docs/tech/` | Technical docs: architecture, build and deploy, guidelines. |
@@ -35,8 +37,9 @@ dotnet build                                   # Debug build of the whole soluti
 dotnet test                                    # all C# tests (Microsoft.Testing.Platform runner, see global.json)
 npm test                                       # JS tests (node --test tests/js/)
 dotnet format --verify-no-changes              # formatting check, as CI runs it
-dotnet publish src/<Game> -c Release           # AOT + trimmed browser build -> artifacts/publish/<Game>/release/wwwroot
-butler push <wwwroot> <user>/<game>:html5 --userversion <ver>
+dotnet publish src/game/LudumDare60.Game.Browser -c Release
+# AOT + trimmed browser build -> artifacts/publish/LudumDare60.Game.Browser/release/wwwroot
+butler push artifacts/publish/LudumDare60.Game.Browser/release/wwwroot <user>/<game>:html5 --userversion <ver>
 ```
 
 Release AOT publishing is slow (several minutes for an empty app). Use Debug for iteration and publish Release
