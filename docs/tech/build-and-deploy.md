@@ -27,9 +27,13 @@ Game projects use `Sdk="Microsoft.NET.Sdk.WebAssembly"`. The root `Directory.Bui
 Release publish:
 
 ```bash
+rm -rf artifacts/publish/LudumDare60.Game.Browser
 dotnet publish src/game/LudumDare60.Game.Browser -c Release
 # output: artifacts/publish/LudumDare60.Game.Browser/release/wwwroot/
 ```
+
+Always delete the publish folder first. `dotnet publish` does not clean it, and asset names carry a content hash,
+so every publish adds new files next to the old ones. `butler push` would upload the stale files too.
 
 Reference point, measured on 2026-10-17 with SDK 10.0.402: an empty `wasmbrowser` app published in Release with
 these settings produced **9 files and 6.7 MB uncompressed** (`dotnet.native.wasm` is about 5.5 MB). AOT took

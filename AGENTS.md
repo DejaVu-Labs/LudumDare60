@@ -21,9 +21,11 @@ itch.io as an HTML5 build and is pushed with `butler`.
 
 | Path | Contents |
 | --- | --- |
-| `src/engine/LudumDare60.Engine` | Engine class library: math, simulation core, renderer abstraction. Never references the game. |
-| `src/game/LudumDare60.Game` | Game class library: rules, content, state. References the engine and has no browser dependency. |
-| `src/game/LudumDare60.Game.Browser` | `wasmbrowser` app and entry point: JS interop, WebGPU and WebGL2 backends, `wwwroot/`. References the game. |
+| `src/engine/LudumDare60.Engine.Platform` | Platform contracts (`IPlatform`, `IFrameSink`). No dependencies. |
+| `src/engine/LudumDare60.Engine` | Engine: `GameEngine` (fixed-step frame loop), `IGame`, `FrameContext`. Depends only on the platform contracts. Never references the game or a concrete platform. |
+| `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `BrowserPlatform : IPlatform` (StaticWebAssets SDK, so it can ship JS under `_content/`). |
+| `src/game/LudumDare60.Game` | Game class library: `LudumDare60Game : IGame`, rules, content, state. No platform dependency. |
+| `src/game/LudumDare60.Game.Browser` | `wasmbrowser` entry point and host page. Wires the game to `BrowserPlatform` and nothing else. |
 | `tests/` | C# test projects (`*.Tests`, xUnit v3 on Microsoft.Testing.Platform) and `tests/js/` (Node test runner). |
 | `samples/` | Small runnable experiments (renderer backends, interop spikes). Same rules as `src/`. |
 | `docs/tech/` | Technical docs: architecture, build and deploy, guidelines. |
@@ -37,6 +39,7 @@ dotnet build                                   # Debug build of the whole soluti
 dotnet test                                    # all C# tests (Microsoft.Testing.Platform runner, see global.json)
 npm test                                       # JS tests (node --test tests/js/)
 dotnet format --verify-no-changes              # formatting check, as CI runs it
+rm -rf artifacts/publish/LudumDare60.Game.Browser   # publish never cleans; hashed names pile up
 dotnet publish src/game/LudumDare60.Game.Browser -c Release
 # AOT + trimmed browser build -> artifacts/publish/LudumDare60.Game.Browser/release/wwwroot
 butler push artifacts/publish/LudumDare60.Game.Browser/release/wwwroot <user>/<game>:html5 --userversion <ver>
@@ -57,6 +60,13 @@ All shared settings live in the root files. Project files should hold only what 
 - `.editorconfig`: style and analyzer severities. `tests/**` relaxes the rules that conflict with xUnit conventions.
 - `global.json`: pins the SDK and selects the Microsoft.Testing.Platform runner for `dotnet test`.
 
+## Architecture
+
+Read [docs/tech/architecture.md](docs/tech/architecture.md) for the project graph and the frame loop. The
+platform drives `GameEngine` through `IFrameSink.Update(dt)` and `IFrameSink.Render()`. Each frame, the engine
+calls `IGame.FixedUpdate` (zero or more times, 1/60 s each), then `IGame.Update`, then `IGame.PrepareRender(alpha)`,
+and finally `IGame.Render`.
+
 ## Code guidelines
 
 Read [docs/tech/coding-guidelines.md](docs/tech/coding-guidelines.md) before writing engine, render or interop
@@ -69,8 +79,8 @@ code. The short version:
   it in one call. Never make one interop call per sprite or draw.
 - **The GPU gets buffers, not objects.** Use `[StructLayout(LayoutKind.Sequential)]` blittable structs that match
   the WGSL/GLSL layout, write them with `MemoryMarshal.AsBytes`, and upload them once per frame.
-- **One thread.** The browser build is single-threaded (`WasmEnableThreads=false`), so never block. Drive the
-  loop from `requestAnimationFrame` on the JS side.
+- **One thread.** The browser build is single-threaded (`WasmEnableThreads=false`), so never block.
+  `BrowserPlatform` drives frames from `requestAnimationFrame`.
 - Keep the renderer behind one backend-neutral interface, with WebGPU and WebGL2 as two implementations. Game
   code never talks to either API directly.
 

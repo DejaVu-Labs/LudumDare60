@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk.StaticWebAssets">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\LudumDare60.Engine.Platform\LudumDare60.Engine.Platform.csproj" />
+  </ItemGroup>
+
+</Project>

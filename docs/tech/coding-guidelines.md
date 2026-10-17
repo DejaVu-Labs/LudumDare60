@@ -11,8 +11,10 @@ check style and AOT safety. The rules below cover what they cannot check.
 - **One renderer abstraction, two backends.** Game code submits draw data to a backend-neutral renderer. WebGPU
   is the primary backend. WebGL2 is the fallback, picked at startup when `navigator.gpu` is missing or
   `requestAdapter()` fails. Both backends consume the same command stream.
-- **JS owns the frame loop.** `requestAnimationFrame` calls one `[JSExport]` `Frame(double timestampMs)` per
-  frame. Use a fixed simulation timestep with an accumulator, and interpolate for rendering.
+- **The platform owns timing, the engine owns the loop.** `IPlatform` (in the browser, `requestAnimationFrame`
+  through one interop call per frame) calls `IFrameSink.Update(dt)` and `IFrameSink.Render()`. `GameEngine`
+  turns those calls into fixed steps, a variable update and interpolated rendering. See
+  [architecture.md](architecture.md#frame-loop).
 - **Data-oriented hot paths.** Use arrays of blittable structs or struct-of-arrays, and index by integer handles
   instead of object references. Class hierarchies are for cold code: menus, setup, tooling.
 

@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\LudumDare60.Game\LudumDare60.Game.csproj" />
+    <ProjectReference Include="..\..\engine\platforms\LudumDare60.Engine.Platform.Browser\LudumDare60.Engine.Platform.Browser.csproj" />
   </ItemGroup>
 
 </Project>

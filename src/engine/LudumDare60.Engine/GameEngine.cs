@@ -1,13 +1,94 @@
-using System.Diagnostics.CodeAnalysis;
+using LudumDare60.Engine.Platform;
 
 namespace LudumDare60.Engine;
 
-public sealed class GameEngine
+/// <summary>
+/// Runs an <see cref="IGame"/> on an <see cref="IPlatform"/>. The platform drives frames through <see cref="IFrameSink"/>.
+/// The engine turns them into fixed simulation steps, a variable update and interpolated rendering.
+/// </summary>
+/// <remarks>See docs/tech/architecture.md for the frame loop.</remarks>
+public sealed class GameEngine : IFrameSink
 {
-    [SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Stub; engine state will be added.")]
-    public Task RunAsync(IGame game)
+    /// <summary>
+    /// Duration of one fixed simulation step, in seconds (60 Hz).
+    /// </summary>
+    public const double FixedDeltaTime = 1.0 / 60.0;
+
+    /// <summary>
+    /// Upper bound for a frame's delta time, in seconds. Longer frames (a hidden tab, a debugger pause) are clamped
+    /// so the fixed-step loop cannot fall into a catch-up spiral.
+    /// </summary>
+    public const double MaxDeltaTime = 0.25;
+
+    private IGame? _game;
+    private double _totalTime;
+    private long _frameIndex;
+    private double _accumulator;
+    private long _fixedStepIndex;
+
+    /// <summary>
+    /// Runs <paramref name="game"/> on <paramref name="platform"/> until the platform stops. Frame counters and
+    /// accumulated time start from zero on every run.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The engine is already running a game.</exception>
+    public async Task RunAsync(IGame game, IPlatform platform)
     {
         ArgumentNullException.ThrowIfNull(game);
-        return Task.CompletedTask;
+        ArgumentNullException.ThrowIfNull(platform);
+
+        if (_game is not null)
+        {
+            throw new InvalidOperationException("The engine is already running.");
+        }
+
+        _game = game;
+        _totalTime = 0;
+        _frameIndex = 0;
+        _accumulator = 0;
+        _fixedStepIndex = 0;
+        try
+        {
+            await platform.RunAsync(this);
+        }
+        finally
+        {
+            _game = null;
+        }
     }
+
+    /// <summary>
+    /// Runs the pending fixed steps, then <see cref="IGame.Update"/>, then <see cref="IGame.PrepareRender"/>.
+    /// </summary>
+    /// <param name="dt">Time since the previous frame, in seconds. Clamped to [0, <see cref="MaxDeltaTime"/>];
+    /// NaN counts as zero.</param>
+    /// <exception cref="InvalidOperationException">No game is running.</exception>
+    public void Update(double dt)
+    {
+        var game = GetRunningGame();
+        var deltaTime = double.IsNaN(dt) ? 0 : Math.Clamp(dt, 0, MaxDeltaTime);
+
+        _accumulator += deltaTime;
+        while (_accumulator >= FixedDeltaTime)
+        {
+            _accumulator -= FixedDeltaTime;
+            var fixedContext = new FrameContext(FixedDeltaTime, (_fixedStepIndex + 1) * FixedDeltaTime, _fixedStepIndex);
+            game.FixedUpdate(in fixedContext);
+            _fixedStepIndex++;
+        }
+
+        _totalTime += deltaTime;
+        var context = new FrameContext(deltaTime, _totalTime, _frameIndex);
+        game.Update(in context);
+        _frameIndex++;
+
+        game.PrepareRender(_accumulator / FixedDeltaTime);
+    }
+
+    /// <summary>
+    /// Forwards to <see cref="IGame.Render"/>.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No game is running.</exception>
+    public void Render() => GetRunningGame().Render();
+
+    private IGame GetRunningGame() => _game ?? throw new InvalidOperationException("The engine is not running.");
 }

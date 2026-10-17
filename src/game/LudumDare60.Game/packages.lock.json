@@ -15,6 +15,12 @@
         "contentHash": "40yrBMsLEcjixBR4G+FiUaBPvxXIPSKJ2OgSrbOZcmSDBda4Sb0k7BWrfDpIvn3IvvDzwOL/tEPa6gDQfh6aRw=="
       },
       "ludumdare60.engine": {
+        "type": "Project",
+        "dependencies": {
+          "LudumDare60.Engine.Platform": "[1.0.0, )"
+        }
+      },
+      "ludumdare60.engine.platform": {
         "type": "Project"
       }
     }

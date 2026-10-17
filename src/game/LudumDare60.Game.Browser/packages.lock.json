@@ -21,7 +21,19 @@
         "contentHash": "MIeBVeWkbKdggl3kmmIUnx8ZNEgjD2m1gTN/0W+TDRn6zcL1WZdq5hXhGQ0wjuSlw/8tvwwCg79PemfkJ3+5JA=="
       },
       "ludumdare60.engine": {
+        "type": "Project",
+        "dependencies": {
+          "LudumDare60.Engine.Platform": "[1.0.0, )"
+        }
+      },
+      "ludumdare60.engine.platform": {
         "type": "Project"
+      },
+      "ludumdare60.engine.platform.browser": {
+        "type": "Project",
+        "dependencies": {
+          "LudumDare60.Engine.Platform": "[1.0.0, )"
+        }
       },
       "ludumdare60.game": {
         "type": "Project",
