@@ -3,23 +3,14 @@
 Work that is agreed or deferred but not done yet. When an item ships, move its design into `docs/tech/` and
 delete it here.
 
-## Input state layer
-
-Replace the raw span in `IGame.Update` with input state the game reads: key and button down/pressed/released,
-pointer position and motion, wheel, gamepad state. The raw events it builds on are described in
-[docs/tech/architecture.md](tech/architecture.md#input).
-
-- **Hard requirement: no extra frame of latency.** The engine applies events before the `FixedUpdate` loop, not
-  after it, and assigns them to fixed steps by `Time`. A press must reach the simulation step it happened in.
-  Today `Update` runs after the fixed steps, so input read in `Update` reaches the simulation one frame late.
-- `Overflow` and `FocusLost` release everything.
-- Pressed/released edges must not be lost when a frame runs zero fixed steps, or counted twice when it runs
-  several.
-
 ## Input bindings
 
 Map keys, pointer buttons and gamepad inputs to game actions. Gamepad bindings rely on the W3C Standard Gamepad
 layout (`standard` flag).
+
+- `InputState` has no gamepads yet: add buttons (down/pressed/released, analog value) and axes per gamepad index,
+  routed to fixed steps like keys (see [architecture.md](tech/architecture.md#input-state)).
+- Multi-touch: `InputState` merges pointers into one; track pointers by id if a mechanic needs two fingers.
 
 ## Platform commands (game to platform)
 

@@ -11,7 +11,7 @@ LudumDare60.Game.Browser ──► LudumDare60.Game ──► LudumDare60.Engine
 | Project | SDK | Role |
 | --- | --- | --- |
 | `src/engine/LudumDare60.Engine.Platform` | `Microsoft.NET.Sdk` | Platform contracts: `IPlatform`, `IFrameSink`, raw input (`RawInputEvent`, `RawInputEventKind`, `Key`, `PointerType`), asset reads (`IAssetSource`, `AssetLoadException`), the GPU (`IGraphicsBackend`, `RenderCommandKind`, `SpriteInstance`, `Color`). No dependencies. |
-| `src/engine/LudumDare60.Engine` | `Microsoft.NET.Sdk` | `GameEngine`, `IGame`, `FrameContext`, `Assets/` (`AssetManager` and loaders), `Rendering/` (`PixelViewport`, `Graphics`, `Texture`, `SpriteBatch`, `SpriteOptions`, `IntRect`). Depends only on the platform contracts and the managed `StbImageSharp` package (image decoding). |
+| `src/engine/LudumDare60.Engine` | `Microsoft.NET.Sdk` | `GameEngine`, `IGame`, `FrameContext`, `Input/` (`InputState`, `PointerButton`), `Assets/` (`AssetManager` and loaders), `Rendering/` (`PixelViewport`, `Graphics`, `Texture`, `SpriteBatch`, `SpriteOptions`, `IntRect`). Depends only on the platform contracts and the managed `StbImageSharp` package (image decoding). |
 | `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `Microsoft.NET.Sdk.StaticWebAssets` | `BrowserPlatform : IPlatform` and its JS: `wwwroot/boot.js` (runtime start), `wwwroot/frame-loop.js`, `wwwroot/input.js`, `wwwroot/assets.js` and `wwwroot/webgl2.js` (renderer, shaders in `wwwroot/shaders/`). Its `wwwroot/` ships with the app under `_content/LudumDare60.Engine.Platform.Browser/`. |
 | `src/game/LudumDare60.Game` | `Microsoft.NET.Sdk` | `LudumDare60Game : IGame`. No platform dependency. |
 | `src/game/LudumDare60.Game.Browser` | `Microsoft.NET.Sdk.WebAssembly` | Entry point, host page and `main.js`. Only wires the game and the browser platform together. |
@@ -174,8 +174,9 @@ Release builds append `?v=<commit hash>` to every asset URL, and Debug builds fe
 ## Input
 
 The platform delivers raw input with each frame: `IFrameSink.Update(dt, ReadOnlySpan<RawInputEvent> events)`. The
-engine passes the span to `IGame.Update` as is. This is transport only: input state (down, pressed, released) and
-bindings come later, see [docs/backlog.md](../backlog.md#input-state-layer).
+engine folds the events into `FrameContext.Input` (see [Input state](#input-state)), which is what gameplay reads. It
+also passes the raw span to `IGame.Update` as is, for tools and diagnostics such as `samples/InputMonitor`. Bindings
+and gamepad state come later, see [docs/backlog.md](../backlog.md#input-bindings).
 
 `RawInputEvent` (in `LudumDare60.Engine.Platform`) is a 24-byte blittable struct, and its layout is the wire format:
 the browser writes events as little-endian bytes and C# reads them in place with `MemoryMarshal.Cast`.
@@ -233,32 +234,69 @@ Browser defaults the game turns off: page scrolling and focus moves from keys in
 Ctrl/Meta shortcuts stay with the browser), wheel scrolling and the context menu on the canvas, and touch gestures
 (`touch-action: none`). `pointerdown` is not prevented: on itch.io that click is what focuses the game's iframe.
 
+### Input state
+
+`InputState` (in `LudumDare60.Engine.Input`) holds keys and pointer buttons (`IsDown`, `IsPressed`, `IsReleased`),
+`PointerPosition` and `PointerDelta` in virtual pixels, `IsPointerOnScreen`, `Wheel` and `HasFocus`. It allocates
+nothing. The game gets it as `context.Input`:
+
+```csharp
+public void FixedUpdate(in FrameContext context)
+{
+    if (context.Input.IsPressed(PointerButton.Primary) && context.Input.IsPointerOnScreen)
+    {
+        _grab.Begin(context.Input.PointerPosition);
+    }
+}
+```
+
+- **Two views.** `FixedUpdate` and `Update` get different `InputState`s. `Update` sees every event of the frame at
+  once, with the edges (pressed, released) of this frame. `FixedUpdate` sees the events that happened before the end
+  of its step, with the edges of this step. Gameplay reads input in `FixedUpdate`; UI, cursors and cameras may read
+  it in `Update`.
+- **No extra latency.** `InputRouter` assigns each event to the fixed step whose time span contains it, using
+  `RawInputEvent.Time`: a step that ends at frame time `-accumulator` gets the queued events with time at most that.
+  A press reaches the step it happened in, not the next frame's first step.
+- **Edges are never lost or doubled.** Events later than the frame's last step wait for the next frame, with their
+  times moved back by its `dt`, so a frame without steps loses nothing. Edges are cleared at the start of each step
+  (and each frame for the `Update` view), so a frame with several steps reports a press once. A key pressed and
+  released within one step is pressed and released, and not down.
+- **Order.** Events are taken in arrival order: one waits while an earlier-arrived one waits, so a key's up never
+  overtakes its down.
+- **Release everything.** `FocusLost` and `Overflow` release every key and button, with released edges, and
+  `PointerCancel` releases the buttons. A new run starts with nothing down and the pointer at the screen center.
+- **Pointers.** Buttons are merged across pointers (one mouse or one finger at a time). Positions are converted with
+  the frame's viewport, so they are virtual pixels; on the bars they fall outside the screen. A locked pointer's
+  motion goes into `PointerDelta` only.
+
 ### FrameContext
 
-`FrameContext(DeltaTime, TotalTime, FrameIndex, Viewport)` is passed by `in` to `FixedUpdate` and `Update`. All
-times are in seconds. `Viewport` is the frame's `PixelViewport` (see [Screen](#screen)), the same in both.
+`FrameContext(DeltaTime, TotalTime, FrameIndex, Viewport, Input)` is passed by `in` to `FixedUpdate` and `Update`.
+All times are in seconds. `Viewport` is the frame's `PixelViewport` (see [Screen](#screen)), the same in both.
 
 | Field | `FixedUpdate` | `Update` |
 | --- | --- | --- |
 | `DeltaTime` | Always `FixedDeltaTime`. | The frame's clamped `dt`. |
 | `TotalTime` | `(FrameIndex + 1) * FixedDeltaTime`: simulated time after this step. Computed from the step count, so it does not drift. | Sum of all clamped `dt`, including this frame. |
 | `FrameIndex` | Zero-based fixed step counter. | Zero-based frame counter. |
+| `Input` | Input up to the end of this step, edges of this step. | Input up to the start of this frame, edges of this frame. |
 
 All counters reset at the start of each `RunAsync`. Starting a second `RunAsync` on an engine that is already
 running throws `InvalidOperationException`. So does calling `Update` or `Render` when no game is running.
 
 ### Rules
 
-- Gameplay that must be deterministic (physics, collisions, timers that affect rules) goes into `FixedUpdate`.
-- `Update` is for per-frame work that may depend on the actual frame rate: input sampling, camera smoothing, UI.
+- Gameplay that must be deterministic (physics, collisions, timers that affect rules) goes into `FixedUpdate`, and
+  reads its input there.
+- `Update` is for per-frame work that may depend on the actual frame rate: cursors, camera smoothing, UI.
 - `PrepareRender` reads simulation state and builds render data. It must not change simulation state.
 - `Render` draws the prepared data into the `SpriteBatch`. It has no access to timing on purpose.
 
 ## Screen
 
 The game draws a low-resolution virtual screen (640x360 for *Six Chambers*, set by `new GameEngine(640, 360)`) and
-the renderer scales it up to the canvas. `Rendering/PixelViewport` holds the math, so the renderer and the input code agree on where every virtual pixel
-is:
+the renderer scales it up to the canvas. `Rendering/PixelViewport` holds the math, so the renderer and the input code
+agree on where every virtual pixel is:
 
 - `PixelViewport.Fit(virtualWidth, virtualHeight, surfaceWidth, surfaceHeight, pixelRatio)` takes the fields of a
   `Resize` event. The surface is converted to device pixels (`SurfaceWidth`, `SurfaceHeight`, rounded): the canvas

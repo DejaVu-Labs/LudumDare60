@@ -54,6 +54,15 @@ public sealed class LudumDare60GameTests
     }
 
     [Fact]
+    public void PrimaryButtonDown_DoublesTheCursorSprite()
+    {
+        _platform.Frame(0, PointerDown(100, 100));
+
+        Assert.True(_game.IsHolding);
+        Assert.Equal(new Vector2(2, 2), _platform.Backend.Frames[0].Instances[^1].Scale);
+    }
+
+    [Fact]
     public void Frames_CreateTheTextureOnce()
     {
         _platform.Frame(0);

@@ -28,8 +28,8 @@ public interface IGame
     /// Per-frame logic with a variable time step. Called once per frame, after the fixed steps.
     /// </summary>
     /// <param name="context">Timing of this frame.</param>
-    /// <param name="events">Raw input events of this frame, in arrival order, valid only during this call. Temporary:
-    /// an input state layer will replace them (see docs/backlog.md).</param>
+    /// <param name="events">Raw input events of this frame, in arrival order, valid only during this call. For tools
+    /// and diagnostics; gameplay reads <see cref="FrameContext.Input"/>.</param>
     void Update(in FrameContext context, ReadOnlySpan<RawInputEvent> events);
 
     /// <summary>

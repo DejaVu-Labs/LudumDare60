@@ -1,4 +1,5 @@
 using LudumDare60.Engine.Assets;
+using LudumDare60.Engine.Input;
 using LudumDare60.Engine.Platform;
 using LudumDare60.Engine.Rendering;
 
@@ -26,6 +27,7 @@ public sealed class GameEngine : IFrameSink
     private AssetManager? _assets;
     private Graphics? _graphics;
     private SpriteBatch? _batch;
+    private readonly InputRouter _input = new();
     private PixelViewport _viewport;
     private double _totalTime;
     private long _frameIndex;
@@ -77,6 +79,7 @@ public sealed class GameEngine : IFrameSink
         _graphics = graphics;
         _batch = new SpriteBatch(graphics);
         _viewport = PixelViewport.Fit(VirtualWidth, VirtualHeight, VirtualWidth, VirtualHeight, 1);
+        _input.Reset(in _viewport);
         _totalTime = 0;
         _frameIndex = 0;
         _accumulator = 0;
@@ -97,7 +100,8 @@ public sealed class GameEngine : IFrameSink
 
     /// <summary>
     /// Applies finished asset reads (<see cref="AssetManager.Update"/>) and this frame's resize events, then runs the
-    /// pending fixed steps, then <see cref="IGame.Update"/>, then <see cref="IGame.PrepareRender"/>.
+    /// pending fixed steps, then <see cref="IGame.Update"/>, then <see cref="IGame.PrepareRender"/>. Each fixed step
+    /// sees the input events that happened before its end (see <see cref="FrameContext.Input"/>).
     /// </summary>
     /// <param name="dt">Time since the previous frame, in seconds. Clamped to [0, <see cref="MaxDeltaTime"/>];
     /// NaN counts as zero.</param>
@@ -112,19 +116,23 @@ public sealed class GameEngine : IFrameSink
         ApplyResize(events);
 
         var deltaTime = double.IsNaN(dt) ? 0 : Math.Clamp(dt, 0, MaxDeltaTime);
+        _input.BeginFrame(events, deltaTime, in _viewport);
 
         _accumulator += deltaTime;
         while (_accumulator >= FixedDeltaTime)
         {
             _accumulator -= FixedDeltaTime;
+
+            // The accumulator is how far the frame start lies past this step's end.
+            _input.BeginFixedStep(-_accumulator, in _viewport);
             var fixedContext = new FrameContext(
-                FixedDeltaTime, (_fixedStepIndex + 1) * FixedDeltaTime, _fixedStepIndex, _viewport);
+                FixedDeltaTime, (_fixedStepIndex + 1) * FixedDeltaTime, _fixedStepIndex, _viewport, _input.Fixed);
             game.FixedUpdate(in fixedContext);
             _fixedStepIndex++;
         }
 
         _totalTime += deltaTime;
-        var context = new FrameContext(deltaTime, _totalTime, _frameIndex, _viewport);
+        var context = new FrameContext(deltaTime, _totalTime, _frameIndex, _viewport, _input.Frame);
         game.Update(in context, events);
         _frameIndex++;
 

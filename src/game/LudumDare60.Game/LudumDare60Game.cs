@@ -1,14 +1,16 @@
 using System.Numerics;
 using LudumDare60.Engine;
 using LudumDare60.Engine.Assets;
+using LudumDare60.Engine.Input;
 using LudumDare60.Engine.Platform;
 using LudumDare60.Engine.Rendering;
 
 namespace LudumDare60.Game;
 
 /// <summary>
-/// The Ludum Dare 60 game. For now a placeholder scene that exercises the renderer: the cutting mat color, a sprite
-/// that follows the pointer, a rotating tinted one and a flipped, scaled one. It goes away once the real art arrives.
+/// The Ludum Dare 60 game. For now a placeholder scene that exercises the renderer and input: the cutting mat color, a
+/// sprite that follows the pointer and grows while the primary button is down, a rotating tinted one and a flipped,
+/// scaled one. It goes away once the real art arrives.
 /// </summary>
 public sealed class LudumDare60Game : IGame
 {
@@ -33,9 +35,14 @@ public sealed class LudumDare60Game : IGame
     private float _time;
 
     /// <summary>
-    /// The last pointer position, in virtual pixels. Starts at the center of the screen.
+    /// The pointer position in virtual pixels, as of the last frame.
     /// </summary>
     public Vector2 PointerPosition { get; private set; } = new(VirtualWidth / 2, VirtualHeight / 2);
+
+    /// <summary>
+    /// Whether the primary pointer button was down in the last frame.
+    /// </summary>
+    public bool IsHolding { get; private set; }
 
     public void Initialize(AssetManager assets, Graphics graphics) => _graphics = graphics;
 
@@ -52,14 +59,8 @@ public sealed class LudumDare60Game : IGame
             _hasPlaceholder = true;
         }
 
-        foreach (ref readonly var e in events)
-        {
-            if (e.Kind is RawInputEventKind.PointerMove or RawInputEventKind.PointerDown)
-            {
-                PointerPosition = context.Viewport.ToVirtual(e.X, e.Y);
-            }
-        }
-
+        PointerPosition = context.Input.PointerPosition;
+        IsHolding = context.Input.IsDown(PointerButton.Primary);
         _time = (float)context.TotalTime;
     }
 
@@ -79,6 +80,6 @@ public sealed class LudumDare60Game : IGame
         var center = new Vector2(PlaceholderSprite.Size / 2);
         batch.Draw(_placeholder, new Vector2(200, 180), new SpriteOptions { Origin = center, Rotation = _time, Tint = s_brassTint });
         batch.Draw(_placeholder, new Vector2(440, 180), new SpriteOptions { Origin = center, Scale = new Vector2(-3, 3) });
-        batch.Draw(_placeholder, PointerPosition, new SpriteOptions { Origin = center });
+        batch.Draw(_placeholder, PointerPosition, new SpriteOptions { Origin = center, Scale = new Vector2(IsHolding ? 2 : 1) });
     }
 }

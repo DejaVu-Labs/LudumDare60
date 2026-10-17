@@ -44,9 +44,19 @@ internal sealed class RecordingGame : IGame
     public Action<AssetManager, Graphics>? OnInitialize { get; set; }
 
     /// <summary>
+    /// Runs inside <see cref="FixedUpdate"/>, after the call is recorded.
+    /// </summary>
+    public Action<FrameContext>? OnFixedUpdate { get; set; }
+
+    /// <summary>
     /// Runs inside <see cref="Update"/>, after the call is recorded.
     /// </summary>
     public Action<Graphics>? OnUpdate { get; set; }
+
+    /// <summary>
+    /// Runs inside <see cref="Update"/>, after <see cref="OnUpdate"/>.
+    /// </summary>
+    public Action<FrameContext>? OnUpdateContext { get; set; }
 
     /// <summary>
     /// Runs inside <see cref="Render"/>, after the call is recorded.
@@ -65,6 +75,7 @@ internal sealed class RecordingGame : IGame
     {
         Record(nameof(FixedUpdate));
         FixedUpdates.Add(context);
+        OnFixedUpdate?.Invoke(context);
     }
 
     public void Update(in FrameContext context, ReadOnlySpan<RawInputEvent> events)
@@ -73,6 +84,7 @@ internal sealed class RecordingGame : IGame
         Updates.Add(context);
         UpdateEvents.Add(events.ToArray());
         OnUpdate?.Invoke(Graphics!);
+        OnUpdateContext?.Invoke(context);
     }
 
     public void PrepareRender(double alpha)

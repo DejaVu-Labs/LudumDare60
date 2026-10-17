@@ -67,8 +67,9 @@ Read [docs/tech/architecture.md](docs/tech/architecture.md) for the project grap
 rendering. The platform drives `GameEngine` through `IFrameSink.Update(dt, events)` and `IFrameSink.Render()`, where
 `events` are the frame's raw input events. Before the first frame, the engine calls `IGame.Initialize(assets, graphics)`
 with the run's `AssetManager` and `Graphics` (the texture factory). Each frame, the engine applies finished asset reads
-(`AssetManager.Update`) and resize events (`FrameContext.Viewport`), then calls `IGame.FixedUpdate` (zero or more
-times, 1/60 s each), then `IGame.Update` (with the events), then `IGame.PrepareRender(alpha)`, and finally
+(`AssetManager.Update`), resize events (`FrameContext.Viewport`) and input (`FrameContext.Input`, routed to the
+fixed step each event happened in), then calls `IGame.FixedUpdate` (zero or more times, 1/60 s each), then
+`IGame.Update` (with the raw events), then `IGame.PrepareRender(alpha)`, and finally
 `IGame.Render(batch)`, after which it submits the frame's `SpriteBatch` to the GPU in one call. Assets are requested
 by path, never block, and are reference counted; see [Assets](docs/tech/architecture.md#assets). Textures are created
 from loaded images, one per file, from the first frame on; see [Rendering](docs/tech/architecture.md#rendering).
