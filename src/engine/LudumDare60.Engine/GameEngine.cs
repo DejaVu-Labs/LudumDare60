@@ -1,3 +1,4 @@
+using LudumDare60.Engine.Assets;
 using LudumDare60.Engine.Platform;
 
 namespace LudumDare60.Engine;
@@ -21,6 +22,7 @@ public sealed class GameEngine : IFrameSink
     public const double MaxDeltaTime = 0.25;
 
     private IGame? _game;
+    private AssetManager? _assets;
     private double _totalTime;
     private long _frameIndex;
     private double _accumulator;
@@ -28,7 +30,9 @@ public sealed class GameEngine : IFrameSink
 
     /// <summary>
     /// Runs <paramref name="game"/> on <paramref name="platform"/> until the platform stops. Frame counters and
-    /// accumulated time start from zero on every run.
+    /// accumulated time start from zero on every run. Each run gets a new <see cref="AssetManager"/> on
+    /// <see cref="IPlatform.Assets"/>: it is passed to <see cref="IGame.Initialize"/> before the first frame, and
+    /// everything it holds is unloaded when the run ends.
     /// </summary>
     /// <exception cref="InvalidOperationException">The engine is already running a game.</exception>
     public async Task RunAsync(IGame game, IPlatform platform)
@@ -41,23 +45,29 @@ public sealed class GameEngine : IFrameSink
             throw new InvalidOperationException("The engine is already running.");
         }
 
+        var assets = new AssetManager(platform.Assets);
         _game = game;
+        _assets = assets;
         _totalTime = 0;
         _frameIndex = 0;
         _accumulator = 0;
         _fixedStepIndex = 0;
         try
         {
+            game.Initialize(assets);
             await platform.RunAsync(this);
         }
         finally
         {
             _game = null;
+            _assets = null;
+            assets.UnloadAll();
         }
     }
 
     /// <summary>
-    /// Runs the pending fixed steps, then <see cref="IGame.Update"/>, then <see cref="IGame.PrepareRender"/>.
+    /// Applies finished asset reads (<see cref="AssetManager.Update"/>), then runs the pending fixed steps, then
+    /// <see cref="IGame.Update"/>, then <see cref="IGame.PrepareRender"/>.
     /// </summary>
     /// <param name="dt">Time since the previous frame, in seconds. Clamped to [0, <see cref="MaxDeltaTime"/>];
     /// NaN counts as zero.</param>
@@ -67,6 +77,8 @@ public sealed class GameEngine : IFrameSink
     public void Update(double dt, ReadOnlySpan<RawInputEvent> events)
     {
         var game = GetRunningGame();
+        _assets!.Update();
+
         var deltaTime = double.IsNaN(dt) ? 0 : Math.Clamp(dt, 0, MaxDeltaTime);
 
         _accumulator += deltaTime;

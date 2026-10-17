@@ -9,6 +9,8 @@ internal sealed class ControlledPlatform : IPlatform
 {
     private readonly TaskCompletionSource _stopped = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    public IAssetSource Assets { get; init; } = new FakeAssetSource();
+
     public Task RunAsync(IFrameSink frameSink) => _stopped.Task;
 
     public void Stop() => _stopped.SetResult();

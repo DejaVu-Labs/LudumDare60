@@ -86,6 +86,36 @@ Source: <https://itch.io/docs/creators/html5> (checked 2026-10-17).
   back from streaming instantiation to an ArrayBuffer. That still works but starts slower. Check the network
   tab after the first upload.
 
+## Asset caching
+
+Checked on 2026-10-17 against live HTML5 games on itch.io:
+
+- Games are served from `https://html-classic.itch.zone/html/<id>/` through Cloudflare, with
+  `cache-control: max-age` of about 2.5 million seconds (**about 29 days**), plus `etag` and `last-modified`.
+- itch.io loads `index.html` with `?v=<timestamp>`, so the page itself is always fresh after an upload.
+- An itch.io admin wrote (2018) that every re-upload gets new file URLs. Whether `<id>` also changes for a `butler push`
+  to the same channel is **not confirmed**. To check it, push twice to the dev channel and compare the `<id>` in the
+  game iframe's URL.
+
+Files whose name carries a content hash (`_framework/*`, every `.js` through the import map) are safe either way. Asset
+files under `wwwroot/assets/` are not. If `<id>` stayed the same, a returning player could get the new code with an
+asset from the previous build, cached for up to a month.
+
+What the build does about it:
+
+- **Release** builds append `?v=<commit hash>` to every asset URL. The hash is `SourceRevisionId` from the SDK's git
+  integration, written into `BuildInfo.SourceRevision` (generated in `LudumDare60.Engine.Platform.Browser`); outside a
+  git checkout the build time is used instead. Cloudflare and the browser cache by full URL, so each deploy reads
+  fresh files, and within one build they stay cached. A deploy re-downloads every asset, which is fine at our sizes.
+  CI deploys commits only. A local Release build with uncommitted asset edits keeps the old hash.
+- **Debug** builds add no version and fetch with `cache: 'no-cache'`: the browser revalidates every read with its
+  ETag, so an edited asset shows up on reload without a commit.
+
+Content-hashed asset names are possible: a `StaticWebAssetFingerprintPattern` for `*.png`, `*.ogg` and so on renames
+the files (`gun.6lf3cyd0pu.png`). But the SDK writes only `.js` files into the import map, `fetch` ignores import maps
+anyway, and the name mapping lands only in `*.staticwebassets.endpoints.json`, which is not shipped. Using them needs a
+generated name table (see [docs/backlog.md](../backlog.md#asset-manager-follow-ups)).
+
 ## Deploying with butler
 
 Source: <https://itch.io/docs/butler/pushing.html>.
@@ -157,3 +187,4 @@ latest version from <https://broth.itch.zone/butler/linux-amd64/LATEST>, then se
 - [ ] Canvas resizes correctly in embed and fullscreen modes, and on high-DPI screens.
 - [ ] Audio starts after the first click or keypress.
 - [ ] No console errors. File count is under 1000.
+- [ ] Asset requests in the network tab carry `?v=<commit hash>`.

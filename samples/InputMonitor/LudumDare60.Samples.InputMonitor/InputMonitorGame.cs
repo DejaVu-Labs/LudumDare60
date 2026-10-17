@@ -1,4 +1,5 @@
 using LudumDare60.Engine;
+using LudumDare60.Engine.Assets;
 using LudumDare60.Engine.Platform;
 
 namespace LudumDare60.Samples.InputMonitor;
@@ -19,6 +20,10 @@ public sealed class InputMonitorGame(ITextDisplay display) : IGame
     private bool _prepared;
 
     public InputTracker Tracker { get; } = new();
+
+    public void Initialize(AssetManager assets)
+    {
+    }
 
     public void FixedUpdate(in FrameContext context)
     {

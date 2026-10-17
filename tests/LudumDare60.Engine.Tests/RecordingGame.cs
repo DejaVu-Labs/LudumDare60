@@ -1,3 +1,4 @@
+using LudumDare60.Engine.Assets;
 using LudumDare60.Engine.Platform;
 
 namespace LudumDare60.Engine.Tests;
@@ -25,6 +26,23 @@ internal sealed class RecordingGame : IGame
     public List<RawInputEvent[]> UpdateEvents { get; } = [];
 
     public List<double> Alphas { get; } = [];
+
+    /// <summary>
+    /// The asset manager passed to <see cref="Initialize"/>.
+    /// </summary>
+    public AssetManager? Assets { get; private set; }
+
+    /// <summary>
+    /// Runs inside <see cref="Initialize"/>, after the call is recorded.
+    /// </summary>
+    public Action<AssetManager>? OnInitialize { get; set; }
+
+    public void Initialize(AssetManager assets)
+    {
+        Record(nameof(Initialize));
+        Assets = assets;
+        OnInitialize?.Invoke(assets);
+    }
 
     public void FixedUpdate(in FrameContext context)
     {

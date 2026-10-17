@@ -71,7 +71,10 @@ check style and AOT safety. The rules below cover what they cannot check.
 
 ## Assets
 
-- File names are lowercase `kebab-case`, because itch.io paths are case-sensitive.
+- File names are lowercase `kebab-case`, because itch.io paths are case-sensitive. `AssetPath.IsValid` enforces it
+  for every requested path.
+- Asset files go in `src/game/LudumDare60.Game.Browser/wwwroot/assets/`. Load them through `AssetManager` (see
+  [architecture.md](architecture.md#assets)), never with a direct `fetch`, so caching and cache busting apply.
 - Keep the shipped file count low (itch.io limit: 1000). Pack sprites into atlases and audio into a few files.
 - Load everything with relative URLs.
 

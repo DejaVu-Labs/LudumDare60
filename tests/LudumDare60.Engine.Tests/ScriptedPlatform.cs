@@ -15,6 +15,8 @@ internal sealed class ScriptedPlatform : IPlatform
 {
     private readonly ScriptedFrame[] _frames;
 
+    public IAssetSource Assets { get; init; } = new FakeAssetSource();
+
     /// <summary>
     /// One frame per delta time, without input.
     /// </summary>

@@ -1,12 +1,21 @@
+using LudumDare60.Engine.Assets;
 using LudumDare60.Engine.Platform;
 
 namespace LudumDare60.Engine;
 
 /// <summary>
-/// A game hosted by <see cref="GameEngine"/>. Methods are listed in the order the engine calls them each frame.
+/// A game hosted by <see cref="GameEngine"/>. Methods are listed in the order the engine calls them: <see cref="Initialize"/>
+/// once, then the others every frame.
 /// </summary>
 public interface IGame
 {
+    /// <summary>
+    /// Called once per run, before the first frame. Register asset loaders and request the first assets here.
+    /// </summary>
+    /// <param name="assets">The run's asset manager. Keep it: the engine updates it at the start of every frame and
+    /// unloads everything when the run ends.</param>
+    void Initialize(AssetManager assets);
+
     /// <summary>
     /// Advances the simulation by one fixed step (<see cref="GameEngine.FixedDeltaTime"/>). Called zero or more times per frame.
     /// </summary>

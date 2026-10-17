@@ -13,4 +13,28 @@
     <ProjectReference Include="..\..\LudumDare60.Engine.Platform\LudumDare60.Engine.Platform.csproj" />
   </ItemGroup>
 
+  <!--
+    BuildInfo.SourceRevision: the commit hash, appended to asset URLs (?v=) so a new deploy never serves a stale asset
+    from the browser or CDN cache (see docs/tech/build-and-deploy.md#asset-caching). SourceRevisionId comes from the
+    SDK's git integration; outside a git checkout the build time is used instead.
+  -->
+  <Target Name="GenerateBuildInfo"
+          BeforeTargets="CoreCompile"
+          DependsOnTargets="InitializeSourceControlInformation">
+    <PropertyGroup>
+      <_BuildInfoRevision>$(SourceRevisionId)</_BuildInfoRevision>
+      <_BuildInfoRevision Condition="'$(_BuildInfoRevision)' == ''">$([System.DateTime]::UtcNow.ToString('yyyyMMddHHmmss'))</_BuildInfoRevision>
+      <_BuildInfoPath>$(IntermediateOutputPath)BuildInfo.g.cs</_BuildInfoPath>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(_BuildInfoPath)"
+                      Lines="// &lt;auto-generated/&gt;;namespace LudumDare60.Engine.Platform.Browser%3B;internal static class BuildInfo;{;    public const string SourceRevision = &quot;$(_BuildInfoRevision)&quot;%3B;}"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <Compile Remove="$(_BuildInfoPath)" />
+      <Compile Include="$(_BuildInfoPath)" />
+      <FileWrites Include="$(_BuildInfoPath)" />
+    </ItemGroup>
+  </Target>
+
 </Project>

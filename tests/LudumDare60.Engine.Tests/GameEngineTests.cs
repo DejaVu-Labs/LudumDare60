@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using LudumDare60.Engine.Assets;
 using LudumDare60.Engine.Platform;
 
 namespace LudumDare60.Engine.Tests;
@@ -93,7 +94,7 @@ public sealed class GameEngineTests
     {
         await RunFramesAsync(0.02);
 
-        Assert.Equal(["FixedUpdate", "Update", "PrepareRender", "Render"], _game.Calls);
+        Assert.Equal(["Initialize", "FixedUpdate", "Update", "PrepareRender", "Render"], _game.Calls);
     }
 
     [Fact]
@@ -101,7 +102,7 @@ public sealed class GameEngineTests
     {
         await RunFramesAsync(0.01);
 
-        Assert.Equal(["Update", "PrepareRender", "Render"], _game.Calls);
+        Assert.Equal(["Initialize", "Update", "PrepareRender", "Render"], _game.Calls);
     }
 
     [Fact]
@@ -109,7 +110,9 @@ public sealed class GameEngineTests
     {
         await RunFramesAsync(0.01, 0.01);
 
-        Assert.Equal(["Update", "PrepareRender", "Render", "FixedUpdate", "Update", "PrepareRender", "Render"], _game.Calls);
+        Assert.Equal(
+            ["Initialize", "Update", "PrepareRender", "Render", "FixedUpdate", "Update", "PrepareRender", "Render"],
+            _game.Calls);
     }
 
     [Fact]
@@ -245,6 +248,92 @@ public sealed class GameEngineTests
         Assert.Equal([KeyDown(Key.D)], Assert.Single(_game.UpdateEvents));
     }
 
+    [Fact]
+    public async Task RunAsync_CallsInitializeOnceBeforeThePlatformRuns()
+    {
+        var platform = new ControlledPlatform();
+        var run = _engine.RunAsync(_game, platform);
+
+        Assert.Equal(["Initialize"], _game.Calls);
+
+        platform.Stop();
+        await run;
+    }
+
+    [Fact]
+    public async Task RunAsync_InitializeThrows_PropagatesAndAllowsNewRun()
+    {
+        var failure = new InvalidOperationException("initialize failure");
+        _game.OnInitialize = _ => throw failure;
+
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => RunFramesAsync(0.01)));
+        Assert.Equal(["Initialize"], _game.Calls);
+
+        _game.OnInitialize = null;
+        await RunFramesAsync(0.01);
+    }
+
+    [Fact]
+    public async Task Initialize_AssetManager_ReadsThroughPlatformAssets()
+    {
+        var source = new FakeAssetSource();
+        _game.OnInitialize = static assets => assets.Request<byte[]>("config.json");
+
+        await _engine.RunAsync(_game, new ScriptedPlatform { Assets = source });
+
+        Assert.Equal(["config.json"], source.Reads);
+    }
+
+    [Fact]
+    public async Task RunAsync_EachRun_GetsNewAssetManager()
+    {
+        await RunFramesAsync();
+        var first = _game.Assets;
+
+        await RunFramesAsync();
+
+        Assert.NotNull(first);
+        Assert.NotSame(first, _game.Assets);
+    }
+
+    [Fact]
+    public async Task Update_AppliesFinishedAssetReadsBeforeFixedUpdate()
+    {
+        var source = new FakeAssetSource { Files = { ["level.txt"] = "level"u8.ToArray() } };
+        var game = new AssetProbeGame("level.txt");
+
+        await _engine.RunAsync(game, new ScriptedPlatform(1.5 * F) { Assets = source });
+
+        Assert.Equal([AssetState.Loaded], game.FixedUpdateStates);
+    }
+
+    [Fact]
+    public async Task RunAsync_End_UnloadsAssets()
+    {
+        var source = new FakeAssetSource { Files = { ["level.txt"] = "level"u8.ToArray() } };
+        var game = new AssetProbeGame("level.txt");
+
+        await _engine.RunAsync(game, new ScriptedPlatform(0.01) { Assets = source });
+
+        Assert.Equal("level", Assert.Single(game.Loader.Unloaded).Text);
+        Assert.Throws<InvalidOperationException>(() => game.Assets!.GetState(game.Handle));
+    }
+
+    [Fact]
+    public async Task RunAsync_PlatformFails_StillUnloadsAssets()
+    {
+        var source = new FakeAssetSource { Files = { ["level.txt"] = "level"u8.ToArray() } };
+        var game = new AssetProbeGame("level.txt");
+        var platform = new ControlledPlatform { Assets = source };
+        var run = _engine.RunAsync(game, platform);
+        _engine.Update(0.01, []);
+
+        platform.Fail(new InvalidOperationException("platform failure"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => run);
+        Assert.Single(game.Loader.Unloaded);
+    }
+
     private static RawInputEvent KeyDown(Key key) => new(RawInputEventKind.KeyDown, 0, (ushort)key, 0, -0.008f, 0, 0, 0);
 
     /// <summary>
@@ -254,6 +343,10 @@ public sealed class GameEngineTests
     {
         public bool SawPlatformMemory { get; private set; }
 
+        public void Initialize(AssetManager assets)
+        {
+        }
+
         public void FixedUpdate(in FrameContext context)
         {
         }
@@ -262,6 +355,41 @@ public sealed class GameEngineTests
         {
             SawPlatformMemory = events.Length == platformEvents.Length
                 && Unsafe.AreSame(ref MemoryMarshal.GetReference(events), ref platformEvents[0]);
+        }
+
+        public void PrepareRender(double alpha)
+        {
+        }
+
+        public void Render()
+        {
+        }
+    }
+
+    /// <summary>
+    /// Requests one text asset in <see cref="Initialize"/> and records its state in every fixed step.
+    /// </summary>
+    private sealed class AssetProbeGame(string path) : IGame
+    {
+        public TextLoader Loader { get; } = new();
+
+        public AssetManager? Assets { get; private set; }
+
+        public AssetHandle<TextAsset> Handle { get; private set; }
+
+        public List<AssetState> FixedUpdateStates { get; } = [];
+
+        public void Initialize(AssetManager assets)
+        {
+            Assets = assets;
+            assets.Register(Loader);
+            Handle = assets.Request<TextAsset>(path);
+        }
+
+        public void FixedUpdate(in FrameContext context) => FixedUpdateStates.Add(Assets!.GetState(Handle));
+
+        public void Update(in FrameContext context, ReadOnlySpan<RawInputEvent> events)
+        {
         }
 
         public void PrepareRender(double alpha)

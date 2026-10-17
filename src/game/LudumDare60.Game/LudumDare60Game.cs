@@ -1,4 +1,5 @@
 using LudumDare60.Engine;
+using LudumDare60.Engine.Assets;
 using LudumDare60.Engine.Platform;
 
 namespace LudumDare60.Game;
@@ -8,6 +9,10 @@ namespace LudumDare60.Game;
 /// </summary>
 public sealed class LudumDare60Game : IGame
 {
+    public void Initialize(AssetManager assets)
+    {
+    }
+
     public void FixedUpdate(in FrameContext context)
     {
     }

@@ -39,6 +39,34 @@ string becomes several events. The event layout does not change.
 Matters for anything aim-based. Camera look from the latest pointer motion in `Update`/`PrepareRender`, not from
 interpolated simulation state. Try the `desynchronized` canvas context hint and measure present latency.
 
+## Asset parsers
+
+`IAssetLoader<T>` implementations for the types the game needs. The asset manager keeps every file as bytes in WASM
+memory, so parsing happens in C#.
+
+- Images (PNG): decode to RGBA for texture upload.
+- Aseprite animations: parse `.aseprite` directly (pixels are zlib-compressed, `ZLibStream` works in WASM). No export
+  to PNG + JSON, because one asset is one file.
+- Fonts (TTF): glyph outlines or a baked atlas, depending on the text renderer.
+- Sounds: decoding in C# or a WebAudio path; decide together with the audio backend.
+- JSON configs: `System.Text.Json` with `[JsonSerializable]` source generation, no reflection.
+
+## Asset manager follow-ups
+
+Deferred when the asset manager shipped (see [docs/tech/architecture.md](tech/architecture.md#assets)):
+
+- Check once whether itch.io keeps `html/<id>/` across `butler push`es to one channel (see
+  [build-and-deploy.md](tech/build-and-deploy.md#asset-caching)).
+- Per-file content hashes instead of the per-build `?v=`: fingerprinted names plus a generated name table, shipped
+  as a JS module so the import map keeps it fresh. Only changed files would be downloaded again.
+- Cancel reads of released assets (`AbortController`).
+- A per-frame parsing budget in `AssetManager.Update`.
+- A limit on parallel reads.
+- Progress in bytes instead of files.
+- Asset packs, to stay far below the 1000-file limit.
+- Assets that depend on other assets.
+- Hot reload in Debug.
+
 ## Browser E2E smoke tests
 
 A `tests/*.E2E` project with `Microsoft.Playwright`: the published build boots, reaches the first frame and logs

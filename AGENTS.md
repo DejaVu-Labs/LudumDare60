@@ -21,9 +21,9 @@ itch.io as an HTML5 build and is pushed with `butler`.
 
 | Path | Contents |
 | --- | --- |
-| `src/engine/LudumDare60.Engine.Platform` | Platform contracts (`IPlatform`, `IFrameSink`, `RawInputEvent`). No dependencies. |
-| `src/engine/LudumDare60.Engine` | Engine: `GameEngine` (fixed-step frame loop), `IGame`, `FrameContext`. Depends only on the platform contracts. Never references the game or a concrete platform. |
-| `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `BrowserPlatform : IPlatform` and its JS: `boot.js` starts the .NET runtime, `frame-loop.js` drives frames, `input.js` queues raw input (StaticWebAssets SDK, shipped under `_content/`). |
+| `src/engine/LudumDare60.Engine.Platform` | Platform contracts (`IPlatform`, `IFrameSink`, `RawInputEvent`, `IAssetSource`). No dependencies. |
+| `src/engine/LudumDare60.Engine` | Engine: `GameEngine` (fixed-step frame loop), `IGame`, `FrameContext`, `AssetManager`. Depends only on the platform contracts. Never references the game or a concrete platform. |
+| `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `BrowserPlatform : IPlatform` and its JS: `boot.js` starts the .NET runtime, `frame-loop.js` drives frames, `input.js` queues raw input, `assets.js` fetches asset files (StaticWebAssets SDK, shipped under `_content/`). |
 | `src/game/LudumDare60.Game` | Game class library: `LudumDare60Game : IGame`, rules, content, state. No platform dependency. |
 | `src/game/LudumDare60.Game.Browser` | `wasmbrowser` entry point and host page. Wires the game to `BrowserPlatform` and nothing else. |
 | `tests/` | C# test projects (`*.Tests`, xUnit v3 on Microsoft.Testing.Platform) and `tests/js/` (Node test runner). |
@@ -65,8 +65,11 @@ All shared settings live in the root files. Project files should hold only what 
 
 Read [docs/tech/architecture.md](docs/tech/architecture.md) for the project graph, the frame loop and input. The
 platform drives `GameEngine` through `IFrameSink.Update(dt, events)` and `IFrameSink.Render()`, where `events` are the
-frame's raw input events. Each frame, the engine calls `IGame.FixedUpdate` (zero or more times, 1/60 s each), then
-`IGame.Update` (with the events), then `IGame.PrepareRender(alpha)`, and finally `IGame.Render`.
+frame's raw input events. Before the first frame, the engine calls `IGame.Initialize(assets)` with the run's
+`AssetManager`. Each frame, the engine applies finished asset reads (`AssetManager.Update`), then calls
+`IGame.FixedUpdate` (zero or more times, 1/60 s each), then `IGame.Update` (with the events), then
+`IGame.PrepareRender(alpha)`, and finally `IGame.Render`. Assets are requested by path, never block, and are
+reference counted; see [Assets](docs/tech/architecture.md#assets).
 
 ## Code guidelines
 
