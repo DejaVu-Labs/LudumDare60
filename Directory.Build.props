@@ -1,0 +1,95 @@
+<Project>
+
+  <!--
+    Repository-wide build settings. Applies to every project under src/, samples/ and tests/.
+    tests/Directory.Build.props imports this file and relaxes the AOT/trimming requirements for test hosts.
+  -->
+
+  <PropertyGroup Label="Language">
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <NeutralLanguage>en</NeutralLanguage>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Analyzers">
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <MSBuildTreatWarningsAsErrors>true</MSBuildTreatWarningsAsErrors>
+    <AnalysisLevel>latest-all</AnalysisLevel>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
+    <!-- Required for IDE0005 (unnecessary usings) to run on build. CS1591 is silenced: XML docs are not mandatory. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <Features>$(Features);strict</Features>
+    <!-- A freshly published advisory must not break the build in the middle of the jam; it is still reported. -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup Label="AOT and trimming">
+    <!-- Turns on the trim, AOT and single-file analyzers. Everything shipped to the browser must stay reflection-free. -->
+    <IsAotCompatible>true</IsAotCompatible>
+    <IsTrimmable>true</IsTrimmable>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+    <SuppressTrimAnalysisWarnings>false</SuppressTrimAnalysisWarnings>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Build output">
+    <UseArtifactsOutput>true</UseArtifactsOutput>
+    <ArtifactsPath>$(MSBuildThisFileDirectory)artifacts</ArtifactsPath>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <IsPackable>false</IsPackable>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup Label="NuGet">
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+  </PropertyGroup>
+
+  <!--
+    Browser game projects (Sdk="Microsoft.NET.Sdk.WebAssembly"). UsingMicrosoftNETSdkWebAssembly is set by the SDK
+    before this file is imported. See docs/tech/build-and-deploy.md for the reasoning behind each switch.
+  -->
+  <PropertyGroup Label="WebAssembly" Condition="'$(UsingMicrosoftNETSdkWebAssembly)' == 'true'">
+    <OutputType>Exe</OutputType>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- itch.io does not reliably provide cross-origin isolation (SharedArrayBuffer), so the runtime stays single-threaded. -->
+    <WasmEnableThreads>false</WasmEnableThreads>
+    <WasmEnableSIMD>true</WasmEnableSIMD>
+    <WasmEnableExceptionHandling>true</WasmEnableExceptionHandling>
+    <!-- itch.io gzips .wasm/.js on the fly; pre-compressed copies only double the file count. -->
+    <CompressionEnabled>false</CompressionEnabled>
+    <WasmFingerprintAssets>true</WasmFingerprintAssets>
+  </PropertyGroup>
+
+  <PropertyGroup Label="WebAssembly release" Condition="'$(UsingMicrosoftNETSdkWebAssembly)' == 'true' and '$(Configuration)' == 'Release'">
+    <RunAOTCompilation>true</RunAOTCompilation>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>full</TrimMode>
+    <WasmStripILAfterAOT>true</WasmStripILAfterAOT>
+    <DebuggerSupport>false</DebuggerSupport>
+    <EventSourceSupport>false</EventSourceSupport>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <StackTraceSupport>false</StackTraceSupport>
+    <MetricsSupport>false</MetricsSupport>
+    <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
+    <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
+    <WasmEmitSymbolMap>false</WasmEmitSymbolMap>
+    <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+  </PropertyGroup>
+
+</Project>

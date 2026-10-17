@@ -396,3 +396,15 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# --- LD60 additions ---
+# Build output (UseArtifactsOutput)
+/artifacts/
+# Release folder pushed with butler
+/dist/
+# Playwright
+playwright-report/
+test-results/
+.playwright/
+# JetBrains
+.idea/

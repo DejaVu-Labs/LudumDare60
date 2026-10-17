@@ -1,0 +1,12 @@
+{
+  "name": "ludumdare60",
+  "private": true,
+  "type": "module",
+  "description": "JavaScript tooling for the LD60 browser build (interop glue, renderer backends, tests).",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test tests/js/"
+  }
+}

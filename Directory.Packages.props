@@ -1,0 +1,17 @@
+<Project>
+
+  <!--
+    Central package management: every version lives here, project files reference packages without versions.
+    Analyzers in GlobalPackageReference apply to every project in the repository.
+  -->
+
+  <ItemGroup Label="Analyzers">
+    <GlobalPackageReference Include="Meziantou.Analyzer" Version="3.0.303" />
+  </ItemGroup>
+
+  <ItemGroup Label="Testing">
+    <PackageVersion Include="xunit.v3.mtp-v2" Version="4.0.2" />
+    <PackageVersion Include="Microsoft.Playwright" Version="1.63.0" />
+  </ItemGroup>
+
+</Project>
