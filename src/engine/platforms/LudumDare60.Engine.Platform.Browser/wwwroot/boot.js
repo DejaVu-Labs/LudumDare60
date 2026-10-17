@@ -3,7 +3,12 @@
 /**
  * Starts the .NET runtime and runs the app's `Main`. The host page's `main.js` calls `boot` with the folder that
  * holds the runtime (`dotnet.js` and the files it loads), so an app can ship several runtime builds side by side.
+ * A page element with id `status` (optional) shows loading text until the runtime is ready, and an error message if
+ * startup or the game fails.
  */
+
+/** Shown in the status element when startup or the game fails. Details go to the console. */
+export const ERROR_TEXT = 'Something went wrong. Reload the page to try again.';
 
 /**
  * @typedef {object} DotnetHostBuilder
@@ -12,6 +17,11 @@
 
 /**
  * @typedef {(url: string) => Promise<{ dotnet: DotnetHostBuilder }>} ImportRuntime
+ */
+
+/**
+ * The part of an element that the status code touches, so tests can pass fakes.
+ * @typedef {{ hidden: boolean, textContent: string | null }} StatusElement
  */
 
 /**
@@ -35,23 +45,52 @@ export function resolveRuntimeUrl(frameworkRoot, baseUrl) {
  *
  * @param {string} runtimeUrl Absolute URL of `dotnet.js`.
  * @param {ImportRuntime} importRuntime Usually `import()`.
+ * @param {() => void} [onReady] Called once the runtime is downloaded and created, right before `Main` runs.
  * @returns {Promise<number>} The exit code of `Main`.
  */
-export async function startRuntime(runtimeUrl, importRuntime) {
+export async function startRuntime(runtimeUrl, importRuntime, onReady = () => {}) {
   const { dotnet } = await importRuntime(runtimeUrl);
   const { runMain } = await dotnet.create();
+  onReady();
   return runMain();
 }
 
 /**
- * Starts the runtime from `frameworkRoot` (relative to the page) and runs `Main`.
+ * Runs `start` with a status element: the element keeps its loading text until `start` reports ready, is hidden then,
+ * and shows `ERROR_TEXT` again if `start` fails, before or after ready (a game that throws in a frame ends `Main`).
+ *
+ * @template T
+ * @param {(onReady: () => void) => Promise<T>} start Usually `startRuntime`.
+ * @param {StatusElement | null} status Nothing is shown without one.
+ * @returns {Promise<T>} What `start` returns. Rejects with the error of `start`.
+ */
+export async function runWithStatus(start, status) {
+  try {
+    return await start(() => {
+      if (status !== null) {
+        status.hidden = true;
+      }
+    });
+  } catch (error) {
+    if (status !== null) {
+      status.textContent = ERROR_TEXT;
+      status.hidden = false;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Starts the runtime from `frameworkRoot` (relative to the page) and runs `Main`, with loading and error text in the
+ * element with id `statusId`, if the page has one.
  *
  * @param {string} [frameworkRoot] Runtime folder. Defaults to the SDK's `./_framework/`.
+ * @param {string} [statusId] Id of the status element.
  * @returns {Promise<number>} The exit code of `Main`.
  */
-export function boot(frameworkRoot = './_framework/') {
-  return startRuntime(
-    resolveRuntimeUrl(frameworkRoot, document.baseURI),
-    (url) => import(url),
+export function boot(frameworkRoot = './_framework/', statusId = 'status') {
+  return runWithStatus(
+    (onReady) => startRuntime(resolveRuntimeUrl(frameworkRoot, document.baseURI), (url) => import(url), onReady),
+    document.getElementById(statusId),
   );
 }

@@ -287,6 +287,38 @@ public sealed class AssetManagerTests
     }
 
     [Fact]
+    public void Request_SourceThrowsSynchronously_FailsInsteadOfStayingLoading()
+    {
+        var failure = new InvalidOperationException("source broken");
+        _source.ThrowOnRead = failure;
+
+        var handle = _assets.Request<TextAsset>(Path);
+        _assets.Update();
+
+        Assert.Equal(AssetState.Failed, _assets.GetState(handle));
+        Assert.Equal(0, _assets.PendingCount);
+        var error = _assets.GetError(handle);
+        Assert.NotNull(error);
+        Assert.Equal(Path, error.AssetPath);
+        Assert.Same(failure, error.InnerException);
+    }
+
+    [Fact]
+    public void Request_SourceThrewThenRecovers_RetryLoads()
+    {
+        _source.ThrowOnRead = new InvalidOperationException("source broken");
+        var handle = _assets.Request<TextAsset>(Path);
+        _assets.Update();
+
+        _source.ThrowOnRead = null;
+        _assets.Request<TextAsset>(Path);
+        _source.Complete(Path, Utf8("bench"));
+        _assets.Update();
+
+        Assert.Equal("bench", _assets.Get(handle).Text);
+    }
+
+    [Fact]
     public void Update_LoaderThrows_FailsWithParserErrorInside()
     {
         var failure = new FormatException("bad header");
@@ -387,6 +419,31 @@ public sealed class AssetManagerTests
         Assert.Single(_loader.Loaded);
         Assert.Throws<InvalidOperationException>(() => _assets.GetState(loaded));
         Assert.Throws<InvalidOperationException>(() => _assets.GetState(loading));
+    }
+
+    [Fact]
+    public void UnloadAll_LoaderUnloadThrows_UnloadsTheRestThenThrows()
+    {
+        var failure = new InvalidOperationException("unload failed");
+        _loader.OnUnload = asset =>
+        {
+            if (string.Equals(asset.Text, "a", StringComparison.Ordinal))
+            {
+                throw failure;
+            }
+        };
+        var a = RequestLoaded("a.txt", "a");
+        var b = RequestLoaded("b.txt", "b");
+
+        var error = Assert.Throws<AggregateException>(_assets.UnloadAll);
+
+        Assert.Same(failure, Assert.Single(error.InnerExceptions));
+        Assert.Collection(
+            _loader.Unloaded,
+            static asset => Assert.Equal("a", asset.Text),
+            static asset => Assert.Equal("b", asset.Text));
+        Assert.Throws<InvalidOperationException>(() => _assets.GetState(a));
+        Assert.Throws<InvalidOperationException>(() => _assets.GetState(b));
     }
 
     [Fact]

@@ -16,13 +16,13 @@ internal static partial class AssetsInterop
     /// </summary>
     public const string ModuleUrl = "../_content/LudumDare60.Engine.Platform.Browser/assets.js";
 
-    private static Task? s_import;
+    private static readonly LazyImport s_import = new(ImportAsync);
 
     /// <summary>
-    /// Loads the module on first use. A game requests assets before the frame loop starts, so the import cannot wait
-    /// for <see cref="BrowserPlatform.RunAsync"/>.
+    /// Loads the module on first use, and again after a failed import. A game requests assets before the frame loop
+    /// starts, so the import cannot wait for <see cref="BrowserPlatform.RunAsync"/>.
     /// </summary>
-    public static Task EnsureImportedAsync() => s_import ??= ImportAsync();
+    public static Task EnsureImportedAsync() => s_import.EnsureAsync();
 
     /// <summary>
     /// Fetches <paramref name="url"/> and keeps the bytes in JS under <paramref name="id"/> until <see cref="Take"/>.

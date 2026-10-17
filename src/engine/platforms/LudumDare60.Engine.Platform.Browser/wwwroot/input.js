@@ -240,7 +240,19 @@ export function createInputQueue(capacity) {
  * @property {Target & { visibilityState: string, pointerLockElement: unknown, hasFocus: () => boolean }} document
  * @property {{ getGamepads?: () => ReadonlyArray<GamepadLike | null> }} navigator
  * @property {() => number} now Usually `performance.now`.
- * @property {(new (callback: () => void) => { observe(target: any): void, disconnect(): void }) | undefined} ResizeObserver
+ * @property {(new (callback: (entries: ReadonlyArray<ResizeEntry>) => void) => ResizeObserverLike) | undefined} ResizeObserver
+ */
+
+/**
+ * The parts of `ResizeObserverEntry` the input code reads. `devicePixelContentBoxSize` is missing in browsers that do
+ * not support the `device-pixel-content-box` box.
+ * @typedef {{ devicePixelContentBoxSize?: ReadonlyArray<{ inlineSize: number, blockSize: number }> }} ResizeEntry
+ */
+
+/**
+ * @typedef {object} ResizeObserverLike
+ * @property {(target: any, options?: { box: string }) => void} observe Throws for a box the browser does not know.
+ * @property {() => void} disconnect
  */
 
 /**
@@ -268,15 +280,24 @@ export function createInput(env, capacity = QUEUE_CAPACITY) {
   let width = -1;
   let height = -1;
   let pixelRatio = -1;
+  // Canvas size in device pixels from the ResizeObserver, or -1 until it reports one (or where it cannot).
+  let deviceWidth = -1;
+  let deviceHeight = -1;
+  let observesDevicePixels = false;
   /** @type {({ axes: Float32Array, values: Float32Array, pressed: Uint8Array } | undefined)[]} */
   const pads = [];
   let gamepadsAvailable = typeof navigator.getGamepads === 'function';
 
-  /** @param {number} timeMs */
+  /**
+   * Queues a `Resize` when the size or the pixel ratio changed. With the device-pixel size known, the logical size is
+   * derived from it, so `width * ratio` gives back the exact canvas pixels. `clientWidth * ratio` can be one pixel off
+   * at ratios like 1.25, and a canvas one pixel off is resampled, which blurs pixel art.
+   * @param {number} timeMs
+   */
   const pushSize = (timeMs) => {
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
     const ratio = window.devicePixelRatio || 1;
+    const w = deviceWidth >= 0 ? deviceWidth / ratio : canvas.clientWidth;
+    const h = deviceHeight >= 0 ? deviceHeight / ratio : canvas.clientHeight;
     if (w === width && h === height && ratio === pixelRatio) {
       return;
     }
@@ -420,7 +441,15 @@ export function createInput(env, capacity = QUEUE_CAPACITY) {
   /** @param {Event} event */
   const onVisibilityChange = (event) => setFocused(document.visibilityState === 'visible' && document.hasFocus(), event.timeStamp);
 
-  const onResize = () => pushSize(now());
+  /** @param {ReadonlyArray<ResizeEntry> | undefined} entries */
+  const onResize = (entries) => {
+    const box = entries?.[entries.length - 1]?.devicePixelContentBoxSize?.[0];
+    if (box !== undefined) {
+      deviceWidth = box.inlineSize;
+      deviceHeight = box.blockSize;
+    }
+    pushSize(now());
+  };
 
   /** @param {number} frameTimeMs */
   const pollGamepads = (frameTimeMs) => {
@@ -503,7 +532,16 @@ export function createInput(env, capacity = QUEUE_CAPACITY) {
   canvas.style.touchAction = 'none';
 
   const resizeObserver = env.ResizeObserver === undefined ? undefined : new env.ResizeObserver(onResize);
-  resizeObserver?.observe(canvas);
+  if (resizeObserver !== undefined) {
+    try {
+      // Also fires when only the pixel ratio changes, with the new device size.
+      resizeObserver.observe(canvas, { box: 'device-pixel-content-box' });
+      observesDevicePixels = true;
+    } catch {
+      // The browser does not know the box (Safari): CSS size times pixel ratio it is.
+      resizeObserver.observe(canvas);
+    }
+  }
 
   const startMs = now();
   pushSize(startMs);
@@ -512,8 +550,9 @@ export function createInput(env, capacity = QUEUE_CAPACITY) {
   return {
     drain(target, frameTimeMs) {
       // The pixel ratio changes without a resize when the window moves to another monitor. Reading the canvas size
-      // only then avoids a layout query every frame.
-      if ((window.devicePixelRatio || 1) !== pixelRatio) {
+      // only then avoids a layout query every frame. A device-pixel observer reports that change itself, with the new
+      // device size; reacting here first would send a size from the old one.
+      if (!observesDevicePixels && (window.devicePixelRatio || 1) !== pixelRatio) {
         pushSize(frameTimeMs);
       }
       pollGamepads(frameTimeMs);

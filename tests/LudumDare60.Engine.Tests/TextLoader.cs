@@ -5,7 +5,7 @@ namespace LudumDare60.Engine.Tests;
 
 /// <summary>
 /// Parses files as UTF-8 text and records every load and unload. <see cref="OnLoad"/> can replace the result or
-/// throw.
+/// throw; <see cref="OnUnload"/> can throw.
 /// </summary>
 internal sealed class TextLoader : IAssetLoader<TextAsset>
 {
@@ -30,5 +30,14 @@ internal sealed class TextLoader : IAssetLoader<TextAsset>
         return result!;
     }
 
-    public void Unload(TextAsset asset) => Unloaded.Add(asset);
+    /// <summary>
+    /// Runs inside <see cref="Unload"/>, after the asset is recorded.
+    /// </summary>
+    public Action<TextAsset>? OnUnload { get; set; }
+
+    public void Unload(TextAsset asset)
+    {
+        Unloaded.Add(asset);
+        OnUnload?.Invoke(asset);
+    }
 }

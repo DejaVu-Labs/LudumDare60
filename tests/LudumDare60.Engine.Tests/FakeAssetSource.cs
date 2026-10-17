@@ -20,9 +20,19 @@ internal sealed class FakeAssetSource : IAssetSource
     /// </summary>
     public List<string> Reads { get; } = [];
 
+    /// <summary>
+    /// When set, <see cref="ReadAsync"/> throws it at once instead of returning a task.
+    /// </summary>
+    public Exception? ThrowOnRead { get; set; }
+
     public Task<byte[]> ReadAsync(string path)
     {
         Reads.Add(path);
+        if (ThrowOnRead is not null)
+        {
+            throw ThrowOnRead;
+        }
+
         if (Files.TryGetValue(path, out var data))
         {
             return Task.FromResult(data);

@@ -252,9 +252,10 @@ function createTarget() {
  */
 
 /**
- * @param {{ focused?: boolean }} [options]
+ * @param {{ focused?: boolean, devicePixelBox?: boolean }} [options] `devicePixelBox`: whether the fake ResizeObserver
+ *   supports the `device-pixel-content-box` box. Without it, `observe` throws for that box, as in Safari.
  */
-function setup({ focused = true } = {}) {
+function setup({ focused = true, devicePixelBox = false } = {}) {
   /** @type {number[]} */
   const captured = [];
   const canvas = Object.assign(createTarget(), {
@@ -284,17 +285,29 @@ function setup({ focused = true } = {}) {
       return getGamepads();
     },
   };
-  /** @type {{ callback: () => void, observed: unknown[], disconnected: boolean }[]} */
+  /**
+   * @typedef {{ devicePixelContentBoxSize?: { inlineSize: number, blockSize: number }[] }} Entry
+   * @type {{ callback: (entries?: Entry[]) => void, observed: unknown[], boxes: (string | undefined)[], disconnected: boolean }[]}
+   */
   const observers = [];
   class FakeResizeObserver {
-    /** @param {() => void} callback */
+    /** @param {(entries?: Entry[]) => void} callback */
     constructor(callback) {
-      this.state = { callback, observed: /** @type {unknown[]} */ ([]), disconnected: false };
+      this.state = {
+        callback,
+        observed: /** @type {unknown[]} */ ([]),
+        boxes: /** @type {(string | undefined)[]} */ ([]),
+        disconnected: false,
+      };
       observers.push(this.state);
     }
-    /** @param {unknown} target */
-    observe(target) {
+    /** @param {unknown} target @param {{ box: string }} [options] */
+    observe(target, options) {
+      if (options?.box === 'device-pixel-content-box' && !devicePixelBox) {
+        throw new TypeError(`Unknown box ${options.box}`);
+      }
       this.state.observed.push(target);
+      this.state.boxes.push(options?.box);
     }
     disconnect() {
       this.state.disconnected = true;
@@ -554,6 +567,63 @@ test('resize_NewSize_QueuesResize', () => {
   canvas.clientWidth = 800;
   canvas.clientHeight = 600;
   observers[0].callback();
+
+  assert.deepEqual(drain().map((e) => [e.kind, e.x, e.y, e.z]), [[Kind.Resize, 800, 600, 1]]);
+});
+
+/**
+ * @param {number} inlineSize
+ * @param {number} blockSize
+ */
+const deviceEntry = (inlineSize, blockSize) => [{ devicePixelContentBoxSize: [{ inlineSize, blockSize }] }];
+
+test('createInput_DevicePixelBoxSupported_ObservesIt', () => {
+  const { canvas, observers } = setup({ devicePixelBox: true });
+
+  assert.deepEqual(observers[0].observed, [canvas]);
+  assert.deepEqual(observers[0].boxes, ['device-pixel-content-box']);
+});
+
+test('createInput_DevicePixelBoxUnsupported_ObservesContentBox', () => {
+  const { canvas, observers } = setup();
+
+  assert.deepEqual(observers[0].observed, [canvas]);
+  assert.deepEqual(observers[0].boxes, [undefined]);
+});
+
+test('resize_DevicePixelSize_ReportsLogicalSizeThatScalesBackExactly', () => {
+  const { window, observers, drain } = setup({ devicePixelBox: true }).started();
+
+  // 1001.6 x 700.8 CSS pixels at 1.25: clientWidth would say 1001 or 1002, and 1001 * 1.25 is 1251.25, not 1252.
+  window.devicePixelRatio = 1.25;
+  observers[0].callback(deviceEntry(1252, 876));
+
+  const [resize] = drain();
+  assert.equal(resize.kind, Kind.Resize);
+  assert.equal(resize.z, 1.25);
+  // What PixelViewport computes, in float32 like the C# side.
+  assert.equal(Math.round(Math.fround(resize.x * resize.z)), 1252);
+  assert.equal(Math.round(Math.fround(resize.y * resize.z)), 876);
+});
+
+test('drain_DevicePixelBox_PixelRatioChangeWaitsForObserver', () => {
+  const { window, observers, drain } = setup({ devicePixelBox: true }).started();
+  observers[0].callback(deviceEntry(640, 360));
+  drain();
+
+  window.devicePixelRatio = 2;
+
+  assert.deepEqual(drain(), []);
+  observers[0].callback(deviceEntry(1280, 720));
+  assert.deepEqual(drain().map((e) => [e.kind, e.x, e.y, e.z]), [[Kind.Resize, 640, 360, 2]]);
+});
+
+test('resize_EntryWithoutDevicePixelSize_UsesCssSize', () => {
+  const { canvas, observers, drain } = setup({ devicePixelBox: true }).started();
+
+  canvas.clientWidth = 800;
+  canvas.clientHeight = 600;
+  observers[0].callback([{}]);
 
   assert.deepEqual(drain().map((e) => [e.kind, e.x, e.y, e.z]), [[Kind.Resize, 800, 600, 1]]);
 });

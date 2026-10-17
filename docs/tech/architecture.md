@@ -25,7 +25,8 @@ await new GameEngine().RunAsync(new LudumDare60Game(), new BrowserPlatform());
 ## Frame loop
 
 `GameEngine.RunAsync(game, platform)` stores the game, creates an `AssetManager` on `platform.Assets`, calls
-`IGame.Initialize(assets)` and awaits `platform.RunAsync(engine)`. When the run ends, it unloads every asset. The
+`IGame.Initialize(assets)` and awaits `platform.RunAsync(engine)`. When the run ends, it unloads every asset. If the
+run failed, the run's exception is the one rethrown, even when a loader also throws while unloading. The
 engine is the platform's `IFrameSink`. The platform owns timing (in the browser: `requestAnimationFrame`) and calls, once per
 frame:
 
@@ -58,6 +59,9 @@ Inside `GameEngine.Update(dt, events)`:
    and loads the fingerprinted file.
 3. `runMain()` runs `Program.Main`, which picks the game and the platform:
    `GameEngine.RunAsync(new LudumDare60Game(), new BrowserPlatform())`.
+4. The page's `<div id="status">` (optional, `boot`'s second parameter) shows "Loading..." while the runtime
+   downloads, is hidden right before `runMain()`, and shows an error message if startup fails or `Main` ends with an
+   exception (a frame that throws stops the frame loop and ends `Main`). The error itself goes to the console.
 
 ### Browser frame loop
 
@@ -111,7 +115,8 @@ public void Update(in FrameContext context, ReadOnlySpan<RawInputEvent> events)
   throws. Each `Request` adds a reference and needs one `Release`. Requests for a cached asset return it at once;
   concurrent requests share one read. The last `Release` unloads the asset (`IAssetLoader<T>.Unload`) right away.
   A read still in progress when its asset is released finishes, and its result is dropped. `UnloadAll` unloads
-  everything, whatever the reference counts.
+  everything, whatever the reference counts. A loader that throws from `Unload` does not stop it: the other assets
+  are unloaded too, and the failures are thrown afterwards as one `AggregateException`.
 - **Loaders.** `IAssetLoader<T>.Load(path, data)` turns the file bytes into a `T` and owns the array. Register them
   explicitly with `Register<T>`; there is no reflection. `RawBytesLoader` (`byte[]`, the file itself) is registered
   in every manager. Parsers for images, Aseprite files, fonts, sounds and JSON are not written yet (see
@@ -129,7 +134,8 @@ public void Update(in FrameContext context, ReadOnlySpan<RawInputEvent> events)
 `assets/`) is resolved against the page (`document.baseURI`), not against `_framework/`. A file costs two interop
 calls: `read(id, url, noCache)` fetches it, keeps the bytes in JS and resolves with their length (or with minus the
 HTTP status), then C# allocates a `byte[]` of that length and `take(id, span)` copies the bytes into it. The module is
-imported on the first read, because a game requests assets in `Initialize`, before `BrowserPlatform.RunAsync` runs.
+imported on the first read, because a game requests assets in `Initialize`, before `BrowserPlatform.RunAsync` runs. A
+failed import (a network error) is tried again by the next read (`LazyImport`).
 
 Release builds append `?v=<commit hash>` to every asset URL, and Debug builds fetch with `cache: 'no-cache'`. See
 [build-and-deploy.md](build-and-deploy.md#asset-caching) for why.
@@ -163,7 +169,8 @@ live and is a small example of a consumer. The rules every platform follows:
 - Pointer coordinates are logical (CSS) pixels from the top-left corner of the drawing surface. A locked mouse
   sends `PointerMotion` (relative) instead of `PointerMove`. Each button change is its own `PointerDown` or
   `PointerUp`, even when several buttons are held.
-- `Resize` comes first at startup, then the focus state (`FocusGained` or `FocusLost`).
+- `Resize` comes first at startup, then the focus state (`FocusGained` or `FocusLost`). Its logical size may be
+  fractional: `X * Z` and `Y * Z`, rounded, are the exact surface size in device pixels where the platform knows it.
 - `FocusLost` and `Overflow` mean that key-up and button-up events may be missing: release everything.
 - `GamepadConnected` with `Detail` 1 means the W3C Standard Gamepad layout: a platform that sets the flag must remap
   to it. With 0 the indices are raw and device specific.
@@ -179,7 +186,10 @@ live and is a small example of a consumer. The rules every platform follows:
   `DataView` and allocate nothing. When the ring is full, new events are dropped, and one `Overflow` event (with
   the dropped count in `Id`) takes their place after the events queued before them.
 - `createInput(env)` installs the listeners: keys and focus on `window`, visibility and pointer lock on `document`,
-  pointer events, `wheel` and `contextmenu` on the canvas, a `ResizeObserver` on the canvas. Gamepads have no
+  pointer events, `wheel` and `contextmenu` on the canvas, a `ResizeObserver` on the canvas. The observer watches
+  the `device-pixel-content-box`, and `Resize` reports that size divided by `devicePixelRatio`, because
+  `clientWidth * devicePixelRatio` can be one pixel off (at 1.25, for example) and a canvas one pixel off is
+  resampled. Browsers without that box (Safari) report `clientWidth` and `clientHeight`. Gamepads have no
   events, so every drain polls `navigator.getGamepads()` and sends what changed since the previous poll; values
   that moved by less than 1/256 count as unchanged.
 - `attach(canvasId)`, `drain(span, frameTimeMs)` and `detach()` are bound through `InputInterop`. The canvas is
@@ -221,7 +231,8 @@ is:
 
 - `PixelViewport.Fit(virtualWidth, virtualHeight, surfaceWidth, surfaceHeight, pixelRatio)` takes the fields of a
   `Resize` event. The surface is converted to device pixels (`SurfaceWidth`, `SurfaceHeight`, rounded): the canvas
-  gets exactly this size.
+  gets exactly this size, which in browsers with `device-pixel-content-box` is the canvas's real size in device pixels
+  (see [Browser input](#browser-input)).
 - The scale is the largest whole number of device pixels per virtual pixel that fits, so every virtual pixel is the
   same size. The image is centered (`X`, `Y`, `Width`, `Height`, from the top-left, in device pixels) with bars
   around it. Only a surface smaller than the virtual screen gets a fractional scale, so nothing is cut off.

@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { resolveRuntimeUrl, startRuntime } from '../../src/engine/platforms/LudumDare60.Engine.Platform.Browser/wwwroot/boot.js';
+import { ERROR_TEXT, resolveRuntimeUrl, runWithStatus, startRuntime } from '../../src/engine/platforms/LudumDare60.Engine.Platform.Browser/wwwroot/boot.js';
 
 const page = 'https://html-classic.itch.zone/html/123/index.html';
 
@@ -58,4 +58,89 @@ test('startRuntime_CreateFails_Rejects', async () => {
   }));
 
   await assert.rejects(run, (error) => error === failure);
+});
+
+test('startRuntime_OnReady_RunsAfterCreateAndBeforeMain', async () => {
+  /** @type {string[]} */
+  const calls = [];
+
+  await startRuntime(
+    'https://example/_framework/dotnet.js',
+    async () => ({
+      dotnet: {
+        async create() {
+          calls.push('create');
+          return {
+            async runMain() {
+              calls.push('runMain');
+              return 0;
+            },
+          };
+        },
+      },
+    }),
+    () => calls.push('ready'),
+  );
+
+  assert.deepEqual(calls, ['create', 'ready', 'runMain']);
+});
+
+/** @returns {{ hidden: boolean, textContent: string | null }} */
+const statusElement = () => ({ hidden: false, textContent: 'Loading...' });
+
+test('runWithStatus_BeforeReady_KeepsLoadingText', async () => {
+  const status = statusElement();
+  /** @type {(value: number) => void} */
+  let finish = () => {};
+
+  const run = runWithStatus(() => new Promise((resolve) => (finish = resolve)), status);
+
+  assert.deepEqual(status, { hidden: false, textContent: 'Loading...' });
+  finish(0);
+  await run;
+});
+
+test('runWithStatus_Ready_HidesStatus', async () => {
+  const status = statusElement();
+
+  const exitCode = await runWithStatus(async (onReady) => {
+    onReady();
+    return 7;
+  }, status);
+
+  assert.equal(exitCode, 7);
+  assert.equal(status.hidden, true);
+});
+
+test('runWithStatus_FailsAfterReady_ShowsErrorAndRejects', async () => {
+  const status = statusElement();
+  const failure = new Error('frame threw');
+
+  const run = runWithStatus(async (onReady) => {
+    onReady();
+    throw failure;
+  }, status);
+
+  await assert.rejects(run, (error) => error === failure);
+  assert.deepEqual(status, { hidden: false, textContent: ERROR_TEXT });
+});
+
+test('runWithStatus_FailsBeforeReady_ShowsError', async () => {
+  const status = statusElement();
+
+  await assert.rejects(runWithStatus(async () => {
+    throw new Error('download failed');
+  }, status));
+
+  assert.deepEqual(status, { hidden: false, textContent: ERROR_TEXT });
+});
+
+test('runWithStatus_NoStatusElement_StillRunsAndRejects', async () => {
+  assert.equal(await runWithStatus(async (onReady) => {
+    onReady();
+    return 1;
+  }, null), 1);
+  await assert.rejects(runWithStatus(async () => {
+    throw new Error('failed');
+  }, null));
 });

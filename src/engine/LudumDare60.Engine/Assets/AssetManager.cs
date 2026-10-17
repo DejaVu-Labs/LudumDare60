@@ -124,14 +124,31 @@ public sealed class AssetManager
     /// <summary>
     /// Unloads every asset, whatever its reference count. Every handle becomes stale.
     /// </summary>
+    /// <exception cref="AggregateException">One or more loaders threw from <see cref="IAssetLoader{T}.Unload"/>. The
+    /// other assets are unloaded anyway, and every slot is free.</exception>
     public void UnloadAll()
     {
+        List<Exception>? failures = null;
         for (var i = 0; i < _slotCount; i++)
         {
-            if (_slots[i].Path is not null)
+            if (_slots[i].Path is null)
+            {
+                continue;
+            }
+
+            try
             {
                 Free(i);
             }
+            catch (Exception exception) when (exception is not OutOfMemoryException)
+            {
+                (failures ??= []).Add(exception);
+            }
+        }
+
+        if (failures is not null)
+        {
+            throw new AggregateException("Unloading assets failed.", failures);
         }
     }
 
@@ -252,8 +269,9 @@ public sealed class AssetManager
         {
             read = _source.ReadAsync(slot.Path!);
         }
-        catch (AssetLoadException exception)
+        catch (Exception exception) when (exception is not OutOfMemoryException)
         {
+            // A source that throws instead of returning a faulted task must not leave the slot loading forever.
             read = Task.FromException<byte[]>(exception);
         }
 

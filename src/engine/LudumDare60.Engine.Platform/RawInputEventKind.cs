@@ -29,8 +29,9 @@ public enum RawInputEventKind
 
     /// <summary>
     /// The drawing surface changed size. Sent first at startup.
-    /// <see cref="RawInputEvent.X"/>, <see cref="RawInputEvent.Y"/>: width and height in logical (CSS) pixels.
-    /// <see cref="RawInputEvent.Z"/>: device pixels per logical pixel.
+    /// <see cref="RawInputEvent.X"/>, <see cref="RawInputEvent.Y"/>: width and height in logical (CSS) pixels, possibly
+    /// fractional. <see cref="RawInputEvent.Z"/>: device pixels per logical pixel. Where the platform knows the size in
+    /// device pixels, <c>X * Z</c> and <c>Y * Z</c> round to it exactly.
     /// </summary>
     Resize = 4,
 

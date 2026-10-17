@@ -334,6 +334,34 @@ public sealed class GameEngineTests
         Assert.Single(game.Loader.Unloaded);
     }
 
+    [Fact]
+    public async Task RunAsync_PlatformFailsAndUnloadThrows_PropagatesPlatformException()
+    {
+        var source = new FakeAssetSource { Files = { ["level.txt"] = "level"u8.ToArray() } };
+        var game = new AssetProbeGame("level.txt");
+        game.Loader.OnUnload = static _ => throw new InvalidOperationException("unload failure");
+        var platform = new ControlledPlatform { Assets = source };
+        var run = _engine.RunAsync(game, platform);
+        _engine.Update(0.01, []);
+        var failure = new InvalidOperationException("platform failure");
+
+        platform.Fail(failure);
+
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => run));
+        Assert.Single(game.Loader.Unloaded);
+    }
+
+    [Fact]
+    public async Task RunAsync_UnloadThrowsAfterCleanEnd_Throws()
+    {
+        var source = new FakeAssetSource { Files = { ["level.txt"] = "level"u8.ToArray() } };
+        var game = new AssetProbeGame("level.txt");
+        game.Loader.OnUnload = static _ => throw new InvalidOperationException("unload failure");
+
+        await Assert.ThrowsAsync<AggregateException>(
+            () => _engine.RunAsync(game, new ScriptedPlatform(0.01) { Assets = source }));
+    }
+
     private static RawInputEvent KeyDown(Key key) => new(RawInputEventKind.KeyDown, 0, (ushort)key, 0, -0.008f, 0, 0, 0);
 
     /// <summary>

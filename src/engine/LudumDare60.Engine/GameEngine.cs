@@ -57,12 +57,13 @@ public sealed class GameEngine : IFrameSink
             game.Initialize(assets);
             await platform.RunAsync(this);
         }
-        finally
+        catch
         {
-            _game = null;
-            _assets = null;
-            assets.UnloadAll();
+            EndRun(assets, runFailed: true);
+            throw;
         }
+
+        EndRun(assets, runFailed: false);
     }
 
     /// <summary>
@@ -103,6 +104,24 @@ public sealed class GameEngine : IFrameSink
     /// </summary>
     /// <exception cref="InvalidOperationException">No game is running.</exception>
     public void Render() => GetRunningGame().Render();
+
+    /// <summary>
+    /// Stops accepting frames and unloads the run's assets. After a failed run, a failing unload is dropped, so the
+    /// caller sees the exception that ended the run, not a later one.
+    /// </summary>
+    private void EndRun(AssetManager assets, bool runFailed)
+    {
+        _game = null;
+        _assets = null;
+        try
+        {
+            assets.UnloadAll();
+        }
+        catch (AggregateException) when (runFailed)
+        {
+            // Every asset is unloaded anyway (see AssetManager.UnloadAll); the run's exception is rethrown.
+        }
+    }
 
     private IGame GetRunningGame() => _game ?? throw new InvalidOperationException("The engine is not running.");
 }
