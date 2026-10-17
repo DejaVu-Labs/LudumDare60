@@ -126,7 +126,7 @@ family, or the last one is the restorer's own).
 **Variety from one gun model:** dirt and rust amount, grip material (palette swap), one fault and one or two
 finds per order.
 
-**Customer art is modular:** one base bust (about 48x64 px) with swappable head, hair and clothing, palette
+**Customer art is modular:** one base bust (about 96x128 px) with swappable head, hair and clothing, palette
 swaps for skin and clothes, three expressions (neutral, surprised at a find, thankful) and a two-frame blink.
 
 **MVP content:** one revolver model, 4-5 customers, one fault and one find each, a short ending.
@@ -177,12 +177,15 @@ Pixel art drives the renderer:
 Release AOT takes several minutes, so publish a Release build at the end of the first block, not only before
 the deadline.
 
+The art hours were estimated for 320x180. At 640x360 every sprite has four times the pixels: re-estimate the art
+blocks once the first revolver part is drawn, and cut early rather than late.
+
 ### Risks and cuts
 
 - **Feel.** If dragging does not feel good, nothing else matters. Tune it before any content.
 - **Bench space.** 640x232 px should fit an exploded revolver. Check the layout with real sprites early.
-- **Customer art cost.** About 6 h for 4-5 customers. Fallback: all customers as silhouettes against the shop
-  window on one shared figure, different only in outline and color.
+- **Customer art cost.** About 6 h for 4-5 customers, estimated at 48x64 px; at 96x128 px expect more. Fallback:
+  all customers as silhouettes against the shop window on one shared figure, different only in outline and color.
 - **Modern clutter.** More than five or six modern objects on screen kill the contrast.
 - **Topic.** A game about guns can look violent at first glance. Screenshots and the page must show antiques,
   the bench, the customers and the finds.

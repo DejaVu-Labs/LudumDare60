@@ -71,7 +71,9 @@ Source: <https://itch.io/docs/creators/html5> (checked 2026-10-17).
   the fly. Files ending in `.br` are served with `content-encoding: br`, and `.gz` files are detected by content.
   To use Brotli later, ship only `*.br` files and load them through `dotnet.withResourceLoader(...)`.
 - The game runs inside an `iframe`. Embed modes:
-  - *Embed in page*: fixed viewport size, and itch.io adds its own fullscreen button.
+  - *Embed in page*: fixed viewport size, and itch.io adds its own fullscreen button. Make the size a whole multiple
+    of the virtual screen: **1280x720** for 640x360. At 960x540 on a screen with pixel ratio 1 the scale is 1, and
+    more than half of the frame is black bars (see `PixelViewport` in [architecture.md](architecture.md#screen)).
   - *Click to launch in fullscreen*: arbitrary size. The canvas **must** follow its container size and
     `devicePixelRatio`.
   - *Click to play* is on by default and provides the user gesture needed to start audio. Keep it on.
@@ -168,7 +170,7 @@ run in parallel.
    both. Only the push job of `deploy.yml` uses these environments, so pull requests never see the key. Optionally
    add required reviewers to `itch` to approve each release by hand.
 4. After the first push to each project, open its *Edit game* page and mark the `html5` upload as *This file will
-   be played in the browser*.
+   be played in the browser*. Set the embed viewport to 1280x720.
 
 The `plan` job fails within seconds if a variable is missing, before the long AOT build. The push job fails if
 `BUTLER_API_KEY` is missing from the environment.
@@ -185,6 +187,8 @@ latest version from <https://broth.itch.zone/butler/linux-amd64/LATEST>, then se
 - [ ] Published build works when served from a subdirectory (`python3 -m http.server` one level up).
 - [ ] Both renderer paths work: WebGPU, and WebGL2 with WebGPU disabled.
 - [ ] Canvas resizes correctly in embed and fullscreen modes, and on high-DPI screens.
+- [ ] Pixel art stays sharp at browser zoom 125% and 150% (fractional pixel ratios), also in Safari.
+- [ ] "Loading..." shows while the runtime downloads and disappears when the game starts.
 - [ ] Audio starts after the first click or keypress.
 - [ ] No console errors. File count is under 1000.
 - [ ] Asset requests in the network tab carry `?v=<commit hash>`.

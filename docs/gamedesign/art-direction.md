@@ -8,7 +8,10 @@ Art direction for *Six Chambers* (see [concepts.md](concepts.md)). Status: draft
 - Every pixel is the same size: no mixed pixel sizes, no anti-aliasing, no gradients.
 - 1-pixel dark outline on gameplay objects (parts, tools), light from the top left.
 - The counter strip (top ~128 px) is drawn in front view. The bench (bottom ~232 px) is strict top-down.
-- Scale reference: the assembled revolver is about 120 px long, a screw is 5-7 px.
+- Scale reference: the assembled revolver is about 240 px long, a screw is 10-14 px, a customer bust is about
+  96x128 px.
+- At 640x360 a sprite has four times the pixels it had in the 320x180 draft. Block in large flat shapes first and
+  spend detail where the player looks: the parts on the mat and the finds.
 
 ## Color logic
 
@@ -64,11 +67,11 @@ Single game screen split into two zones by the front edge of a wooden counter, l
 **Sprite sheet (scale check):**
 
 ```text
-Pixel art sprite sheet on a flat dark green background, top-down view, each item separate with space around it: antique single-action revolver assembled (about 120 pixels long), cylinder front view, cylinder side view, base pin, hammer, trigger, mainspring, three screws, two walnut grip panels (one with carved initials and three notches), a rolled paper note, one brass cartridge. Same strict pixel grid, same limited palette, 1-pixel dark outline on every item, light from the top left.
+Pixel art sprite sheet on a flat dark green background, top-down view, each item separate with space around it: antique single-action revolver assembled (about 240 pixels long), cylinder front view, cylinder side view, base pin, hammer, trigger, mainspring, three screws, two walnut grip panels (one with carved initials and three notches), a rolled paper note, one brass cartridge. Same strict pixel grid, same limited palette, 1-pixel dark outline on every item, light from the top left.
 ```
 
 **Customer busts (modular check):**
 
 ```text
-Pixel art character sheet, front view, five modern customers from the chest up, about 48x64 pixels each, all built on the same base body shape with different hair, clothes and skin tones: a young person in a hoodie, an elderly woman in a cardigan, a man in a work jacket, a teenager with headphones, a woman in a raincoat. Each customer in three expressions: neutral, surprised, thankful. Flat dark background, same strict pixel grid and limited palette.
+Pixel art character sheet, front view, five modern customers from the chest up, about 96x128 pixels each, all built on the same base body shape with different hair, clothes and skin tones: a young person in a hoodie, an elderly woman in a cardigan, a man in a work jacket, a teenager with headphones, a woman in a raincoat. Each customer in three expressions: neutral, surprised, thankful. Flat dark background, same strict pixel grid and limited palette.
 ```
