@@ -4,10 +4,10 @@ Art direction for *Six Chambers* (see [concepts.md](concepts.md)). Status: draft
 
 ## Format
 
-- Pixel art on a strict grid. Base resolution **320x180**, integer scaling with nearest filtering.
+- Pixel art on a strict grid. Base resolution **640x360**, integer scaling with nearest filtering.
 - Every pixel is the same size: no mixed pixel sizes, no anti-aliasing, no gradients.
 - 1-pixel dark outline on gameplay objects (parts, tools), light from the top left.
-- The counter strip (top ~64 px) is drawn in front view. The bench (bottom ~116 px) is strict top-down.
+- The counter strip (top ~128 px) is drawn in front view. The bench (bottom ~232 px) is strict top-down.
 - Scale reference: the assembled revolver is about 120 px long, a screw is 5-7 px.
 
 ## Color logic
@@ -44,7 +44,7 @@ Palette swaps carry variety: grip material, customer skin and clothes, and time 
 ## Concept art prompts
 
 For external image generators. These images are mood references only: in the Compo every asset is drawn by
-hand during the event. Generators mix pixel sizes, so check a result by downscaling it to 320x180 with
+hand during the event. Generators mix pixel sizes, so check a result by downscaling it to 640x360 with
 nearest filtering and reducing it to the palette above.
 
 Put the style block before every prompt so the screens look like one game.
@@ -52,7 +52,7 @@ Put the style block before every prompt so the screens look like one game.
 **Style block:**
 
 ```text
-Pixel art game screen, strict pixel grid at 320x180 resolution upscaled with nearest neighbor, every pixel the same size, no anti-aliasing, no blur, no mixed pixel sizes, no gradients, limited palette of about 24 colors, clean readable shapes, cozy quiet mood. Setting: a small present-day city shop of a restorer of antique 19th-century revolvers. Color logic: the modern world is cool (night-city blue, white LED light, gray plastic), the antique objects are warm (brass, walnut wood, blued steel with warm highlights, yellowed paper). No visible text or letters, no logos, no blood, no violence.
+Pixel art game screen, strict pixel grid at 640x360 resolution upscaled with nearest neighbor, every pixel the same size, no anti-aliasing, no blur, no mixed pixel sizes, no gradients, limited palette of about 24 colors, clean readable shapes, cozy quiet mood. Setting: a small present-day city shop of a restorer of antique 19th-century revolvers. Color logic: the modern world is cool (night-city blue, white LED light, gray plastic), the antique objects are warm (brass, walnut wood, blued steel with warm highlights, yellowed paper). No visible text or letters, no logos, no blood, no violence.
 ```
 
 **Main screen (counter and bench):**

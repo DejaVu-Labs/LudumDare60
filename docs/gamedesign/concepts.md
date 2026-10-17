@@ -77,10 +77,10 @@ modern people, mostly descendants of the original owners.
 
 One screen, two projections, split by the front edge of the counter (the *Papers, Please* layout):
 
-| Zone | Share of 320x180 | View | Contents |
+| Zone | Share of 640x360 | View | Contents |
 | --- | --- | --- | --- |
-| Counter | top ~64 px | front view | Customer from the chest up, shop window with the street behind |
-| Bench | bottom ~116 px | strict top-down, no perspective | Green self-healing cutting mat with a grid, revolver parts, tool strip along the bottom edge, phone at the right edge |
+| Counter | top ~128 px | front view | Customer from the chest up, shop window with the street behind |
+| Bench | bottom ~232 px | strict top-down, no perspective | Green self-healing cutting mat with a grid, revolver parts, tool strip along the bottom edge, phone at the right edge |
 
 The bench never uses perspective: constrained drags and part layout stay simple. If the exploded gun does not
 fit, the customer steps back to the window while you work and the counter strip shrinks.
@@ -133,7 +133,7 @@ swaps for skin and clothes, three expressions (neutral, surprised at a find, tha
 
 ### Art direction
 
-Pixel art at 320x180 on a strict grid. Palette, color logic and concept art prompts live in
+Pixel art at 640x360 on a strict grid. Palette, color logic and concept art prompts live in
 [art-direction.md](art-direction.md).
 
 ### Audio
@@ -147,8 +147,9 @@ buzz for messages.
 
 Pixel art drives the renderer:
 
-- **Low-resolution target.** The scene is drawn into a 320x180 render target and scaled to the canvas by an
-  integer factor with nearest filtering (x4 = 1280x720, x6 = 1920x1080), letterboxed if needed.
+- **Low-resolution target.** The scene is drawn into a 640x360 render target and scaled to the canvas by an
+  integer factor with nearest filtering (x2 = 1280x720, x3 = 1920x1080), letterboxed if needed.
+  The math lives in `PixelViewport` (see [architecture.md](../tech/architecture.md#screen)).
 - **Sprite batcher.** All sprites come from one texture atlas. Each sprite is one instanced quad;
   `[StructLayout(LayoutKind.Sequential)]` instance structs are written into a preallocated array, uploaded with
   one `bufferSubData` and drawn with one or two instanced draw calls per frame.
@@ -164,7 +165,7 @@ Pixel art drives the renderer:
 
 | Block | Hours | Done when |
 | --- | --- | --- |
-| Platform | ~4 | WebGL2 sprite batcher with palette and 320x180 target, mouse input, sound playback, first Release publish |
+| Platform | ~4 | WebGL2 sprite batcher with palette and 640x360 target, mouse input, sound playback, first Release publish |
 | Disassembly | ~5 | Parts move on paths with resistance and snap; ordered disassembly and reassembly |
 | Cleaning | ~3 | Dirt mask scrubbing, oiling |
 | **Decision point** | ~12 h from start | One gun can be taken apart, cleaned and put back. If not: switch to the Jam |
@@ -179,7 +180,7 @@ the deadline.
 ### Risks and cuts
 
 - **Feel.** If dragging does not feel good, nothing else matters. Tune it before any content.
-- **Bench space.** 320x116 px is tight for an exploded revolver. Check the layout with real sprites early.
+- **Bench space.** 640x232 px should fit an exploded revolver. Check the layout with real sprites early.
 - **Customer art cost.** About 6 h for 4-5 customers. Fallback: all customers as silhouettes against the shop
   window on one shared figure, different only in outline and color.
 - **Modern clutter.** More than five or six modern objects on screen kill the contrast.

@@ -11,7 +11,7 @@ LudumDare60.Game.Browser ──► LudumDare60.Game ──► LudumDare60.Engine
 | Project | SDK | Role |
 | --- | --- | --- |
 | `src/engine/LudumDare60.Engine.Platform` | `Microsoft.NET.Sdk` | Platform contracts: `IPlatform`, `IFrameSink`, raw input (`RawInputEvent`, `RawInputEventKind`, `Key`, `PointerType`), asset reads (`IAssetSource`, `AssetLoadException`). No dependencies. |
-| `src/engine/LudumDare60.Engine` | `Microsoft.NET.Sdk` | `GameEngine`, `IGame`, `FrameContext`, `Assets/` (`AssetManager` and loaders). Depends only on the platform contracts. |
+| `src/engine/LudumDare60.Engine` | `Microsoft.NET.Sdk` | `GameEngine`, `IGame`, `FrameContext`, `Assets/` (`AssetManager` and loaders), `Rendering/` (`PixelViewport`). Depends only on the platform contracts. |
 | `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `Microsoft.NET.Sdk.StaticWebAssets` | `BrowserPlatform : IPlatform` and its JS: `wwwroot/boot.js` (runtime start), `wwwroot/frame-loop.js`, `wwwroot/input.js` and `wwwroot/assets.js`. Its `wwwroot/` ships with the app under `_content/LudumDare60.Engine.Platform.Browser/`. |
 | `src/game/LudumDare60.Game` | `Microsoft.NET.Sdk` | `LudumDare60Game : IGame`. No platform dependency. |
 | `src/game/LudumDare60.Game.Browser` | `Microsoft.NET.Sdk.WebAssembly` | Entry point, host page and `main.js`. Only wires the game and the browser platform together. |
@@ -212,3 +212,21 @@ running throws `InvalidOperationException`. So does calling `Update` or `Render`
 - `Update` is for per-frame work that may depend on the actual frame rate: input sampling, camera smoothing, UI.
 - `PrepareRender` reads simulation state and builds render data. It must not change simulation state.
 - `Render` submits the prepared data. It has no access to timing on purpose.
+
+## Screen
+
+The game draws a low-resolution virtual screen (640x360 for *Six Chambers*) and the renderer scales it up to the
+canvas. `Rendering/PixelViewport` holds the math, so the renderer and the input code agree on where every virtual pixel
+is:
+
+- `PixelViewport.Fit(virtualWidth, virtualHeight, surfaceWidth, surfaceHeight, pixelRatio)` takes the fields of a
+  `Resize` event. The surface is converted to device pixels (`SurfaceWidth`, `SurfaceHeight`, rounded): the canvas
+  gets exactly this size.
+- The scale is the largest whole number of device pixels per virtual pixel that fits, so every virtual pixel is the
+  same size. The image is centered (`X`, `Y`, `Width`, `Height`, from the top-left, in device pixels) with bars
+  around it. Only a surface smaller than the virtual screen gets a fractional scale, so nothing is cut off.
+- `ToVirtual(x, y)` converts pointer positions (logical pixels) to virtual pixels. Positions on the bars fall
+  outside the screen: check with `Contains`.
+
+Examples for 640x360: 1280x720 is scale 2, 1920x1080 is scale 3, 1280x720 at pixel ratio 1.5 is scale 3, and
+1400x800 is scale 2 with 60 and 40 pixel bars.
