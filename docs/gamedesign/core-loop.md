@@ -61,6 +61,11 @@ The player controls the pace. Nothing in the loop has a timer, and nothing in it
   keeps the bench readable and the content small: each order is a short script, not a full simulation.
 - **Blocking is the puzzle.** Each part lists the parts that must come off before it can move. Disassembly
   order follows from that; reassembly is the same graph backwards.
+- **A drag feels like this** (`PartDrag`, tuned with `DragFeel`): a seated part sticks until the pointer pulls it
+  about 8 px, and meanwhile only strains a quarter of the pull towards the pointer. Loose, it trails the pointer with
+  friction and a speed limit. Within 3 px of an end, moving towards it, it snaps in with a click and leaves the
+  player's hand; let go within 3 px of an end, it settles there; let go elsewhere, it stays. Snapping out (free) and in
+  (seated) click at different pitches, and coming loose gives a soft tick.
 - **A part is in one of five states:** blocked, available (glows), held (being dragged), off (on the mat),
   back (in its slot).
 - **Dirty parts:** each has a dirt mask and a clean threshold (about 90 % of mask pixels). Past the threshold the

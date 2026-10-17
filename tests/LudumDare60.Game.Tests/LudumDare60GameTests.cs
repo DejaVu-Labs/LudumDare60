@@ -2,11 +2,14 @@ using System.Numerics;
 using LudumDare60.Engine;
 using LudumDare60.Engine.Platform;
 using LudumDare60.Engine.Testing;
+using LudumDare60.Game.Parts;
 
 namespace LudumDare60.Game.Tests;
 
 public sealed class LudumDare60GameTests
 {
+    private const double Step = 1.0 / 60;
+
     private readonly ManualPlatform _platform = new();
     private readonly LudumDare60Game _game = new();
 
@@ -16,15 +19,47 @@ public sealed class LudumDare60GameTests
     private static RawInputEvent Resize(float width, float height, float ratio)
         => new(RawInputEventKind.Resize, 0, 0, 0, 0, width, height, ratio);
 
-    private static RawInputEvent PointerDown(float x, float y)
-        => new(RawInputEventKind.PointerDown, 0, (ushort)PointerType.Mouse, 1, 0, x, y, 0);
+    private static RawInputEvent PointerDown(Vector2 at)
+        => new(RawInputEventKind.PointerDown, 0, (ushort)PointerType.Mouse, 1, 0, at.X, at.Y, 0);
+
+    private static RawInputEvent PointerMove(Vector2 at)
+        => new(RawInputEventKind.PointerMove, 0, (ushort)PointerType.Mouse, 1, 0, at.X, at.Y, 0);
+
+    private static RawInputEvent PointerUp(Vector2 at)
+        => new(RawInputEventKind.PointerUp, 0, (ushort)PointerType.Mouse, 1, 0, at.X, at.Y, 0);
+
+    /// <summary>
+    /// Starts at one logical pixel per virtual pixel, with the click sound decoded.
+    /// </summary>
+    private void StartWithSound()
+    {
+        _platform.Frame(0, Resize(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight, 1));
+        _platform.AudioBackend.ReportReady(0);
+        _platform.Frame(Step);
+    }
+
+    /// <summary>
+    /// Holds the pointer at <paramref name="at"/> for <paramref name="frames"/> frames of one fixed step each.
+    /// </summary>
+    private void HoldAt(Vector2 at, int frames)
+    {
+        for (var i = 0; i < frames; i++)
+        {
+            _platform.Frame(Step, PointerMove(at));
+        }
+    }
+
+    private static int AlphaAt(byte[] pixels, int x, int y) => pixels[(((y * PlaceholderParts.Width) + x) * 4) + 3];
+
+    private List<double> PlayedPitches()
+        => [.. _platform.AudioBackend.AllCommands().Where(c => c.Kind == AudioCommandKind.Play).Select(c => c.Arguments[3])];
 
     [Fact]
-    public void FirstFrame_CreatesPlaceholderTextureAndDrawsOnMat()
+    public void FirstFrame_CreatesThePartsTextureAndDrawsOnMat()
     {
         _platform.Frame(0);
 
-        Assert.Equal("create 0 32x32", _platform.Backend.Calls[0]);
+        Assert.Equal("create 0 64x48", _platform.Backend.Calls[0]);
         var frame = Assert.Single(_platform.Backend.Frames);
         var commands = frame.Decode();
         Assert.Equal(RenderCommandKind.Clear, commands[1].Kind);
@@ -34,46 +69,121 @@ public sealed class LudumDare60GameTests
     }
 
     [Fact]
-    public void PlaceholderTexture_HasTransparentCornersAndOpaqueInside()
+    public void FirstFrame_CreatesTheClickAsWav()
+    {
+        _platform.Frame(0);
+
+        var click = Assert.Single(_platform.AudioBackend.Sounds).Value;
+        Assert.Equal("RIFF"u8.ToArray(), click[..4]);
+        Assert.Equal("WAVE"u8.ToArray(), click[8..12]);
+        Assert.Equal(44 + (PlaceholderSounds.SampleRate * 60 / 1000 * 2), click.Length);
+    }
+
+    [Fact]
+    public void PartsTexture_PinHeadIsOpaqueAndItsGlowSurroundsIt()
     {
         _platform.Frame(0);
 
         var pixels = _platform.Backend.Textures[0];
-        Assert.Equal(0, pixels[3]);
-        Assert.Equal(255, pixels[(((16 * 32) + 16) * 4) + 3]);
+        var pin = PlaceholderParts.Pin;
+        var glow = PlaceholderParts.PinGlow;
+        Assert.Equal(255, AlphaAt(pixels, pin.X + 2, pin.Y + 3));
+        Assert.Equal(0, AlphaAt(pixels, pin.X + 20, pin.Y));
+        Assert.Equal(255, AlphaAt(pixels, glow.X, glow.Y + 1));
+        Assert.Equal(0, AlphaAt(pixels, glow.X + 3, glow.Y + 4));
     }
 
     [Fact]
-    public void PointerDown_MovesSpriteToVirtualPosition()
-    {
-        // 1400x800 at ratio 1: scale 2 with a 60 px bar left and a 40 px bar on top.
-        _platform.Frame(0, Resize(1400, 800, 1), PointerDown(60 + 200, 40 + 100));
-
-        Assert.Equal(new Vector2(100, 50), _game.PointerPosition);
-        Assert.Equal(new Vector2(100, 50), _platform.Backend.Frames[0].Instances[^1].Position);
-    }
-
-    [Fact]
-    public void PrimaryButtonDown_DoublesTheCursorSprite()
-    {
-        _platform.Frame(0, PointerDown(100, 100));
-
-        Assert.True(_game.IsHolding);
-        Assert.Equal(new Vector2(2, 2), _platform.Backend.Frames[0].Instances[^1].Scale);
-    }
-
-    [Fact]
-    public void Frames_CreateTheTextureOnce()
+    public void Frames_CreateTheTextureAndSoundOnce()
     {
         _platform.Frame(0);
         _platform.Frame(0.01);
 
         Assert.Single(_platform.Backend.Textures);
+        Assert.Single(_platform.AudioBackend.Sounds);
         Assert.Equal(2, _platform.Backend.Frames.Count);
     }
 
     [Fact]
-    public void FirstFrame_NoBackgroundFile_DrawsMatAndPlaceholdersOnly()
+    public void Render_PinSeated_DrawsGlowPinThenFrame()
+    {
+        _platform.Frame(0);
+
+        var instances = _platform.Backend.Frames[0].Instances;
+        Assert.Equal(LudumDare60Game.PinSeated, instances[0].Position);
+        Assert.Equal(PlaceholderParts.PinGlow.Height, instances[0].SourceHeight);
+        Assert.Equal(LudumDare60Game.PinSeated, instances[1].Position);
+        Assert.Equal(PlaceholderParts.Pin.Width, instances[1].SourceWidth);
+        Assert.Equal(LudumDare60Game.FramePosition, instances[2].Position);
+    }
+
+    [Fact]
+    public void PointerOverPin_GlowsAtFullStrength()
+    {
+        StartWithSound();
+
+        _platform.Frame(Step, PointerMove(LudumDare60Game.PinSeated + new Vector2(0, 2)));
+
+        Assert.True(_game.BasePin.IsHovered);
+        Assert.Equal(255, _platform.Backend.Frames[^1].Instances[0].Tint.A);
+    }
+
+    [Fact]
+    public void PointerAwayFromPin_GlowsFaintly()
+    {
+        StartWithSound();
+
+        _platform.Frame(Step, PointerMove(new Vector2(500, 300)));
+
+        Assert.False(_game.BasePin.IsHovered);
+        Assert.InRange(_platform.Backend.Frames[^1].Instances[0].Tint.A, 1, 254);
+    }
+
+    [Fact]
+    public void DragPinOut_SnapsItFreeWithClicks()
+    {
+        StartWithSound();
+
+        _platform.Frame(Step, PointerDown(LudumDare60Game.PinSeated));
+        HoldAt(LudumDare60Game.PinOut - new Vector2(20, 0), 90);
+
+        Assert.Equal(PartStop.End, _game.BasePin.Stop);
+        Assert.False(_game.BasePin.IsHeld);
+        Assert.Equal(LudumDare60Game.PinOut, _platform.Backend.Frames[^1].Instances[1].Position);
+        Assert.Equal([0.55, 1.25], PlayedPitches(), (a, b) => Math.Abs(a - b) < 1e-6);
+    }
+
+    [Fact]
+    public void PushPinBackIn_SeatsItWithALowClick()
+    {
+        StartWithSound();
+        _platform.Frame(Step, PointerDown(LudumDare60Game.PinSeated));
+        HoldAt(LudumDare60Game.PinOut - new Vector2(20, 0), 90);
+        _platform.Frame(Step, PointerUp(LudumDare60Game.PinOut - new Vector2(20, 0)));
+
+        _platform.Frame(Step, PointerDown(LudumDare60Game.PinOut));
+        HoldAt(LudumDare60Game.PinSeated + new Vector2(20, 0), 90);
+
+        Assert.Equal(PartStop.Start, _game.BasePin.Stop);
+        Assert.Equal(LudumDare60Game.PinSeated, _platform.Backend.Frames[^1].Instances[1].Position);
+        Assert.Equal(0.75, PlayedPitches()[^1], 1e-6);
+    }
+
+    [Fact]
+    public void PullPinLessThanBreakaway_KeepsItSeatedAndSilent()
+    {
+        StartWithSound();
+
+        _platform.Frame(Step, PointerDown(LudumDare60Game.PinSeated));
+        HoldAt(LudumDare60Game.PinSeated - new Vector2(4, 0), 30);
+
+        Assert.Equal(PartStop.Start, _game.BasePin.Stop);
+        Assert.True(_game.BasePin.IsHeld);
+        Assert.Empty(PlayedPitches());
+    }
+
+    [Fact]
+    public void FirstFrame_NoBackgroundFile_DrawsMatAndPartsOnly()
     {
         _platform.Frame(0);
 

@@ -4,4 +4,8 @@
     <ProjectReference Include="..\..\engine\LudumDare60.Engine\LudumDare60.Engine.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="LudumDare60.Game.Tests" />
+  </ItemGroup>
+
 </Project>
