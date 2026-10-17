@@ -79,6 +79,16 @@ A second `IGraphicsBackend` in the browser platform on the same command stream, 
 (`wwwroot/shaders/sprite.wgsl.js` next to `sprite.glsl.js`). Picked at startup when `navigator.gpu` and
 `requestAdapter()` succeed, with WebGL2 as the fallback. Not needed for the Compo.
 
+## FTUE support
+
+Engine and host work for the first-time experience (see [ftue.md](gamedesign/ftue.md)):
+
+- Poster frame in the host page: the title screen image and a loading bar instead of the `Loading...` text,
+  removed when the first frame is rendered.
+- Cursor sprites per verb, drawn by the game. Needs the cursor visibility command from
+  [Platform commands](#platform-commands-game-to-platform) to hide the system cursor over the canvas.
+- Idle timer and hint state (glow, wiggle, ghost hand) in the order logic, tested without a browser.
+
 ## Browser E2E smoke tests
 
 A `tests/*.E2E` project with `Microsoft.Playwright`: the published build boots, reaches the first frame and logs

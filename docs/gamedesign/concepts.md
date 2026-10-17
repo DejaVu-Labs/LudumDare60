@@ -87,6 +87,9 @@ fit, the customer steps back to the window while you work and the counter strip 
 
 ### Core loop
 
+Summary below; the full loop, rules and order list are in [core-loop.md](core-loop.md), and how a new player
+learns it is in [ftue.md](ftue.md).
+
 1. A customer comes to the counter and puts down a revolver. Their request is shown as an icon of the symptom
    (jammed cylinder, broken spring, rust), not as text.
 2. **Inspect.** Look the gun over with the magnifier, find dirt, rust and the broken part.
