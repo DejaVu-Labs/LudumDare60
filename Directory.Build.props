@@ -10,7 +10,8 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Browser projects enable it in Release only: any non-default value forces a native relink on every Debug build. -->
+    <InvariantGlobalization Condition="'$(UsingMicrosoftNETSdkWebAssembly)' != 'true'">true</InvariantGlobalization>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <NeutralLanguage>en</NeutralLanguage>
   </PropertyGroup>
@@ -78,6 +79,7 @@
 
   <PropertyGroup Label="WebAssembly release" Condition="'$(UsingMicrosoftNETSdkWebAssembly)' == 'true' and '$(Configuration)' == 'Release'">
     <RunAOTCompilation>true</RunAOTCompilation>
+    <InvariantGlobalization>true</InvariantGlobalization>
     <PublishTrimmed>true</PublishTrimmed>
     <TrimMode>full</TrimMode>
     <WasmStripILAfterAOT>true</WasmStripILAfterAOT>

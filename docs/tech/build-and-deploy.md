@@ -18,7 +18,7 @@ Game projects use `Sdk="Microsoft.NET.Sdk.WebAssembly"`. The root `Directory.Bui
 | `WasmEnableSIMD` | `true` | Wasm SIMD128 is supported by every browser we target; `System.Numerics` / `Vector128` code gets faster. |
 | `WasmEnableExceptionHandling` | `true` | Native Wasm EH gives smaller, faster code than the JS fallback. |
 | `CompressionEnabled` | `false` | itch.io already gzips `.wasm`, `.js`, `.html` and `.css`. Pre-compressed `.br`/`.gz` copies would double the file count and would never be served. |
-| `InvariantGlobalization` | `true` | No ICU data files (saves several MB). Culture-sensitive APIs must not be relied on. |
+| `InvariantGlobalization` (Release) | `true` | No ICU data files (saves several MB). Culture-sensitive APIs must not be relied on. Only Release sets it, because any value that differs from the runtime pack default forces a native relink on every Debug build (about +10 s). Desktop projects and tests always run invariant. |
 | `RunAOTCompilation` (Release) | `true` | IL is compiled to native Wasm. Much faster at runtime, slower to build. |
 | `WasmStripILAfterAOT` (Release) | `true` | Drops IL bodies that AOT has already compiled. |
 | `TrimMode` (Release) | `full` | Trims the whole app, not only the framework. |

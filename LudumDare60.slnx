@@ -1,2 +1,22 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path="AGENTS.md" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Build.targets" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+    <File Path="package.json" />
+  </Folder>
+  <Folder Name="/src/" />
+  <Folder Name="/src/engine/">
+    <Project Path="src/engine/LudumDare60.Engine/LudumDare60.Engine.csproj" />
+  </Folder>
+  <Folder Name="/src/game/">
+    <Project Path="src/game/LudumDare60.Game.Browser/LudumDare60.Game.Browser.csproj" />
+    <Project Path="src/game/LudumDare60.Game/LudumDare60.Game.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <File Path="tests/Directory.Build.props" />
+  </Folder>
 </Solution>
