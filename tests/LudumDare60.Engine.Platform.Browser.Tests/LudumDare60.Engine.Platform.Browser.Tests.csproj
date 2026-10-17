@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\engine\platforms\LudumDare60.Engine.Platform.Browser\LudumDare60.Engine.Platform.Browser.csproj" />
+  </ItemGroup>
+
+</Project>

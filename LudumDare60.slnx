@@ -22,6 +22,7 @@
   </Folder>
   <Folder Name="/tests/">
     <File Path="tests/Directory.Build.props" />
+    <Project Path="tests/LudumDare60.Engine.Platform.Browser.Tests/LudumDare60.Engine.Platform.Browser.Tests.csproj" />
     <Project Path="tests/LudumDare60.Engine.Tests/LudumDare60.Engine.Tests.csproj" />
   </Folder>
 </Solution>

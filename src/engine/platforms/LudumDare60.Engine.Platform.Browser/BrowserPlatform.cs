@@ -1,18 +1,21 @@
-using System.Diagnostics.CodeAnalysis;
+using System.Runtime.Versioning;
 
 namespace LudumDare60.Engine.Platform.Browser;
 
 /// <summary>
-/// <see cref="IPlatform"/> for the browser (WebAssembly).
+/// <see cref="IPlatform"/> for the browser (WebAssembly). Frames come from <c>requestAnimationFrame</c>, one
+/// JS-to-.NET call per frame.
 /// </summary>
-/// <remarks>Stub: it does not produce frames yet, so <see cref="RunAsync"/> completes immediately.</remarks>
+[SupportedOSPlatform("browser")]
 public sealed class BrowserPlatform : IPlatform
 {
     /// <inheritdoc />
-    [SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Stub; platform state will be added.")]
-    public Task RunAsync(IFrameSink frameSink)
+    /// <remarks>The returned task completes only if a frame throws; it then faults with that exception.</remarks>
+    public async Task RunAsync(IFrameSink frameSink)
     {
         ArgumentNullException.ThrowIfNull(frameSink);
-        return Task.CompletedTask;
+
+        await FrameLoopInterop.ImportAsync();
+        await FrameLoopInterop.RunAsync(new FrameDispatcher(frameSink).OnFrame);
     }
 }

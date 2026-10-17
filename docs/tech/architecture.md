@@ -12,7 +12,7 @@ LudumDare60.Game.Browser ──► LudumDare60.Game ──► LudumDare60.Engine
 | --- | --- | --- |
 | `src/engine/LudumDare60.Engine.Platform` | `Microsoft.NET.Sdk` | Platform contracts: `IPlatform`, `IFrameSink`. No dependencies. |
 | `src/engine/LudumDare60.Engine` | `Microsoft.NET.Sdk` | `GameEngine`, `IGame`, `FrameContext`. Depends only on the platform contracts. |
-| `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `Microsoft.NET.Sdk.StaticWebAssets` | `BrowserPlatform : IPlatform`. Its `wwwroot/` (when added) ships with the app under `_content/LudumDare60.Engine.Platform.Browser/`. |
+| `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `Microsoft.NET.Sdk.StaticWebAssets` | `BrowserPlatform : IPlatform` and its JS (`wwwroot/frame-loop.js`). Its `wwwroot/` ships with the app under `_content/LudumDare60.Engine.Platform.Browser/`. |
 | `src/game/LudumDare60.Game` | `Microsoft.NET.Sdk` | `LudumDare60Game : IGame`. No platform dependency. |
 | `src/game/LudumDare60.Game.Browser` | `Microsoft.NET.Sdk.WebAssembly` | Entry point and host page. Only wires the game and the browser platform together. |
 
@@ -42,6 +42,22 @@ Inside `GameEngine.Update(dt)`:
    far the current time is between the last fixed step and the next one. Use it to interpolate render state.
 
 `GameEngine.Render()` forwards to `IGame.Render()`.
+
+### Browser frame loop
+
+`BrowserPlatform.RunAsync(sink)` imports `frame-loop.js` with `JSHost.ImportAsync` and calls its `run(onFrame)`
+through `[JSImport]`, passing an `Action<double>` that calls `sink.Update(dt)` and then `sink.Render()`.
+
+- `frame-loop.js` schedules one `requestAnimationFrame` callback per frame and calls `onFrame(dt)` from it, so a
+  frame costs exactly one JS-to-.NET call. `dt` is the difference between two rAF timestamps, in seconds; the
+  first frame reports 0. The engine clamps large values (a hidden tab pauses rAF).
+- If a frame throws, the loop stops and the promise returned by `run` rejects. The `[JSImport]` task faults with
+  the original .NET exception, so `BrowserPlatform.RunAsync` and then `GameEngine.RunAsync` fault with it.
+  Otherwise the task never completes.
+- The module URL is `../_content/LudumDare60.Engine.Platform.Browser/frame-loop.js`, relative to
+  `_framework/dotnet.runtime.js` (the runtime performs the `import()`). On build and publish the file gets a
+  content hash in its name (`frame-loop.<hash>.js`), and the import map that the SDK writes into `index.html`
+  maps the plain URL to it. See [build-and-deploy.md](build-and-deploy.md#static-web-assets).
 
 ### FrameContext
 

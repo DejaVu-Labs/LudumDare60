@@ -72,10 +72,22 @@
     <WasmEnableThreads>false</WasmEnableThreads>
     <WasmEnableSIMD>true</WasmEnableSIMD>
     <WasmEnableExceptionHandling>true</WasmEnableExceptionHandling>
-    <!-- itch.io gzips .wasm/.js on the fly; pre-compressed copies only double the file count. -->
-    <CompressionEnabled>false</CompressionEnabled>
     <WasmFingerprintAssets>true</WasmFingerprintAssets>
   </PropertyGroup>
+
+  <!--
+    Static web assets: the browser game and the browser platform's _content/ files. Both settings are inert in other
+    projects. By default the SDK fingerprints only *.lib.module.js among JS files; the pattern below renames every .js
+    asset to name.<hash>.js on publish and maps the original URL to it in the host page's import map.
+  -->
+  <PropertyGroup Label="Static web assets">
+    <!-- itch.io gzips .wasm/.js on the fly; pre-compressed copies only double the file count. -->
+    <CompressionEnabled>false</CompressionEnabled>
+  </PropertyGroup>
+
+  <ItemGroup Label="Static web assets">
+    <StaticWebAssetFingerprintPattern Include="JS" Pattern="*.js" Expression="#[.{fingerprint}]!" />
+  </ItemGroup>
 
   <PropertyGroup Label="WebAssembly release" Condition="'$(UsingMicrosoftNETSdkWebAssembly)' == 'true' and '$(Configuration)' == 'Release'">
     <RunAOTCompilation>true</RunAOTCompilation>

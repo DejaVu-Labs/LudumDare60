@@ -24,6 +24,16 @@ Game projects use `Sdk="Microsoft.NET.Sdk.WebAssembly"`. The root `Directory.Bui
 | `TrimMode` (Release) | `full` | Trims the whole app, not only the framework. |
 | Feature switches (Release) | off | `DebuggerSupport`, `EventSourceSupport`, `StackTraceSupport`, `MetricsSupport`, `UseSystemResourceKeys` reduce size. Exception messages become resource keys in Release builds. |
 
+### Static web assets
+
+These settings apply to every static web assets project: the game (`Microsoft.NET.Sdk.WebAssembly`) and the
+browser platform (`Microsoft.NET.Sdk.StaticWebAssets`, files under `_content/<project>/`).
+
+| Setting | Value | Why |
+| --- | --- | --- |
+| `CompressionEnabled` | `false` | See above. Without it, library assets would still ship `.br` and `.gz` copies. |
+| `StaticWebAssetFingerprintPattern` `*.js` | `#[.{fingerprint}]!` | The SDK fingerprints only `*.lib.module.js` by default. This pattern renames every `.js` asset to `name.<hash>.js` and adds an import map entry from the plain URL. Load JS modules by their plain URL (static `import`, `import()` or `JSHost.ImportAsync`); the `<script type="importmap">` placeholder in `index.html` (`OverrideHtmlAssetPlaceholders`) resolves it. |
+
 Release publish:
 
 ```bash
