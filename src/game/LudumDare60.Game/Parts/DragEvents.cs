@@ -1,7 +1,7 @@
 namespace LudumDare60.Game.Parts;
 
 /// <summary>
-/// What happened to a <see cref="PartDrag"/> during one <see cref="PartDrag.Step"/>, for sounds and effects.
+/// What happened to a <see cref="PartDrag"/> during one <see cref="PartDrag.Step(in PointerSample, float, bool)"/>, for sounds and effects.
 /// </summary>
 [Flags]
 public enum DragEvents
@@ -32,4 +32,10 @@ public enum DragEvents
     /// The pointer went up while holding the part.
     /// </summary>
     Dropped = 16,
+
+    /// <summary>
+    /// The pointer went down on the part while something blocked it, so it did not move. Reported by
+    /// <see cref="PartAssembly"/>.
+    /// </summary>
+    Refused = 32,
 }

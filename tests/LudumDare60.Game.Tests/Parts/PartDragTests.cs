@@ -23,12 +23,12 @@ public sealed class PartDragTests
     /// <summary>
     /// Steps until an event in <paramref name="until"/> happens, and returns all events seen.
     /// </summary>
-    private static DragEvents StepUntil(PartDrag part, PointerSample pointer, DragEvents until, int maxSteps = 600)
+    private static DragEvents StepUntil(PartDrag part, PointerSample pointer, DragEvents until, int maxSteps = 600, bool canGrab = true)
     {
         var seen = DragEvents.None;
         for (var i = 0; i < maxSteps && (seen & until) == DragEvents.None; i++)
         {
-            seen |= part.Step(pointer, Dt);
+            seen |= part.Step(pointer, Dt, canGrab);
             Assert.InRange(part.Distance, 0, s_path.Length);
         }
 
@@ -103,6 +103,33 @@ public sealed class PartDragTests
         Assert.True(_part.IsHeld);
         Assert.False(_part.IsHovered);
     }
+
+    [Fact]
+    public void Step_CannotGrab_NeitherHoversNorGrabs()
+    {
+        var events = _part.Step(Press(100), Dt, canGrab: false);
+
+        Assert.Equal(DragEvents.None, events);
+        Assert.False(_part.IsHovered);
+        Assert.False(_part.IsHeld);
+    }
+
+    [Fact]
+    public void Step_CannotGrabWhileHeld_KeepsDragging()
+    {
+        GrabAndBreakFree();
+
+        var events = StepUntil(_part, Hold(0), DragEvents.SnappedEnd, canGrab: false);
+
+        Assert.Equal(DragEvents.SnappedEnd, events);
+    }
+
+    [Theory]
+    [InlineData(100, 50, true)]
+    [InlineData(106, 50, true)]
+    [InlineData(104, 55, false)]
+    public void IsUnder_Point_ChecksTheGrabRadius(float x, float y, bool expected)
+        => Assert.Equal(expected, _part.IsUnder(new Vector2(x, y)));
 
     [Fact]
     public void Step_PressAwayFromPart_DoesNotGrab()

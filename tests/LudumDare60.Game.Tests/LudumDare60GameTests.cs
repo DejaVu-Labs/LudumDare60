@@ -59,13 +59,13 @@ public sealed class LudumDare60GameTests
     {
         _platform.Frame(0);
 
-        Assert.Equal("create 0 64x48", _platform.Backend.Calls[0]);
+        Assert.Equal("create 0 64x64", _platform.Backend.Calls[0]);
         var frame = Assert.Single(_platform.Backend.Frames);
         var commands = frame.Decode();
         Assert.Equal(RenderCommandKind.Clear, commands[1].Kind);
         Assert.Equal(BitConverter.ToInt32([0x0b, 0x4f, 0x45, 0xff]), commands[1].Arguments[0]);
-        Assert.Equal(3, frame.Instances.Length);
-        Assert.Equal(new RenderCommand(RenderCommandKind.DrawSprites, [0, 0, 3]), commands[2]);
+        Assert.Equal(5, frame.Instances.Length);
+        Assert.Equal(new RenderCommand(RenderCommandKind.DrawSprites, [0, 0, 5]), commands[2]);
     }
 
     [Fact]
@@ -170,6 +170,71 @@ public sealed class LudumDare60GameTests
     }
 
     [Fact]
+    public void PartsTexture_FrameWindowIsOpen()
+    {
+        _platform.Frame(0);
+
+        var pixels = _platform.Backend.Textures[0];
+        var inWindow = PlaceholderParts.CylinderInFrame + new Vector2(5, 5);
+        Assert.Equal(0, AlphaAt(pixels, (int)inWindow.X, (int)inWindow.Y));
+        Assert.Equal(255, AlphaAt(pixels, 5, 5));
+    }
+
+    [Fact]
+    public void Render_Assembled_DrawsTheCylinderInTheWindowWithoutGlow()
+    {
+        _platform.Frame(0);
+
+        var instances = _platform.Backend.Frames[0].Instances;
+        Assert.Equal(LudumDare60Game.CylinderSeated, instances[4].Position);
+        Assert.Equal(PlaceholderParts.Cylinder.Width, instances[4].SourceWidth);
+        Assert.Equal(0, instances[3].Tint.A);
+        Assert.Equal(LudumDare60Game.PinSeated.Y, LudumDare60Game.CylinderSeated.Y);
+    }
+
+    [Fact]
+    public void PressOnCylinderFirst_RefusesWithADullTickAndFlashesThePin()
+    {
+        StartWithSound();
+
+        _platform.Frame(Step, PointerDown(LudumDare60Game.CylinderSeated));
+        HoldAt(LudumDare60Game.CylinderOut + new Vector2(0, 20), 3);
+
+        Assert.Equal(PartStop.Start, _game.Cylinder.Stop);
+        Assert.False(_game.Cylinder.IsHeld);
+        Assert.Equal([0.4], PlayedPitches(), (a, b) => Math.Abs(a - b) < 1e-6);
+        Assert.Equal(255, _platform.Backend.Frames[^4].Instances[0].Tint.A);
+    }
+
+    [Fact]
+    public void TakeApartAndPutBack_PinThenCylinderAndBackInReverse()
+    {
+        StartWithSound();
+        Drag(LudumDare60Game.PinSeated, LudumDare60Game.PinOut - new Vector2(20, 0));
+        Drag(LudumDare60Game.CylinderSeated, LudumDare60Game.CylinderOut + new Vector2(0, 20));
+
+        Assert.True(_game.Gun.AllAt(PartStop.End));
+        Assert.Equal(LudumDare60Game.CylinderOut, _platform.Backend.Frames[^1].Instances[4].Position);
+
+        Drag(LudumDare60Game.CylinderOut, LudumDare60Game.CylinderSeated - new Vector2(0, 20));
+        Drag(LudumDare60Game.PinOut, LudumDare60Game.PinSeated + new Vector2(20, 0));
+
+        Assert.True(_game.Gun.AllAt(PartStop.Start));
+        var cylinderClicks = PlayedPitches().Where(p => Math.Abs(p - 1.0) < 1e-6 || Math.Abs(p - 0.6) < 1e-6);
+        Assert.Equal([1.0, 0.6], cylinderClicks, (a, b) => Math.Abs(a - b) < 1e-6);
+    }
+
+    /// <summary>
+    /// Presses at <paramref name="from"/>, holds at <paramref name="to"/> for 90 frames and lets go.
+    /// </summary>
+    private void Drag(Vector2 from, Vector2 to)
+    {
+        _platform.Frame(Step, PointerDown(from));
+        HoldAt(to, 90);
+        _platform.Frame(Step, PointerUp(to));
+    }
+
+    [Fact]
     public void PullPinLessThanBreakaway_KeepsItSeatedAndSilent()
     {
         StartWithSound();
@@ -210,7 +275,7 @@ public sealed class LudumDare60GameTests
         platform.Frame(0);
 
         var frame = Assert.Single(platform.Backend.Frames);
-        Assert.Equal(4, frame.Instances.Length);
+        Assert.Equal(6, frame.Instances.Length);
         var background = frame.Instances[0];
         Assert.Equal(Vector2.Zero, background.Position);
         Assert.Equal(LudumDare60Game.VirtualWidth, background.SourceWidth);
@@ -218,7 +283,7 @@ public sealed class LudumDare60GameTests
         var commands = frame.Decode();
         Assert.Equal(RenderCommandKind.Clear, commands[1].Kind);
         Assert.Equal(new RenderCommand(RenderCommandKind.DrawSprites, [1, 0, 1]), commands[2]);
-        Assert.Equal(new RenderCommand(RenderCommandKind.DrawSprites, [0, 1, 3]), commands[3]);
+        Assert.Equal(new RenderCommand(RenderCommandKind.DrawSprites, [0, 1, 5]), commands[3]);
     }
 
     [Fact]
@@ -230,7 +295,7 @@ public sealed class LudumDare60GameTests
         platform.Frame(0.01);
 
         Assert.Equal(2, platform.Backend.Textures.Count);
-        Assert.Equal(4, platform.Backend.Frames[1].Instances.Length);
+        Assert.Equal(6, platform.Backend.Frames[1].Instances.Length);
     }
 
     private static (ManualPlatform Platform, LudumDare60Game Game) StartWithShippedAssets()

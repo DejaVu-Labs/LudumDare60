@@ -7,7 +7,7 @@ namespace LudumDare60.Game.Parts;
 /// docs/gamedesign/core-loop.md. Snapped into an end, the part sticks until it is pulled
 /// <see cref="DragFeel.BreakawayAtStart"/> pixels and only strains towards the pointer; loose, it follows the pointer
 /// with friction; moving into an end, it snaps there and the player lets go of it. A part let go between the ends
-/// stays where it is, unless it is within an end's snap zone. Advance it once per fixed step with <see cref="Step"/>.
+/// stays where it is, unless it is within an end's snap zone. Advance it once per fixed step with <see cref="Step(in PointerSample, float, bool)"/>.
 /// </summary>
 public sealed class PartDrag
 {
@@ -65,7 +65,7 @@ public sealed class PartDrag
     public float Distance { get; private set; }
 
     /// <summary>
-    /// <see cref="Distance"/> before the last <see cref="Step"/>, for interpolated rendering.
+    /// <see cref="Distance"/> before the last <see cref="Step(in PointerSample, float, bool)"/>, for interpolated rendering.
     /// </summary>
     public float PreviousDistance { get; private set; }
 
@@ -96,18 +96,33 @@ public sealed class PartDrag
     public Vector2 GetRenderPosition(float alpha) => Path.PointAt(float.Lerp(PreviousDistance, Distance, alpha));
 
     /// <summary>
+    /// Whether <paramref name="point"/> lies within <see cref="GrabRadius"/> of the part.
+    /// </summary>
+    public bool IsUnder(Vector2 point) => Vector2.DistanceSquared(point, Position) <= GrabRadius * GrabRadius;
+
+    /// <summary>
     /// Advances the part by one fixed step.
     /// </summary>
     /// <param name="input">The pointer at the end of the step.</param>
     /// <param name="deltaTime">The step's length in seconds.</param>
     /// <returns>What happened during the step.</returns>
-    public DragEvents Step(in PointerSample input, float deltaTime)
+    public DragEvents Step(in PointerSample input, float deltaTime) => Step(input, deltaTime, canGrab: true);
+
+    /// <summary>
+    /// Advances the part by one fixed step.
+    /// </summary>
+    /// <param name="input">The pointer at the end of the step.</param>
+    /// <param name="deltaTime">The step's length in seconds.</param>
+    /// <param name="canGrab">Whether the part may be hovered and grabbed in this step: false while it is blocked, or
+    /// while another part has the pointer. A part already held keeps moving either way.</param>
+    /// <returns>What happened during the step.</returns>
+    public DragEvents Step(in PointerSample input, float deltaTime, bool canGrab)
     {
         PreviousDistance = Distance;
         var events = DragEvents.None;
         if (!IsHeld)
         {
-            IsHovered = Vector2.DistanceSquared(input.Position, Position) <= GrabRadius * GrabRadius;
+            IsHovered = canGrab && IsUnder(input.Position);
             if (!input.IsPressed || !IsHovered)
             {
                 return events;

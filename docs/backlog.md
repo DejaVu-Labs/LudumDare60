@@ -71,15 +71,18 @@ Deferred when the asset manager shipped (see [docs/tech/architecture.md](tech/ar
 
 ## Touch loop follow-ups
 
-The base pin drags along a line with breakaway, friction and a snap (`Parts/PartDrag`). Still to do:
+Order 1's base pin and cylinder drag along lines with breakaway, friction and a snap (`Parts/PartDrag`), in the
+order their blocking graph allows (`Parts/PartAssembly`). Still to do:
 
 - Tune `DragFeel` by hand with a mouse and a touchpad. A quick flick released early leaves the part short of the end,
   because it trails the pointer at most 160 px/s; check whether that reads as weight or as a missed drag.
 - Arc and circle paths for swing (loading gate, grip panel) and unscrew (circular motion around a screw).
 - A friction loop sound while a loose part moves, its pitch rising towards the snap, and a small screen shake on the
   snap.
-- Lift a free part off its path onto the mat, and the blocking graph between parts (an order unlocks only its parts).
-- Replace the code-generated frame, pin and click with the real sprites and recordings.
+- Lift a free part off its path onto the mat, so the bench is not limited to one straight path per part.
+- Order data: which parts an order unlocks, their paths, feel and blocks, instead of the two parts built in
+  `LudumDare60Game`.
+- Replace the code-generated frame, pin, cylinder and click with the real sprites and recordings.
 
 ## Dirt masks
 

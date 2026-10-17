@@ -60,7 +60,9 @@ The player controls the pace. Nothing in the loop has a timer, and nothing in it
 - **An order unlocks only the parts it needs.** Every other part of the revolver is fixed for that order. This
   keeps the bench readable and the content small: each order is a short script, not a full simulation.
 - **Blocking is the puzzle.** Each part lists the parts that must come off before it can move. Disassembly
-  order follows from that; reassembly is the same graph backwards.
+  order follows from that; reassembly is the same graph backwards (`PartAssembly`): a blocker goes back in only
+  once everything it blocks is back. A part halfway out still blocks. Pressing a blocked part does not move it: a
+  dull tick plays and the parts that hold it flash for a moment, so the player sees what comes first.
 - **A drag feels like this** (`PartDrag`, tuned with `DragFeel`): a seated part sticks until the pointer pulls it
   about 8 px, and meanwhile only strains a quarter of the pull towards the pointer. Loose, it trails the pointer with
   friction and a speed limit. Within 3 px of an end, moving towards it, it snaps in with a click and leaves the

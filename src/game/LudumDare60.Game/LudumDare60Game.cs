@@ -9,10 +9,10 @@ using LudumDare60.Game.Parts;
 namespace LudumDare60.Game;
 
 /// <summary>
-/// The Ludum Dare 60 game. For now the bench background (the cutting mat color until it loads) with one touch-loop
-/// prototype on it: a base pin the player pulls out of a block of frame steel and pushes back in, with breakaway,
-/// friction, a glow and a click at either end. The parts and the click are placeholders until the real art and
-/// recordings arrive.
+/// The Ludum Dare 60 game. For now the bench background (the cutting mat color until it loads) with the parts of
+/// order 1 on it: a block of frame steel holding a cylinder on a base pin. The pin comes out first, then the cylinder;
+/// they go back in reverse order. Parts that can move glow, a press on a blocked part flashes what blocks it, and every
+/// snap clicks. The parts and the click are placeholders until the real art and recordings arrive.
 /// </summary>
 public sealed class LudumDare60Game : IGame
 {
@@ -23,6 +23,16 @@ public sealed class LudumDare60Game : IGame
 
     /// <inheritdoc cref="VirtualWidth"/>
     public const int VirtualHeight = 360;
+
+    /// <summary>
+    /// Index of the base pin in <see cref="Gun"/>.
+    /// </summary>
+    public const int BasePinIndex = 0;
+
+    /// <summary>
+    /// Index of the cylinder in <see cref="Gun"/>.
+    /// </summary>
+    public const int CylinderIndex = 1;
 
     /// <summary>
     /// The cutting mat, the screen color until the background is loaded.
@@ -44,17 +54,43 @@ public sealed class LudumDare60Game : IGame
     /// </summary>
     public static readonly Vector2 PinOut = PinSeated - new Vector2(PlaceholderParts.Pin.Width - 4, 0);
 
-    private const float PinGrabRadius = 7;
+    /// <summary>
+    /// The cylinder's middle when it is seated in the frame's window, on the pin's axis.
+    /// </summary>
+    public static readonly Vector2 CylinderSeated = FramePosition + PlaceholderParts.CylinderInFrame + PlaceholderParts.CylinderOrigin;
+
+    /// <summary>
+    /// The cylinder's middle when it is out: below the frame, on the mat.
+    /// </summary>
+    public static readonly Vector2 CylinderOut = CylinderSeated + new Vector2(0, 36);
+
+    /// <summary>
+    /// How long the parts that block a refused part flash, in seconds.
+    /// </summary>
+    public const float HintSeconds = 0.6f;
+
+    private const int PartCount = 2;
 
     // Glow alpha of a part that can move, pulsing, and of the part under the pointer or in the hand.
     private const float GlowIdleBase = 70;
     private const float GlowIdlePulse = 50;
     private const float GlowPulseRate = 4;
     private const byte GlowActive = 255;
+    private const byte GlowHintLow = 60;
+    private const float HintBlinkRate = 10;
 
-    private static readonly SoundOptions s_seatClick = new() { Pitch = 0.75f };
-    private static readonly SoundOptions s_outClick = new() { Pitch = 1.25f };
-    private static readonly SoundOptions s_breakClick = new() { Pitch = 0.55f, Volume = 0.4f };
+    private static readonly IntRect[] s_sources = [PlaceholderParts.Pin, PlaceholderParts.Cylinder];
+    private static readonly IntRect[] s_glows = [PlaceholderParts.PinGlow, PlaceholderParts.CylinderGlow];
+    private static readonly Vector2[] s_origins = [PlaceholderParts.PinOrigin, PlaceholderParts.CylinderOrigin];
+
+    // The cylinder is heavier: its clicks are lower.
+    private static readonly float[] s_pitches = [1, 0.8f];
+
+    private static readonly SoundOptions s_refusedClick = new() { Pitch = 0.4f, Volume = 0.3f };
+
+    private readonly Vector2[] _drawPositions = new Vector2[PartCount];
+    private readonly byte[] _glowAlphas = new byte[PartCount];
+    private readonly float[] _hints = new float[PartCount];
 
     private AssetManager? _assets;
     private Graphics? _graphics;
@@ -66,8 +102,14 @@ public sealed class LudumDare60Game : IGame
     private Sound _click;
     private bool _hasClick;
     private float _time;
-    private Vector2 _pinDrawPosition;
-    private byte _pinGlow;
+
+    public LudumDare60Game()
+    {
+        Gun = new PartAssembly(
+            new PartDrag(new LinePath(PinSeated, PinOut), grabRadius: 7, DragFeel.Default),
+            new PartDrag(new LinePath(CylinderSeated, CylinderOut), grabRadius: 11, new DragFeel { BreakawayAtStart = 4 }));
+        Gun.AddBlock(BasePinIndex, CylinderIndex);
+    }
 
     /// <summary>
     /// Whether the bench background is loaded and drawn.
@@ -75,9 +117,19 @@ public sealed class LudumDare60Game : IGame
     public bool HasBackground { get; private set; }
 
     /// <summary>
-    /// The base pin, seated at <see cref="PinSeated"/> and free at <see cref="PinOut"/>.
+    /// The parts of the gun on the bench, indexed by <see cref="BasePinIndex"/> and <see cref="CylinderIndex"/>.
     /// </summary>
-    public PartDrag BasePin { get; } = new(new LinePath(PinSeated, PinOut), PinGrabRadius, DragFeel.Default);
+    public PartAssembly Gun { get; }
+
+    /// <summary>
+    /// The base pin, seated at <see cref="PinSeated"/> and out at <see cref="PinOut"/>.
+    /// </summary>
+    public PartDrag BasePin => Gun[BasePinIndex];
+
+    /// <summary>
+    /// The cylinder, seated at <see cref="CylinderSeated"/> and out at <see cref="CylinderOut"/>.
+    /// </summary>
+    public PartDrag Cylinder => Gun[CylinderIndex];
 
     public void Initialize(AssetManager assets, Graphics graphics, Audio audio)
     {
@@ -91,23 +143,22 @@ public sealed class LudumDare60Game : IGame
 
     public void FixedUpdate(in FrameContext context)
     {
-        var events = BasePin.Step(PointerSample.From(context.Input), (float)context.DeltaTime);
-        if (!_hasClick)
+        var deltaTime = (float)context.DeltaTime;
+        Gun.Step(PointerSample.From(context.Input), deltaTime);
+        for (var i = 0; i < PartCount; i++)
         {
-            return;
+            _hints[i] = MathF.Max(0, _hints[i] - deltaTime);
         }
 
-        if ((events & DragEvents.SnappedStart) != DragEvents.None)
+        var events = Gun.Events;
+        for (var i = 0; i < PartCount; i++)
         {
-            _audio!.Play(_click, AudioBus.Sfx, s_seatClick);
-        }
-        else if ((events & DragEvents.SnappedEnd) != DragEvents.None)
-        {
-            _audio!.Play(_click, AudioBus.Sfx, s_outClick);
-        }
-        else if ((events & DragEvents.BrokeFree) != DragEvents.None)
-        {
-            _audio!.Play(_click, AudioBus.Sfx, s_breakClick);
+            if ((events[i] & DragEvents.Refused) != DragEvents.None)
+            {
+                Hint(i);
+            }
+
+            PlayClick(i, events[i]);
         }
     }
 
@@ -135,13 +186,20 @@ public sealed class LudumDare60Game : IGame
 
     public void PrepareRender(double alpha)
     {
-        var position = BasePin.GetRenderPosition((float)alpha);
+        var idleGlow = (byte)(GlowIdleBase + (GlowIdlePulse * MathF.Sin(_time * GlowPulseRate)));
+        for (var i = 0; i < PartCount; i++)
+        {
+            var part = Gun[i];
+            var position = part.GetRenderPosition((float)alpha);
 
-        // Whole pixels, so the pin never shimmers between two columns.
-        _pinDrawPosition = new Vector2(MathF.Round(position.X), MathF.Round(position.Y));
-        _pinGlow = BasePin.IsHeld || BasePin.IsHovered
-            ? GlowActive
-            : (byte)(GlowIdleBase + (GlowIdlePulse * MathF.Sin(_time * GlowPulseRate)));
+            // Whole pixels, so a part never shimmers between two columns.
+            _drawPositions[i] = new Vector2(MathF.Round(position.X), MathF.Round(position.Y));
+            _glowAlphas[i] = _hints[i] > 0
+                ? (int)(_hints[i] * HintBlinkRate) % 2 == 0 ? GlowActive : GlowHintLow
+                : part.IsHeld || part.IsHovered ? GlowActive
+                : Gun.CanMove(i) ? idleGlow
+                : (byte)0;
+        }
     }
 
     public void Render(SpriteBatch batch)
@@ -158,9 +216,58 @@ public sealed class LudumDare60Game : IGame
             return;
         }
 
-        // The frame goes on top, so the part of the pin still in the bore is hidden.
-        batch.Draw(_parts, PlaceholderParts.PinGlow, _pinDrawPosition, new SpriteOptions { Origin = PlaceholderParts.PinGlowOrigin, Tint = Color.White.WithAlpha(_pinGlow) });
-        batch.Draw(_parts, PlaceholderParts.Pin, _pinDrawPosition, new SpriteOptions { Origin = PlaceholderParts.PinOrigin });
+        // The pin goes under the frame, so the part of it still in the bore is hidden; the cylinder sits in the
+        // frame's window, over the pin.
+        DrawPart(batch, BasePinIndex);
         batch.Draw(_parts, PlaceholderParts.Frame, FramePosition);
+        DrawPart(batch, CylinderIndex);
+    }
+
+    private void DrawPart(SpriteBatch batch, int part)
+    {
+        var position = _drawPositions[part];
+        var glow = new SpriteOptions { Origin = s_origins[part] + Vector2.One, Tint = Color.White.WithAlpha(_glowAlphas[part]) };
+        batch.Draw(_parts, s_glows[part], position, glow);
+        batch.Draw(_parts, s_sources[part], position, new SpriteOptions { Origin = s_origins[part] });
+    }
+
+    /// <summary>
+    /// Flashes the parts that keep <paramref name="refused"/> from moving.
+    /// </summary>
+    private void Hint(int refused)
+    {
+        for (var i = 0; i < PartCount; i++)
+        {
+            if (Gun.Holds(i, refused))
+            {
+                _hints[i] = HintSeconds;
+            }
+        }
+    }
+
+    private void PlayClick(int part, DragEvents events)
+    {
+        if (!_hasClick || events == DragEvents.None)
+        {
+            return;
+        }
+
+        var pitch = s_pitches[part];
+        if ((events & DragEvents.SnappedStart) != DragEvents.None)
+        {
+            _audio!.Play(_click, AudioBus.Sfx, new SoundOptions { Pitch = 0.75f * pitch });
+        }
+        else if ((events & DragEvents.SnappedEnd) != DragEvents.None)
+        {
+            _audio!.Play(_click, AudioBus.Sfx, new SoundOptions { Pitch = 1.25f * pitch });
+        }
+        else if ((events & DragEvents.BrokeFree) != DragEvents.None)
+        {
+            _audio!.Play(_click, AudioBus.Sfx, new SoundOptions { Pitch = 0.55f * pitch, Volume = 0.4f });
+        }
+        else if ((events & DragEvents.Refused) != DragEvents.None)
+        {
+            _audio!.Play(_click, AudioBus.Sfx, s_refusedClick);
+        }
     }
 }
