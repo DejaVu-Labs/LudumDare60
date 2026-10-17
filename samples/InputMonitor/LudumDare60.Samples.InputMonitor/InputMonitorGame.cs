@@ -1,6 +1,7 @@
 using LudumDare60.Engine;
 using LudumDare60.Engine.Assets;
 using LudumDare60.Engine.Platform;
+using LudumDare60.Engine.Rendering;
 
 namespace LudumDare60.Samples.InputMonitor;
 
@@ -14,6 +15,11 @@ public sealed class InputMonitorGame(ITextDisplay display) : IGame
     /// </summary>
     public const int ReportCapacity = 4096;
 
+    /// <summary>
+    /// Behind the report text: the page background of the sample.
+    /// </summary>
+    public static readonly Color Background = Color.FromRgb(0x0b0f0b);
+
     private readonly byte[] _report = new byte[ReportCapacity];
     private int _reportLength;
     private bool _changed = true;
@@ -21,7 +27,7 @@ public sealed class InputMonitorGame(ITextDisplay display) : IGame
 
     public InputTracker Tracker { get; } = new();
 
-    public void Initialize(AssetManager assets)
+    public void Initialize(AssetManager assets, Graphics graphics)
     {
     }
 
@@ -48,8 +54,11 @@ public sealed class InputMonitorGame(ITextDisplay display) : IGame
         }
     }
 
-    public void Render()
+    public void Render(SpriteBatch batch)
     {
+        ArgumentNullException.ThrowIfNull(batch);
+        batch.Clear(Background);
+
         // One interop call per changed frame, none while nothing happens.
         if (_prepared)
         {

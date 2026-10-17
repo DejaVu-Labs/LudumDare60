@@ -8,9 +8,10 @@ check style and AOT safety. The rules below cover what they cannot check.
 - **Pure core, thin platform layer.** Simulation, game rules and math live in plain `net10.0` class libraries
   with no browser dependency, so they are unit-tested on the desktop CLR. The WebAssembly project only wires
   input, timing, rendering and audio to the browser.
-- **One renderer abstraction, two backends.** Game code submits draw data to a backend-neutral renderer. WebGPU
-  is the primary backend. WebGL2 is the fallback, picked at startup when `navigator.gpu` is missing or
-  `requestAdapter()` fails. Both backends consume the same command stream.
+- **One renderer abstraction, two backends.** Game code draws through `SpriteBatch`, which records a
+  backend-neutral command stream (see [architecture.md](architecture.md#rendering)). WebGL2 is the only backend
+  for the Compo. WebGPU comes later as the primary backend, with WebGL2 as the fallback when `navigator.gpu` is
+  missing or `requestAdapter()` fails. Both consume the same command stream.
 - **The platform owns timing, the engine owns the loop.** `IPlatform` (in the browser, `requestAnimationFrame`
   through one interop call per frame) calls `IFrameSink.Update(dt, events)` and `IFrameSink.Render()`. `GameEngine`
   turns those calls into fixed steps, a variable update and interpolated rendering. See
@@ -44,10 +45,13 @@ check style and AOT safety. The rules below cover what they cannot check.
   the WGSL/GLSL layout exactly. Mind WGSL alignment: `vec3<f32>` aligns to 16 bytes, so pad explicitly. Check
   sizes with `Unsafe.SizeOf<T>()` in a unit test.
 - Upload once per frame per buffer (`writeBuffer` / `bufferSubData`) from one contiguous span.
-- Batch by pipeline and texture. Use texture atlases and instancing. Aim for a two-digit draw call count per frame.
+- Batch by pipeline and texture: consecutive sprites with the same texture share a draw call. Keep the texture count
+  low (one sheet per animated object) and group draws by texture where the draw order allows it. Aim for a two-digit
+  draw call count per frame.
 - Create pipelines, bind group layouts and samplers at load time. Never create GPU objects per frame.
-- Keep shader sources in `wwwroot/shaders/` (`.wgsl` for WebGPU, `.glsl` for WebGL2). Keep the two variants
-  next to each other and in sync.
+- Keep shader sources in `wwwroot/shaders/` as JS modules that export the source string (`.glsl.js` for WebGL2,
+  `.wgsl.js` for WebGPU), so they get a content hash and an import map entry like other modules. Keep the two
+  variants next to each other and in sync.
 
 ## JS interop
 
@@ -75,7 +79,8 @@ check style and AOT safety. The rules below cover what they cannot check.
   for every requested path.
 - Asset files go in `src/game/LudumDare60.Game.Browser/wwwroot/assets/`. Load them through `AssetManager` (see
   [architecture.md](architecture.md#assets)), never with a direct `fetch`, so caching and cache busting apply.
-- Keep the shipped file count low (itch.io limit: 1000). Pack sprites into atlases and audio into a few files.
+- Keep the shipped file count low (itch.io limit: 1000). Put an object's frames into one sprite sheet and audio into
+  a few files.
 - Load everything with relative URLs.
 
 ## Tests

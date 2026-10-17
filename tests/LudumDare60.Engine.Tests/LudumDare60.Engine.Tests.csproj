@@ -4,4 +4,10 @@
     <ProjectReference Include="..\..\src\engine\LudumDare60.Engine\LudumDare60.Engine.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Shared\FakeGraphicsBackend.cs" Link="Shared\FakeGraphicsBackend.cs" />
+    <!-- Shared with tests/js/webgl2.test.mjs. -->
+    <None Include="..\fixtures\render-frame.json" Link="fixtures\render-frame.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

@@ -1,5 +1,6 @@
 using LudumDare60.Engine.Assets;
 using LudumDare60.Engine.Platform;
+using LudumDare60.Engine.Rendering;
 
 namespace LudumDare60.Engine;
 
@@ -23,16 +24,40 @@ public sealed class GameEngine : IFrameSink
 
     private IGame? _game;
     private AssetManager? _assets;
+    private Graphics? _graphics;
+    private SpriteBatch? _batch;
+    private PixelViewport _viewport;
     private double _totalTime;
     private long _frameIndex;
     private double _accumulator;
     private long _fixedStepIndex;
 
+    /// <param name="virtualWidth">Width of the virtual screen the game draws, in virtual pixels.</param>
+    /// <param name="virtualHeight">Height of the virtual screen.</param>
+    /// <exception cref="ArgumentOutOfRangeException">A side is less than 1.</exception>
+    public GameEngine(int virtualWidth, int virtualHeight)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(virtualWidth, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(virtualHeight, 1);
+        VirtualWidth = virtualWidth;
+        VirtualHeight = virtualHeight;
+    }
+
+    /// <summary>
+    /// Width of the virtual screen in virtual pixels. The renderer scales it up to the drawing surface (see
+    /// <see cref="PixelViewport"/>).
+    /// </summary>
+    public int VirtualWidth { get; }
+
+    /// <inheritdoc cref="VirtualWidth"/>
+    public int VirtualHeight { get; }
+
     /// <summary>
     /// Runs <paramref name="game"/> on <paramref name="platform"/> until the platform stops. Frame counters and
     /// accumulated time start from zero on every run. Each run gets a new <see cref="AssetManager"/> on
-    /// <see cref="IPlatform.Assets"/>: it is passed to <see cref="IGame.Initialize"/> before the first frame, and
-    /// everything it holds is unloaded when the run ends.
+    /// <see cref="IPlatform.Assets"/> and a new <see cref="Graphics"/> on <see cref="IPlatform.Graphics"/>: both are
+    /// passed to <see cref="IGame.Initialize"/> before the first frame, and everything they hold is unloaded or
+    /// destroyed when the run ends.
     /// </summary>
     /// <exception cref="InvalidOperationException">The engine is already running a game.</exception>
     public async Task RunAsync(IGame game, IPlatform platform)
@@ -46,39 +71,45 @@ public sealed class GameEngine : IFrameSink
         }
 
         var assets = new AssetManager(platform.Assets);
+        var graphics = new Graphics(platform.Graphics);
         _game = game;
         _assets = assets;
+        _graphics = graphics;
+        _batch = new SpriteBatch(graphics);
+        _viewport = PixelViewport.Fit(VirtualWidth, VirtualHeight, VirtualWidth, VirtualHeight, 1);
         _totalTime = 0;
         _frameIndex = 0;
         _accumulator = 0;
         _fixedStepIndex = 0;
         try
         {
-            game.Initialize(assets);
+            game.Initialize(assets, graphics);
             await platform.RunAsync(this);
         }
         catch
         {
-            EndRun(assets, runFailed: true);
+            EndRun(assets, graphics, runFailed: true);
             throw;
         }
 
-        EndRun(assets, runFailed: false);
+        EndRun(assets, graphics, runFailed: false);
     }
 
     /// <summary>
-    /// Applies finished asset reads (<see cref="AssetManager.Update"/>), then runs the pending fixed steps, then
-    /// <see cref="IGame.Update"/>, then <see cref="IGame.PrepareRender"/>.
+    /// Applies finished asset reads (<see cref="AssetManager.Update"/>) and this frame's resize events, then runs the
+    /// pending fixed steps, then <see cref="IGame.Update"/>, then <see cref="IGame.PrepareRender"/>.
     /// </summary>
     /// <param name="dt">Time since the previous frame, in seconds. Clamped to [0, <see cref="MaxDeltaTime"/>];
     /// NaN counts as zero.</param>
     /// <param name="events">Raw input events of this frame. Passed to <see cref="IGame.Update"/> as is, without
-    /// copying.</param>
+    /// copying. The last <see cref="RawInputEventKind.Resize"/> among them sets <see cref="FrameContext.Viewport"/>.</param>
     /// <exception cref="InvalidOperationException">No game is running.</exception>
     public void Update(double dt, ReadOnlySpan<RawInputEvent> events)
     {
         var game = GetRunningGame();
+        _graphics!.BeginFrame();
         _assets!.Update();
+        ApplyResize(events);
 
         var deltaTime = double.IsNaN(dt) ? 0 : Math.Clamp(dt, 0, MaxDeltaTime);
 
@@ -86,13 +117,14 @@ public sealed class GameEngine : IFrameSink
         while (_accumulator >= FixedDeltaTime)
         {
             _accumulator -= FixedDeltaTime;
-            var fixedContext = new FrameContext(FixedDeltaTime, (_fixedStepIndex + 1) * FixedDeltaTime, _fixedStepIndex);
+            var fixedContext = new FrameContext(
+                FixedDeltaTime, (_fixedStepIndex + 1) * FixedDeltaTime, _fixedStepIndex, _viewport);
             game.FixedUpdate(in fixedContext);
             _fixedStepIndex++;
         }
 
         _totalTime += deltaTime;
-        var context = new FrameContext(deltaTime, _totalTime, _frameIndex);
+        var context = new FrameContext(deltaTime, _totalTime, _frameIndex, _viewport);
         game.Update(in context, events);
         _frameIndex++;
 
@@ -100,19 +132,30 @@ public sealed class GameEngine : IFrameSink
     }
 
     /// <summary>
-    /// Forwards to <see cref="IGame.Render"/>.
+    /// Lets <see cref="IGame.Render"/> record the frame's sprites, then submits them to the GPU in one call and deletes
+    /// the textures destroyed during the frame.
     /// </summary>
     /// <exception cref="InvalidOperationException">No game is running.</exception>
-    public void Render() => GetRunningGame().Render();
+    public void Render()
+    {
+        var game = GetRunningGame();
+        var batch = _batch!;
+        batch.Begin(in _viewport);
+        game.Render(batch);
+        batch.End();
+        _graphics!.EndFrame();
+    }
 
     /// <summary>
-    /// Stops accepting frames and unloads the run's assets. After a failed run, a failing unload is dropped, so the
-    /// caller sees the exception that ended the run, not a later one.
+    /// Stops accepting frames, unloads the run's assets and destroys its textures. After a failed run, a failing unload
+    /// or destroy is dropped, so the caller sees the exception that ended the run, not a later one.
     /// </summary>
-    private void EndRun(AssetManager assets, bool runFailed)
+    private void EndRun(AssetManager assets, Graphics graphics, bool runFailed)
     {
         _game = null;
         _assets = null;
+        _graphics = null;
+        _batch = null;
         try
         {
             assets.UnloadAll();
@@ -120,6 +163,35 @@ public sealed class GameEngine : IFrameSink
         catch (AggregateException) when (runFailed)
         {
             // Every asset is unloaded anyway (see AssetManager.UnloadAll); the run's exception is rethrown.
+        }
+        finally
+        {
+            DestroyTextures(graphics, runFailed);
+        }
+    }
+
+    private static void DestroyTextures(Graphics graphics, bool runFailed)
+    {
+        try
+        {
+            graphics.DestroyAll();
+        }
+        catch (AggregateException) when (runFailed)
+        {
+            // Every texture is destroyed anyway (see Graphics.DestroyAll); the run's exception is rethrown.
+        }
+    }
+
+    private void ApplyResize(ReadOnlySpan<RawInputEvent> events)
+    {
+        for (var i = events.Length - 1; i >= 0; i--)
+        {
+            ref readonly var e = ref events[i];
+            if (e.Kind == RawInputEventKind.Resize)
+            {
+                _viewport = PixelViewport.Fit(VirtualWidth, VirtualHeight, e.X, e.Y, e.Z);
+                return;
+            }
         }
     }
 

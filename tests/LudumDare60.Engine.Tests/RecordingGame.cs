@@ -1,5 +1,6 @@
 using LudumDare60.Engine.Assets;
 using LudumDare60.Engine.Platform;
+using LudumDare60.Engine.Rendering;
 
 namespace LudumDare60.Engine.Tests;
 
@@ -33,15 +34,31 @@ internal sealed class RecordingGame : IGame
     public AssetManager? Assets { get; private set; }
 
     /// <summary>
+    /// The graphics passed to <see cref="Initialize"/>.
+    /// </summary>
+    public Graphics? Graphics { get; private set; }
+
+    /// <summary>
     /// Runs inside <see cref="Initialize"/>, after the call is recorded.
     /// </summary>
-    public Action<AssetManager>? OnInitialize { get; set; }
+    public Action<AssetManager, Graphics>? OnInitialize { get; set; }
 
-    public void Initialize(AssetManager assets)
+    /// <summary>
+    /// Runs inside <see cref="Update"/>, after the call is recorded.
+    /// </summary>
+    public Action<Graphics>? OnUpdate { get; set; }
+
+    /// <summary>
+    /// Runs inside <see cref="Render"/>, after the call is recorded.
+    /// </summary>
+    public Action<SpriteBatch>? OnRender { get; set; }
+
+    public void Initialize(AssetManager assets, Graphics graphics)
     {
         Record(nameof(Initialize));
         Assets = assets;
-        OnInitialize?.Invoke(assets);
+        Graphics = graphics;
+        OnInitialize?.Invoke(assets, graphics);
     }
 
     public void FixedUpdate(in FrameContext context)
@@ -55,6 +72,7 @@ internal sealed class RecordingGame : IGame
         Record(nameof(Update));
         Updates.Add(context);
         UpdateEvents.Add(events.ToArray());
+        OnUpdate?.Invoke(Graphics!);
     }
 
     public void PrepareRender(double alpha)
@@ -63,7 +81,11 @@ internal sealed class RecordingGame : IGame
         Alphas.Add(alpha);
     }
 
-    public void Render() => Record(nameof(Render));
+    public void Render(SpriteBatch batch)
+    {
+        Record(nameof(Render));
+        OnRender?.Invoke(batch);
+    }
 
     private void Record(string call)
     {

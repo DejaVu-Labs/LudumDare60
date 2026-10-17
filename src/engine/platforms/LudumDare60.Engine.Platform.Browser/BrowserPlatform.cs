@@ -6,7 +6,8 @@ namespace LudumDare60.Engine.Platform.Browser;
 /// <see cref="IPlatform"/> for the browser (WebAssembly). Frames come from <c>requestAnimationFrame</c>; each frame
 /// costs one JS-to-.NET call and one .NET-to-JS call that drains input.
 /// </summary>
-/// <param name="canvasId">Id of the page's <c>&lt;canvas&gt;</c>. Pointer, wheel and resize input come from it.</param>
+/// <param name="canvasId">Id of the page's <c>&lt;canvas&gt;</c>. The game draws to it with WebGL2, and pointer, wheel and
+/// resize input come from it.</param>
 /// <param name="assetRoot">Folder of the asset files, relative to the page.</param>
 [SupportedOSPlatform("browser")]
 public sealed class BrowserPlatform(
@@ -43,13 +44,21 @@ public sealed class BrowserPlatform(
         },
         take: AssetsInterop.Take);
 
+    private readonly BrowserGraphics _graphics = new();
+
     /// <inheritdoc />
-    /// <remarks>The returned task completes only if a frame throws; it then faults with that exception. Input
-    /// listeners are attached before the first frame and removed when the loop ends.</remarks>
+    /// <remarks>WebGL2 on the canvas. <see cref="RunAsync"/> creates the context before the first frame.</remarks>
+    public IGraphicsBackend Graphics => _graphics;
+
+    /// <inheritdoc />
+    /// <remarks>The returned task completes only if a frame throws; it then faults with that exception. It also faults
+    /// before the first frame if the browser has no WebGL2. Input listeners are attached before the first frame and
+    /// removed when the loop ends.</remarks>
     public async Task RunAsync(IFrameSink frameSink)
     {
         ArgumentNullException.ThrowIfNull(frameSink);
 
+        await _graphics.InitializeAsync(canvasId);
         await FrameLoopInterop.ImportAsync();
         await InputInterop.ImportAsync();
 

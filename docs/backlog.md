@@ -66,7 +66,29 @@ Deferred when the asset manager shipped (see [docs/tech/architecture.md](tech/ar
 - Assets that depend on other assets.
 - Hot reload in Debug.
 
+## Dirt masks
+
+Cleaning works pixel by pixel (see [concepts.md](gamedesign/concepts.md#rendering)). Deferred when the WebGL2 renderer
+shipped:
+
+- One mask per part at sprite resolution, in a second texture the sprite shader samples (`R8`), and a mask
+  rectangle in `SpriteInstance` (grows past 40 bytes: change C#, `webgl2.js`, the shader and the fixture together).
+- `Graphics.UpdateTexture(texture, rows)` that re-uploads only changed rows with `texSubImage2D`.
+- The brush erases mask pixels with a little dither; the CPU keeps the mask and counts clean pixels exactly.
+
+## Animation frames
+
+`SpriteBatch.Draw` takes a source rectangle; nothing names frames yet. Add a `SpriteSheet` for PNG sheets (a grid of
+equal frames) and frame and tag tables from the Aseprite parser (see [Asset parsers](#asset-parsers)), so the game
+draws "frame 3 of `cylinder-spin`" instead of rectangles.
+
+## WebGPU backend
+
+A second `IGraphicsBackend` in the browser platform on the same command stream, instance layout and shaders
+(`wwwroot/shaders/sprite.wgsl.js` next to `sprite.glsl.js`). Picked at startup when `navigator.gpu` and
+`requestAdapter()` succeed, with WebGL2 as the fallback. Not needed for the Compo.
+
 ## Browser E2E smoke tests
 
 A `tests/*.E2E` project with `Microsoft.Playwright`: the published build boots, reaches the first frame and logs
-no console errors, on both the WebGPU and WebGL2 paths.
+no console errors, on the WebGL2 path (and on WebGPU once it exists).

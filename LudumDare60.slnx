@@ -8,6 +8,7 @@
     <File Path="global.json" />
     <File Path="package.json" />
   </Folder>
+  <Folder Name="/.github/" />
   <Folder Name="/.github/workflows/">
     <File Path=".github/workflows/ci.yml" />
     <File Path=".github/workflows/deploy.yml" />
@@ -33,6 +34,7 @@
     <File Path="tests/Directory.Build.props" />
     <Project Path="tests/LudumDare60.Engine.Platform.Browser.Tests/LudumDare60.Engine.Platform.Browser.Tests.csproj" />
     <Project Path="tests/LudumDare60.Engine.Tests/LudumDare60.Engine.Tests.csproj" />
+    <Project Path="tests/LudumDare60.Game.Tests/LudumDare60.Game.Tests.csproj" />
     <Project Path="tests/LudumDare60.Samples.InputMonitor.Tests/LudumDare60.Samples.InputMonitor.Tests.csproj" />
   </Folder>
 </Solution>

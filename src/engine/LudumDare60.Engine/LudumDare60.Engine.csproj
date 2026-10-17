@@ -8,4 +8,8 @@
     <PackageReference Include="StbImageSharp" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="LudumDare60.Engine.Tests" />
+  </ItemGroup>
+
 </Project>

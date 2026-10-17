@@ -10,23 +10,24 @@ LudumDare60.Game.Browser ──► LudumDare60.Game ──► LudumDare60.Engine
 
 | Project | SDK | Role |
 | --- | --- | --- |
-| `src/engine/LudumDare60.Engine.Platform` | `Microsoft.NET.Sdk` | Platform contracts: `IPlatform`, `IFrameSink`, raw input (`RawInputEvent`, `RawInputEventKind`, `Key`, `PointerType`), asset reads (`IAssetSource`, `AssetLoadException`). No dependencies. |
-| `src/engine/LudumDare60.Engine` | `Microsoft.NET.Sdk` | `GameEngine`, `IGame`, `FrameContext`, `Assets/` (`AssetManager` and loaders), `Rendering/` (`PixelViewport`). Depends only on the platform contracts and the managed `StbImageSharp` package (image decoding). |
-| `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `Microsoft.NET.Sdk.StaticWebAssets` | `BrowserPlatform : IPlatform` and its JS: `wwwroot/boot.js` (runtime start), `wwwroot/frame-loop.js`, `wwwroot/input.js` and `wwwroot/assets.js`. Its `wwwroot/` ships with the app under `_content/LudumDare60.Engine.Platform.Browser/`. |
+| `src/engine/LudumDare60.Engine.Platform` | `Microsoft.NET.Sdk` | Platform contracts: `IPlatform`, `IFrameSink`, raw input (`RawInputEvent`, `RawInputEventKind`, `Key`, `PointerType`), asset reads (`IAssetSource`, `AssetLoadException`), the GPU (`IGraphicsBackend`, `RenderCommandKind`, `SpriteInstance`, `Color`). No dependencies. |
+| `src/engine/LudumDare60.Engine` | `Microsoft.NET.Sdk` | `GameEngine`, `IGame`, `FrameContext`, `Assets/` (`AssetManager` and loaders), `Rendering/` (`PixelViewport`, `Graphics`, `Texture`, `SpriteBatch`, `SpriteOptions`, `IntRect`). Depends only on the platform contracts and the managed `StbImageSharp` package (image decoding). |
+| `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `Microsoft.NET.Sdk.StaticWebAssets` | `BrowserPlatform : IPlatform` and its JS: `wwwroot/boot.js` (runtime start), `wwwroot/frame-loop.js`, `wwwroot/input.js`, `wwwroot/assets.js` and `wwwroot/webgl2.js` (renderer, shaders in `wwwroot/shaders/`). Its `wwwroot/` ships with the app under `_content/LudumDare60.Engine.Platform.Browser/`. |
 | `src/game/LudumDare60.Game` | `Microsoft.NET.Sdk` | `LudumDare60Game : IGame`. No platform dependency. |
 | `src/game/LudumDare60.Game.Browser` | `Microsoft.NET.Sdk.WebAssembly` | Entry point, host page and `main.js`. Only wires the game and the browser platform together. |
 
 The engine and the game never reference a concrete platform. Only the entry-point project chooses one:
 
 ```csharp
-await new GameEngine().RunAsync(new LudumDare60Game(), new BrowserPlatform());
+await new GameEngine(640, 360).RunAsync(new LudumDare60Game(), new BrowserPlatform());
 ```
 
 ## Frame loop
 
-`GameEngine.RunAsync(game, platform)` stores the game, creates an `AssetManager` on `platform.Assets`, calls
-`IGame.Initialize(assets)` and awaits `platform.RunAsync(engine)`. When the run ends, it unloads every asset. If the
-run failed, the run's exception is the one rethrown, even when a loader also throws while unloading. The
+`GameEngine.RunAsync(game, platform)` stores the game, creates an `AssetManager` on `platform.Assets` and a `Graphics`
+on `platform.Graphics`, calls `IGame.Initialize(assets, graphics)` and awaits `platform.RunAsync(engine)`. When the run
+ends, it unloads every asset and destroys every texture. If the run failed, the run's exception is the one rethrown,
+even when a loader or the GPU also throws while cleaning up. The
 engine is the platform's `IFrameSink`. The platform owns timing (in the browser: `requestAnimationFrame`) and calls, once per
 frame:
 
@@ -37,6 +38,7 @@ frame:
 Inside `GameEngine.Update(dt, events)`:
 
 1. `AssetManager.Update()` applies the asset reads that finished since the previous frame (see [Assets](#assets)).
+   The last `Resize` event of the frame, if any, sets the viewport (see [Screen](#screen)).
 2. `dt` is clamped to `[0, GameEngine.MaxDeltaTime]` (0.25 s), and NaN counts as 0. This prevents a catch-up
    spiral after a hidden tab or a debugger pause.
 3. `dt` is added to an accumulator. While the accumulator holds at least `GameEngine.FixedDeltaTime` (1/60 s),
@@ -46,7 +48,8 @@ Inside `GameEngine.Update(dt, events)`:
 5. `IGame.PrepareRender(alpha)` runs last, with `alpha = accumulator / FixedDeltaTime` in `[0, 1)`. It tells how
    far the current time is between the last fixed step and the next one. Use it to interpolate render state.
 
-`GameEngine.Render()` forwards to `IGame.Render()`.
+`GameEngine.Render()` calls `IGame.Render(batch)` and then submits the recorded frame to the GPU (see
+[Rendering](#rendering)).
 
 ### Browser startup
 
@@ -61,11 +64,14 @@ Inside `GameEngine.Update(dt, events)`:
    `GameEngine.RunAsync(new LudumDare60Game(), new BrowserPlatform())`.
 4. The page's `<div id="status">` (optional, `boot`'s second parameter) shows "Loading..." while the runtime
    downloads, is hidden right before `runMain()`, and shows an error message if startup fails or `Main` ends with an
-   exception (a frame that throws stops the frame loop and ends `Main`). The error itself goes to the console.
+   exception (a frame that throws stops the frame loop and ends `Main`). The error itself goes to the console. A
+   module that knows why the game stopped sets a better message with `setErrorText` before it throws: `webgl2.js`
+   does so when the browser has no WebGL2 and when the GPU context is lost.
 
 ### Browser frame loop
 
-`BrowserPlatform.RunAsync(sink)` imports `frame-loop.js` and `input.js` with `JSHost.ImportAsync`, attaches input
+`BrowserPlatform.RunAsync(sink)` creates the WebGL2 context (see [Browser renderer](#browser-renderer)), imports
+`frame-loop.js` and `input.js` with `JSHost.ImportAsync`, attaches input
 (see [Browser input](#browser-input)) and calls `run(onFrame)` through `[JSImport]`. `onFrame` is an
 `Action<double, double>` (`FrameDispatcher.OnFrame`) that drains input, then calls `sink.Update(dt, events)` and
 `sink.Render()`. Input listeners are removed when the loop ends.
@@ -91,7 +97,7 @@ as `const string` fields in one static class (`AssetPaths`), so a typo fails at 
 
 ```csharp
 // FontLoader and Font stand for a future parser.
-public void Initialize(AssetManager assets)
+public void Initialize(AssetManager assets, Graphics graphics)
 {
     _assets = assets;
     assets.Register(new FontLoader());                  // one IAssetLoader<T> per type; byte[] is built in
@@ -143,7 +149,8 @@ _revolver = assets.Request<Image>(AssetPaths.Revolver);
 - **Format.** `Image` holds 8-bit RGBA pixels, row by row from the top-left corner, rows tightly packed
   (`Stride = Width * 4`), straight alpha. This is the `rgba8unorm` texture layout, so the pixels upload as they are.
   Every file is expanded to it: gray goes to red, green and blue, and a missing alpha channel is opaque. Pixels are
-  not premultiplied and rows are not flipped; a WebGL2 upload that wants bottom-up rows flips at upload time.
+  not premultiplied and rows are not flipped. `Graphics.CreateTexture` uploads them as they are (see
+  [Rendering](#rendering)).
 - **Files.** Ship PNG. The decoder also reads JPEG, BMP, TGA, PSD, HDR (reduced to 8 bits) and the first frame of a
   GIF, but JPEG artifacts ruin pixel art, and Aseprite files get their own parser.
 - **Memory.** Decoding allocates the pixel array once, at load time in `AssetManager.Update`, and `Image` keeps it.
@@ -228,8 +235,8 @@ Ctrl/Meta shortcuts stay with the browser), wheel scrolling and the context menu
 
 ### FrameContext
 
-`FrameContext(DeltaTime, TotalTime, FrameIndex)` is passed by `in` to `FixedUpdate` and `Update`. All times are
-in seconds.
+`FrameContext(DeltaTime, TotalTime, FrameIndex, Viewport)` is passed by `in` to `FixedUpdate` and `Update`. All
+times are in seconds. `Viewport` is the frame's `PixelViewport` (see [Screen](#screen)), the same in both.
 
 | Field | `FixedUpdate` | `Update` |
 | --- | --- | --- |
@@ -245,12 +252,12 @@ running throws `InvalidOperationException`. So does calling `Update` or `Render`
 - Gameplay that must be deterministic (physics, collisions, timers that affect rules) goes into `FixedUpdate`.
 - `Update` is for per-frame work that may depend on the actual frame rate: input sampling, camera smoothing, UI.
 - `PrepareRender` reads simulation state and builds render data. It must not change simulation state.
-- `Render` submits the prepared data. It has no access to timing on purpose.
+- `Render` draws the prepared data into the `SpriteBatch`. It has no access to timing on purpose.
 
 ## Screen
 
-The game draws a low-resolution virtual screen (640x360 for *Six Chambers*) and the renderer scales it up to the
-canvas. `Rendering/PixelViewport` holds the math, so the renderer and the input code agree on where every virtual pixel
+The game draws a low-resolution virtual screen (640x360 for *Six Chambers*, set by `new GameEngine(640, 360)`) and
+the renderer scales it up to the canvas. `Rendering/PixelViewport` holds the math, so the renderer and the input code agree on where every virtual pixel
 is:
 
 - `PixelViewport.Fit(virtualWidth, virtualHeight, surfaceWidth, surfaceHeight, pixelRatio)` takes the fields of a
@@ -265,3 +272,98 @@ is:
 
 Examples for 640x360: 1280x720 is scale 2, 1920x1080 is scale 3, 1280x720 at pixel ratio 1.5 is scale 3, and
 1400x800 is scale 2 with 60 and 40 pixel bars.
+
+The engine owns the viewport: before the fixed steps of a frame it applies the frame's last `Resize` event and
+passes the result in `FrameContext.Viewport`, and the renderer receives the same value. Until the first `Resize`
+the viewport is the virtual screen at scale 1. Convert pointer positions with `context.Viewport.ToVirtual(x, y)`.
+
+## Rendering
+
+Rendering is a sprite batch over a backend-neutral command stream. The game sees three types in
+`LudumDare60.Engine.Rendering`:
+
+```csharp
+public void Initialize(AssetManager assets, Graphics graphics)
+{
+    assets.Register(new ImageLoader());
+    _image = assets.Request<Image>(AssetPaths.Revolver);
+    _graphics = graphics;
+}
+
+public void Update(in FrameContext context, ReadOnlySpan<RawInputEvent> events)
+{
+    if (!_hasTexture && _assets.TryGet(_image, out var image))
+    {
+        _texture = _graphics.CreateTexture(image); // one interop call, at load time
+        _hasTexture = true;
+    }
+}
+
+public void Render(SpriteBatch batch)
+{
+    batch.Clear(MatColor);
+    batch.Draw(_texture, new IntRect(0, 0, 32, 32), position, new SpriteOptions { Origin = new(16, 16), Rotation = angle });
+}
+```
+
+- **Textures.** `Graphics.CreateTexture(Image)` uploads an image and returns a `Texture`: a handle with an id, a
+  generation and the size, like `AssetHandle`. One texture per file: a PNG or Aseprite file that holds several frames
+  is one texture, and the frame is the source rectangle of `Draw`. There is no atlas packing. Textures can be created
+  from the first frame on; in `Initialize` it throws, because the platform sets up the GPU when its frame loop starts.
+  Sides are at most `Graphics.MaxTextureSize` (4096). The texture keeps no copy of the pixels: keep the `Image` (or its
+  asset handle) for pixel-exact hit tests.
+- **Destroying.** `Graphics.DestroyTexture` makes the handle stale at once (drawing with it throws), and the GPU texture
+  is deleted after the frame is submitted, so sprites already drawn with it still show. Its id is reused only after
+  that. When the run ends, the engine destroys every remaining texture.
+- **Drawing.** `SpriteBatch` exists only during `IGame.Render`. `Draw(texture, source, position, options)` adds one
+  sprite; `SpriteOptions` holds origin (the pivot, in source pixels), scale (negative flips), rotation (radians,
+  clockwise on screen) and tint (multiplies the texels; its alpha fades). Positions are virtual pixels, y down.
+  Sprites are drawn in call order. Consecutive sprites with the same texture share one draw call, so a texture change
+  costs one. `Clear(color)` fills the virtual screen; nothing clears it otherwise. A frame holds at most
+  `SpriteBatch.Capacity` (16384) sprites; one more throws.
+- **Pixel grid.** A sprite without rotation is snapped so its top-left corner lands on a whole virtual pixel. The scene
+  is drawn into a texture of the virtual size and scaled onto the canvas with nearest filtering, so even rotated
+  sprites stay on the virtual pixel grid.
+- **Alpha.** Textures hold straight alpha. The sprite shader multiplies by the tint and premultiplies, and blending is
+  `ONE, ONE_MINUS_SRC_ALPHA`. With nearest filtering this matches premultiplying at upload time.
+
+### Command stream
+
+`GameEngine.Render` calls `SpriteBatch.Begin`, `IGame.Render(batch)`, then `SpriteBatch.End`, which hands two spans
+to `IGraphicsBackend.Submit`: the commands and the frame's `SpriteInstance` array. A backend runs them in one call.
+
+| Command | Arguments (32-bit, little-endian) |
+| --- | --- |
+| `SetSurface` (1) | Surface width and height (device pixels), virtual width and height, viewport x, y, width, height (device pixels from the top-left). Always first. |
+| `Clear` (2) | RGBA as 4 bytes. |
+| `DrawSprites` (3) | Texture id, first instance, instance count. |
+| `Present` (4) | None. Scales the virtual screen into the viewport, black bars around it. Always last. |
+
+`SpriteInstance` is 40 bytes and is the vertex layout of the sprite shader: position, origin and scale (`float` x2
+each), rotation (`float`), tint (4 bytes), source x, y, width, height (`ushort` each). The layouts are documented on
+`RenderCommandKind` and `SpriteInstance`. `tests/fixtures/render-frame.json` holds one encoded frame that both
+`SpriteBatchTests` (C# must write these bytes) and `tests/js/webgl2.test.mjs` (the backend must run them) check.
+
+Textures are created and destroyed through their own calls (`IGraphicsBackend.CreateTexture`, `DestroyTexture`),
+outside the stream, because the pixels would not fit in it.
+
+### Browser renderer
+
+`BrowserPlatform.Graphics` is a `BrowserGraphics` on `wwwroot/webgl2.js`. `RunAsync` imports the module and calls
+`init(canvasId)`, which creates a WebGL2 context on the canvas (`alpha`, `antialias`, `depth` and `stencil` off) before
+the first frame. Each frame is one `submit(commands, instances)` interop call; the module reads both spans in place
+(`_unsafe_create_view`) and uploads the instances with one `bufferSubData`.
+
+- `SetSurface` sets `canvas.width` and `canvas.height` when they change and (re)creates the render target: an `RGBA8`
+  texture of the virtual size with a framebuffer.
+- `DrawSprites` draws `TRIANGLE_STRIP` quads with `drawArraysInstanced`, one instance per sprite. WebGL2 has no base
+  instance, so the attribute pointers are moved to the run's first instance before each draw.
+- `Present` clears the canvas to black and `blitFramebuffer`s the render target into the viewport with `NEAREST`.
+- The shaders are GLSL ES 3.00 strings in `wwwroot/shaders/sprite.glsl.js`. They ship as JS modules, so they get a
+  content hash and an import map entry like every other module; a `.glsl` file would be served under a fixed name.
+- **Failures.** Without WebGL2, `init` sets the status text to "This game needs WebGL2..." and throws, so `RunAsync`
+  faults and the page shows it. A lost context is not restored: the next `submit` throws, the game stops and the page
+  says "The graphics context was lost. Reload the page to continue."
+
+WebGPU is not implemented yet (see [docs/backlog.md](../backlog.md#webgpu-backend)). It will consume the same command
+stream and instance layout.

@@ -10,6 +10,24 @@
 /** Shown in the status element when startup or the game fails. Details go to the console. */
 export const ERROR_TEXT = 'Something went wrong. Reload the page to try again.';
 
+/** @type {string | null} */
+let errorText = null;
+
+/**
+ * Replaces `ERROR_TEXT` for the failure that follows. A module that knows why the game cannot go on (no WebGL2, a lost
+ * GPU) sets a message the player can act on, then throws.
+ *
+ * @param {string | null} text `null` restores `ERROR_TEXT`.
+ */
+export function setErrorText(text) {
+  errorText = text;
+}
+
+/** @returns {string} The text the status element shows on failure. */
+export function getErrorText() {
+  return errorText ?? ERROR_TEXT;
+}
+
 /**
  * @typedef {object} DotnetHostBuilder
  * @property {() => Promise<{ runMain: () => Promise<number> }>} create
@@ -57,14 +75,15 @@ export async function startRuntime(runtimeUrl, importRuntime, onReady = () => {}
 
 /**
  * Runs `start` with a status element: the element keeps its loading text until `start` reports ready, is hidden then,
- * and shows `ERROR_TEXT` again if `start` fails, before or after ready (a game that throws in a frame ends `Main`).
+ * and shows the error text if `start` fails, before or after ready (a game that throws in a frame ends `Main`).
  *
  * @template T
  * @param {(onReady: () => void) => Promise<T>} start Usually `startRuntime`.
  * @param {StatusElement | null} status Nothing is shown without one.
+ * @param {() => string} [errorTextOf] The text to show on failure. Defaults to `getErrorText`.
  * @returns {Promise<T>} What `start` returns. Rejects with the error of `start`.
  */
-export async function runWithStatus(start, status) {
+export async function runWithStatus(start, status, errorTextOf = getErrorText) {
   try {
     return await start(() => {
       if (status !== null) {
@@ -73,7 +92,7 @@ export async function runWithStatus(start, status) {
     });
   } catch (error) {
     if (status !== null) {
-      status.textContent = ERROR_TEXT;
+      status.textContent = errorTextOf();
       status.hidden = false;
     }
     throw error;

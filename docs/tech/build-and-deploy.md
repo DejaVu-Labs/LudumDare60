@@ -185,7 +185,7 @@ latest version from <https://broth.itch.zone/butler/linux-amd64/LATEST>, then se
 
 - [ ] `dotnet build -c Release`, `dotnet test` and `npm test` pass.
 - [ ] Published build works when served from a subdirectory (`python3 -m http.server` one level up).
-- [ ] Both renderer paths work: WebGPU, and WebGL2 with WebGPU disabled.
+- [ ] The WebGL2 renderer works (WebGPU is not built yet; once it is, check both paths).
 - [ ] Canvas resizes correctly in embed and fullscreen modes, and on high-DPI screens.
 - [ ] Pixel art stays sharp at browser zoom 125% and 150% (fractional pixel ratios), also in Safari.
 - [ ] "Loading..." shows while the runtime downloads and disappears when the game starts.

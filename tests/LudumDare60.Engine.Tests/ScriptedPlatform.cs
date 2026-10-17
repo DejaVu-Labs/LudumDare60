@@ -1,4 +1,5 @@
 using LudumDare60.Engine.Platform;
+using LudumDare60.Engine.Testing;
 
 namespace LudumDare60.Engine.Tests;
 
@@ -16,6 +17,10 @@ internal sealed class ScriptedPlatform : IPlatform
     private readonly ScriptedFrame[] _frames;
 
     public IAssetSource Assets { get; init; } = new FakeAssetSource();
+
+    public FakeGraphicsBackend Backend { get; } = new();
+
+    public IGraphicsBackend Graphics => Backend;
 
     /// <summary>
     /// One frame per delta time, without input.

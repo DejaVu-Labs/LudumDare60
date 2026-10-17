@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using LudumDare60.Engine.Assets;
 using LudumDare60.Engine.Platform;
+using LudumDare60.Engine.Rendering;
 
 namespace LudumDare60.Engine.Tests;
 
@@ -10,7 +11,7 @@ public sealed class GameEngineTests
     private const double Tolerance = 1e-9;
     private const double F = GameEngine.FixedDeltaTime;
 
-    private readonly GameEngine _engine = new();
+    private readonly GameEngine _engine = new(640, 360);
     private readonly RecordingGame _game = new();
 
     private Task RunFramesAsync(params double[] deltaTimes) => _engine.RunAsync(_game, new ScriptedPlatform(deltaTimes));
@@ -145,7 +146,9 @@ public sealed class GameEngineTests
         await RunFramesAsync(0.01, 0.02, 0.03);
 
         Assert.Equal(3, _game.Updates.Count);
-        Assert.Equal(new FrameContext(0.01, 0.01, 0), _game.Updates[0]);
+        Assert.Equal(0.01, _game.Updates[0].DeltaTime);
+        Assert.Equal(0.01, _game.Updates[0].TotalTime);
+        Assert.Equal(0, _game.Updates[0].FrameIndex);
         Assert.Equal(0.02, _game.Updates[1].DeltaTime);
         Assert.Equal(0.03, _game.Updates[1].TotalTime, Tolerance);
         Assert.Equal(1, _game.Updates[1].FrameIndex);
@@ -264,7 +267,7 @@ public sealed class GameEngineTests
     public async Task RunAsync_InitializeThrows_PropagatesAndAllowsNewRun()
     {
         var failure = new InvalidOperationException("initialize failure");
-        _game.OnInitialize = _ => throw failure;
+        _game.OnInitialize = (_, _) => throw failure;
 
         Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => RunFramesAsync(0.01)));
         Assert.Equal(["Initialize"], _game.Calls);
@@ -277,7 +280,7 @@ public sealed class GameEngineTests
     public async Task Initialize_AssetManager_ReadsThroughPlatformAssets()
     {
         var source = new FakeAssetSource();
-        _game.OnInitialize = static assets => assets.Request<byte[]>("config.json");
+        _game.OnInitialize = static (assets, _) => assets.Request<byte[]>("config.json");
 
         await _engine.RunAsync(_game, new ScriptedPlatform { Assets = source });
 
@@ -371,7 +374,7 @@ public sealed class GameEngineTests
     {
         public bool SawPlatformMemory { get; private set; }
 
-        public void Initialize(AssetManager assets)
+        public void Initialize(AssetManager assets, Graphics graphics)
         {
         }
 
@@ -389,7 +392,7 @@ public sealed class GameEngineTests
         {
         }
 
-        public void Render()
+        public void Render(SpriteBatch batch)
         {
         }
     }
@@ -407,7 +410,7 @@ public sealed class GameEngineTests
 
         public List<AssetState> FixedUpdateStates { get; } = [];
 
-        public void Initialize(AssetManager assets)
+        public void Initialize(AssetManager assets, Graphics graphics)
         {
             Assets = assets;
             assets.Register(Loader);
@@ -424,7 +427,7 @@ public sealed class GameEngineTests
         {
         }
 
-        public void Render()
+        public void Render(SpriteBatch batch)
         {
         }
     }

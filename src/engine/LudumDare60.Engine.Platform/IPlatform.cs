@@ -12,6 +12,11 @@ public interface IPlatform
     IAssetSource Assets { get; }
 
     /// <summary>
+    /// The GPU. Usable from the first frame on: <see cref="RunAsync"/> sets it up before it starts producing frames.
+    /// </summary>
+    IGraphicsBackend Graphics { get; }
+
+    /// <summary>
     /// Drives <paramref name="frameSink"/> until the platform shuts down.
     /// </summary>
     /// <returns>A task that completes when the platform stops producing frames.</returns>

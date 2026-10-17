@@ -13,7 +13,7 @@ takes apart, cleans and repairs antique revolvers that families bring in.
 - The engine has a frame loop and nothing else: no renderer, no input, no audio. Every hour spent on
   engine work comes out of game time.
 - Renderer: **WebGL2 only for the Compo**, behind the backend-neutral renderer interface. WebGPU comes later
-  with the same atlas, palette and instance format. See [Rendering](#rendering).
+  with the same command stream and instance format. See [Rendering](#rendering).
 
 ## What the audience rewards
 
@@ -150,22 +150,23 @@ Pixel art drives the renderer:
 - **Low-resolution target.** The scene is drawn into a 640x360 render target and scaled to the canvas by an
   integer factor with nearest filtering (x2 = 1280x720, x3 = 1920x1080), letterboxed if needed.
   The math lives in `PixelViewport` (see [architecture.md](../tech/architecture.md#screen)).
-- **Sprite batcher.** All sprites come from one texture atlas. Each sprite is one instanced quad;
-  `[StructLayout(LayoutKind.Sequential)]` instance structs are written into a preallocated array, uploaded with
-  one `bufferSubData` and drawn with one or two instanced draw calls per frame.
-- **Indexed palette.** Sprites store palette indices and the shader looks up the color. Grip materials,
-  customer clothes and skin, and time of day are palette swaps.
+- **Sprite batcher.** One texture per file: a PNG or Aseprite file that holds an animation is one sprite sheet,
+  and a frame is a source rectangle. No atlas packing. Each sprite is one instanced quad; the instances go into a
+  preallocated array, are uploaded with one `bufferSubData` and drawn with one instanced draw call per run of
+  sprites with the same texture. See [architecture.md](../tech/architecture.md#rendering).
+- **Palette in the art, not in the shader.** Assets are plain RGBA. Palette swaps (grip materials, customer
+  clothes and skin, time of day) are separate sprites or a per-sprite tint, not indexed colors.
 - **Dirt masks.** One mask per part at sprite resolution, so cleaning works pixel by pixel. The brush erases
   mask pixels with a little dither, and the CPU counts clean pixels exactly. Dirty rows are re-uploaded with
-  `texSubImage2D` only when they change.
+  `texSubImage2D` only when they change. Not built yet (see [docs/backlog.md](../backlog.md#dirt-masks)).
 - **WebGL2 only for the Compo**, behind the backend-neutral renderer interface. WebGPU follows later with the
-  same atlas, palette and instance format.
+  same command stream and instance format.
 
 ### Plan (36 h, ~28 working hours)
 
 | Block | Hours | Done when |
 | --- | --- | --- |
-| Platform | ~4 | WebGL2 sprite batcher with palette and 640x360 target, mouse input, sound playback, first Release publish |
+| Platform | ~4 | WebGL2 sprite batcher and 640x360 target, mouse input, sound playback, first Release publish |
 | Disassembly | ~5 | Parts move on paths with resistance and snap; ordered disassembly and reassembly |
 | Cleaning | ~3 | Dirt mask scrubbing, oiling |
 | **Decision point** | ~12 h from start | One gun can be taken apart, cleaned and put back. If not: switch to the Jam |

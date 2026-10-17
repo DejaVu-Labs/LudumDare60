@@ -1,5 +1,6 @@
 using LudumDare60.Engine.Assets;
 using LudumDare60.Engine.Platform;
+using LudumDare60.Engine.Rendering;
 
 namespace LudumDare60.Engine;
 
@@ -14,7 +15,9 @@ public interface IGame
     /// </summary>
     /// <param name="assets">The run's asset manager. Keep it: the engine updates it at the start of every frame and
     /// unloads everything when the run ends.</param>
-    void Initialize(AssetManager assets);
+    /// <param name="graphics">The run's texture factory. Keep it: textures can be created from the first frame on, not
+    /// here, and the engine destroys the remaining ones when the run ends.</param>
+    void Initialize(AssetManager assets, Graphics graphics);
 
     /// <summary>
     /// Advances the simulation by one fixed step (<see cref="GameEngine.FixedDeltaTime"/>). Called zero or more times per frame.
@@ -37,7 +40,9 @@ public interface IGame
     void PrepareRender(double alpha);
 
     /// <summary>
-    /// Submits the data built by <see cref="PrepareRender"/>. Called once per frame, after <see cref="PrepareRender"/>.
+    /// Draws the data built by <see cref="PrepareRender"/>. Called once per frame, after <see cref="PrepareRender"/>.
+    /// The engine submits the frame to the GPU after this call returns.
     /// </summary>
-    void Render();
+    /// <param name="batch">Records this frame's sprites. Valid only during this call.</param>
+    void Render(SpriteBatch batch);
 }

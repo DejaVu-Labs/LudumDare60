@@ -2,7 +2,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { ERROR_TEXT, resolveRuntimeUrl, runWithStatus, startRuntime } from '../../src/engine/platforms/LudumDare60.Engine.Platform.Browser/wwwroot/boot.js';
+import {
+  ERROR_TEXT,
+  getErrorText,
+  resolveRuntimeUrl,
+  runWithStatus,
+  setErrorText,
+  startRuntime,
+} from '../../src/engine/platforms/LudumDare60.Engine.Platform.Browser/wwwroot/boot.js';
 
 const page = 'https://html-classic.itch.zone/html/123/index.html';
 
@@ -143,4 +150,27 @@ test('runWithStatus_NoStatusElement_StillRunsAndRejects', async () => {
   await assert.rejects(runWithStatus(async () => {
     throw new Error('failed');
   }, null));
+});
+
+test('runWithStatus_FailsWithErrorTextSet_ShowsThatText', async () => {
+  const status = statusElement();
+
+  await assert.rejects(runWithStatus(async () => {
+    throw new Error('no WebGL2');
+  }, status, () => 'Needs WebGL2.'));
+
+  assert.deepEqual(status, { hidden: false, textContent: 'Needs WebGL2.' });
+});
+
+test('setErrorText_ReplacesDefaultUntilReset', () => {
+  assert.equal(getErrorText(), ERROR_TEXT);
+
+  setErrorText('Lost the GPU.');
+  try {
+    assert.equal(getErrorText(), 'Lost the GPU.');
+  } finally {
+    setErrorText(null);
+  }
+
+  assert.equal(getErrorText(), ERROR_TEXT);
 });
