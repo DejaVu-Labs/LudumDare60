@@ -37,7 +37,7 @@ itch.io as an HTML5 build and is pushed with `butler`.
 ```bash
 dotnet build                                   # Debug build of the whole solution
 dotnet test                                    # all C# tests (Microsoft.Testing.Platform runner, see global.json)
-npm test                                       # JS tests (node --test tests/js/)
+npm test                                       # JS tests: node --test "tests/js/**/*.test.mjs" (Node 22+)
 dotnet format --verify-no-changes              # formatting check, as CI runs it
 rm -rf artifacts/publish/LudumDare60.Game.Browser   # publish never cleans; hashed names pile up
 dotnet publish src/game/LudumDare60.Game.Browser -c Release

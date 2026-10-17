@@ -12,7 +12,7 @@
     and breaks the locked restore in CI.
   - To upgrade: change `sdk.version` and `sdk.workloadVersion` together, run `dotnet workload install wasm-tools`,
     then `dotnet restore --force-evaluate` to refresh the lock files, and commit all of it.
-- Node.js 20+ for JS tests (CI uses 24).
+- Node.js 22+ for JS tests (CI uses 24). `npm test` passes a glob to `node --test`, which Node 20 does not expand.
 - `butler` (itch.io CLI) on `PATH`. Run `butler login` once locally. CI uses the `BUTLER_API_KEY` secret.
 
 ## Browser build

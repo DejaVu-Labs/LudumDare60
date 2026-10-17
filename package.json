@@ -4,9 +4,9 @@
   "type": "module",
   "description": "JavaScript tooling for the LD60 browser build (interop glue, renderer backends, tests).",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
-    "test": "node --test tests/js/"
+    "test": "node --test \"tests/js/**/*.test.mjs\""
   }
 }
