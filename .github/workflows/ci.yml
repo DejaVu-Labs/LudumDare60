@@ -1,0 +1,50 @@
+# Build, tests and formatting. Runs on pull requests; deploy.yml calls it before every push to itch.io, so
+# commits on main are checked there and not twice.
+name: CI
+
+on:
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      # SDK version from global.json. GitHub sets CI=true, which turns on locked restore (Directory.Build.props).
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Restore
+        run: dotnet restore
+
+      # Debug does not relink the native runtime, so the wasm-tools workload is not needed here.
+      - name: Build
+        run: dotnet build --no-restore
+
+      - name: Test (C#)
+        run: dotnet test --no-build
+
+      - name: Test (JS)
+        run: npm test
+
+      - name: Check formatting
+        run: dotnet format --verify-no-changes --no-restore

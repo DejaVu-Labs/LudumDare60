@@ -1,0 +1,157 @@
+# Publishes the Release (AOT) browser build to itch.io with butler.
+#
+#   tag v*            -> release: vars.ITCH_GAME      (the public game page), environment "itch"
+#   push to main      -> dev:     vars.ITCH_DEV_GAME  (a restricted test page), environment "itch-dev"
+#   manual run        -> either, picked in the form
+#
+# Setup (see docs/tech/build-and-deploy.md#continuous-deployment): repository variables ITCH_USER, ITCH_GAME and
+# ITCH_DEV_GAME, and a BUTLER_API_KEY secret in both environments.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Where to push
+        type: choice
+        options: [dev, release]
+        default: dev
+      version:
+        description: Version shown on itch.io (required for release; dev builds use the run number)
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+env:
+  PUBLISH_DIR: artifacts/publish/LudumDare60.Game.Browser/release/wwwroot
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      target: ${{ steps.plan.outputs.target }}
+      environment: ${{ steps.plan.outputs.environment }}
+      channel: ${{ steps.plan.outputs.channel }}
+      version: ${{ steps.plan.outputs.version }}
+    steps:
+      # Fails here, before the long AOT build, when the itch.io settings are missing.
+      - id: plan
+        name: Choose target and version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_TARGET: ${{ inputs.target }}
+          INPUT_VERSION: ${{ inputs.version }}
+          ITCH_USER: ${{ vars.ITCH_USER }}
+          ITCH_GAME: ${{ vars.ITCH_GAME }}
+          ITCH_DEV_GAME: ${{ vars.ITCH_DEV_GAME }}
+        run: |
+          if [ "$REF_TYPE" = tag ] || [ "$INPUT_TARGET" = release ]; then
+            target=release environment=itch game=$ITCH_GAME
+            if [ "$REF_TYPE" = tag ]; then version=${REF_NAME#v}; else version=$INPUT_VERSION; fi
+            if [ -z "$version" ]; then echo "::error::A release needs a version (tag v<version> or the version input)."; exit 1; fi
+          else
+            target=dev environment=itch-dev game=$ITCH_DEV_GAME
+            version="dev-$GITHUB_RUN_NUMBER-${GITHUB_SHA::7}"
+          fi
+          if [ -z "$ITCH_USER" ] || [ -z "$game" ]; then
+            echo "::error::Set the repository variables ITCH_USER, ITCH_GAME and ITCH_DEV_GAME (Settings > Secrets and variables > Actions > Variables)."
+            exit 1
+          fi
+          channel="$ITCH_USER/$game:html5"
+          {
+            echo "target=$target"
+            echo "environment=$environment"
+            echo "channel=$channel"
+            echo "version=$version"
+          } >> "$GITHUB_OUTPUT"
+          echo "Deploying $version to $channel ($target)" >> "$GITHUB_STEP_SUMMARY"
+
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    name: Publish (Release AOT)
+    needs: [plan, ci]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      # AOT needs the wasm-tools workload. Its version comes from sdk.workloadVersion in global.json, so CI and
+      # local builds use the same runtime pack and toolchain.
+      - name: Install wasm-tools workload
+        run: dotnet workload install wasm-tools
+
+      - name: Publish
+        run: dotnet publish src/game/LudumDare60.Game.Browser -c Release
+
+      # itch.io HTML5 limits: index.html at the root, at most 1000 files.
+      - name: Check output
+        run: |
+          test -f "$PUBLISH_DIR/index.html" || { echo "::error::index.html is missing from $PUBLISH_DIR"; exit 1; }
+          files=$(find "$PUBLISH_DIR" -type f | wc -l)
+          size=$(du -sh "$PUBLISH_DIR" | cut -f1)
+          echo "Build: $files files, $size" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$files" -gt 1000 ]; then echo "::error::$files files; itch.io allows at most 1000."; exit 1; fi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: html5
+          path: ${{ env.PUBLISH_DIR }}
+          if-no-files-found: error
+          retention-days: 14
+
+  push:
+    name: Push to itch.io (${{ needs.plan.outputs.target }})
+    needs: [plan, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The environment holds BUTLER_API_KEY, so only this job sees it. Add required reviewers to "itch" to approve
+    # each release by hand.
+    environment: ${{ needs.plan.outputs.environment }}
+    concurrency:
+      group: itch-${{ needs.plan.outputs.target }}
+      cancel-in-progress: false
+    env:
+      BUTLER_VERSION: 15.32.0
+      BUTLER_SHA256: 2335971394ef6596f95ded0833e85ee28755e13761716ef4c91d6b11f69162f5
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: html5
+          path: html5
+
+      - name: Install butler
+        run: |
+          archive="$RUNNER_TEMP/butler.zip"
+          curl -fsSL -o "$archive" "https://broth.itch.zone/butler/linux-amd64/$BUTLER_VERSION/archive/default"
+          echo "$BUTLER_SHA256  $archive" | sha256sum --check --strict
+          unzip -q "$archive" -d "$RUNNER_TEMP/butler"
+          chmod +x "$RUNNER_TEMP/butler/butler"
+          echo "$RUNNER_TEMP/butler" >> "$GITHUB_PATH"
+
+      - name: Push
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+          CHANNEL: ${{ needs.plan.outputs.channel }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          if [ -z "$BUTLER_API_KEY" ]; then echo "::error::BUTLER_API_KEY is not set in the environment."; exit 1; fi
+          butler -V
+          butler push html5 "$CHANNEL" --userversion "$VERSION" --if-changed
+          butler status "$CHANNEL"

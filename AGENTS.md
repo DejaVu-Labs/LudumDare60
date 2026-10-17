@@ -97,5 +97,6 @@ code. The short version:
 ## Deploying
 
 See [docs/tech/build-and-deploy.md](docs/tech/build-and-deploy.md) for the itch.io HTML5 limits and the `butler`
-workflow. Key constraints: `index.html` at the zip root, relative paths only, case-sensitive file names, at most
+workflow. GitHub Actions deploys automatically: a push to `main` goes to the dev project on itch.io, a `v*` tag goes
+to the public page (`.github/workflows/deploy.yml`). Key constraints: `index.html` at the zip root, relative paths only, case-sensitive file names, at most
 1000 files, and no `SharedArrayBuffer`.

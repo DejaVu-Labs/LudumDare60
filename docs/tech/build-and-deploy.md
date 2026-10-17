@@ -3,8 +3,10 @@
 ## Toolchain
 
 - .NET SDK 10.0.402+ (pinned in `global.json`, `rollForward: latestFeature`).
-- `wasm-tools` workload, needed for Release AOT: `dotnet workload install wasm-tools`.
-- Node.js 20+ for JS tests.
+- `wasm-tools` workload, needed for Release AOT: `dotnet workload install wasm-tools`. The workload set version is
+  pinned in `global.json` (`sdk.workloadVersion`), so local and CI builds use the same runtime pack. To move to a
+  newer set, run `dotnet workload update`, check `dotnet workload --version` and update `global.json`.
+- Node.js 20+ for JS tests (CI uses 24).
 - `butler` (itch.io CLI) on `PATH`. Run `butler login` once locally. CI uses the `BUTLER_API_KEY` secret.
 
 ## Browser build
@@ -92,6 +94,54 @@ butler status <user>/<game>:html5
 - `--dry-run` lists the files without pushing. `butler push-preview` diffs against the last build.
 - Push an exact release folder. Do not rely on `--ignore` patterns.
 - `BUTLER_API_KEY` is a secret. If it ever appears in a log, revoke it on the itch.io API keys page.
+
+## Continuous deployment
+
+Two GitHub Actions workflows live in `.github/workflows/`:
+
+| Workflow | Runs on | Does |
+| --- | --- | --- |
+| `ci.yml` | pull requests, manual runs, and as the first job of `deploy.yml` | Locked restore (`CI=true`), Debug build, `dotnet test`, `npm test`, `dotnet format --verify-no-changes`. No workload needed: Debug does not relink the native runtime. |
+| `deploy.yml` | push to `main`, tags `v*`, manual runs | Runs `ci.yml`, publishes Release AOT, checks the itch.io limits, uploads the build as the `html5` workflow artifact, then pushes it with butler. |
+
+Where a build goes:
+
+| Trigger | Target | itch.io project | `--userversion` | GitHub environment |
+| --- | --- | --- | --- | --- |
+| push to `main` | dev | `vars.ITCH_DEV_GAME` | `dev-<run number>-<short sha>` | `itch-dev` |
+| tag `v1.2.0` | release | `vars.ITCH_GAME` | `1.2.0` | `itch` |
+| manual run | picked in the form | as above | release: the `version` input (required) | as above |
+
+Commits on `main` are checked by the CI job inside `deploy.yml`, not by a separate CI run. A release is a tag:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Pushing a commit and a tag at once starts two deploys, one per target. Deploys to the same target are queued, never
+run in parallel.
+
+### One-time setup
+
+1. On itch.io, create two HTML projects: the public game and a test copy that stays non-public (for example the
+   game slug with `-dev`). Generate an API key at <https://itch.io/user/settings/api-keys>.
+2. In the GitHub repository, *Settings > Secrets and variables > Actions > Variables*: add `ITCH_USER` (the itch.io
+   user or team name in the project URL), `ITCH_GAME` and `ITCH_DEV_GAME` (the project slugs).
+3. *Settings > Environments*: create `itch` and `itch-dev`, and add the API key as the `BUTLER_API_KEY` secret in
+   both. Only the push job of `deploy.yml` uses these environments, so pull requests never see the key. Optionally
+   add required reviewers to `itch` to approve each release by hand.
+4. After the first push to each project, open its *Edit game* page and mark the `html5` upload as *This file will
+   be played in the browser*.
+
+The `plan` job fails within seconds if a variable is missing, before the long AOT build. The push job fails if
+`BUTLER_API_KEY` is missing from the environment.
+
+### Updating butler
+
+`deploy.yml` downloads butler from `broth.itch.zone` at a pinned version and checks its SHA-256. To update, read the
+latest version from <https://broth.itch.zone/butler/linux-amd64/LATEST>, then set `BUTLER_VERSION` and
+`BUTLER_SHA256` (`curl -fsSL https://broth.itch.zone/butler/linux-amd64/<version>/archive/default | sha256sum`).
 
 ## Pre-release checklist
 
