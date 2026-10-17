@@ -4,4 +4,9 @@
     <ProjectReference Include="..\..\src\engine\platforms\LudumDare60.Engine.Platform.Browser\LudumDare60.Engine.Platform.Browser.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Shared with tests/js/input.test.mjs. -->
+    <None Include="..\fixtures\raw-input-events.json" Link="fixtures\raw-input-events.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

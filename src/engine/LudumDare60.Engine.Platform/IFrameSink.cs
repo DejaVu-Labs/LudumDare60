@@ -10,7 +10,9 @@ public interface IFrameSink
     /// Advances the frame.
     /// </summary>
     /// <param name="dt">Time since the previous frame, in seconds.</param>
-    void Update(double dt);
+    /// <param name="events">Raw input events that arrived since the previous frame, in arrival order. The span is
+    /// valid only during this call.</param>
+    void Update(double dt, ReadOnlySpan<RawInputEvent> events);
 
     /// <summary>
     /// Draws the frame prepared by the last <see cref="Update"/>.

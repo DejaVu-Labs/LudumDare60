@@ -28,9 +28,10 @@ internal static partial class FrameLoopInterop
 
     /// <summary>
     /// Calls <paramref name="onFrame"/> from <c>requestAnimationFrame</c> once per frame, with the seconds since the
-    /// previous frame (0 on the first frame).
+    /// previous frame (0 on the first frame) and the frame's timestamp in milliseconds.
     /// </summary>
     /// <returns>A task that faults with the exception thrown by <paramref name="onFrame"/>.</returns>
     [JSImport("run", ModuleName)]
-    public static partial Task RunAsync([JSMarshalAs<JSType.Function<JSType.Number>>] Action<double> onFrame);
+    public static partial Task RunAsync(
+        [JSMarshalAs<JSType.Function<JSType.Number, JSType.Number>>] Action<double, double> onFrame);
 }

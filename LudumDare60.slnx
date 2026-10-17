@@ -24,9 +24,15 @@
     <Project Path="src/game/LudumDare60.Game.Browser/LudumDare60.Game.Browser.csproj" />
     <Project Path="src/game/LudumDare60.Game/LudumDare60.Game.csproj" />
   </Folder>
+  <Folder Name="/samples/" />
+  <Folder Name="/samples/InputMonitor/">
+    <Project Path="samples/InputMonitor/LudumDare60.Samples.InputMonitor.Browser/LudumDare60.Samples.InputMonitor.Browser.csproj" />
+    <Project Path="samples/InputMonitor/LudumDare60.Samples.InputMonitor/LudumDare60.Samples.InputMonitor.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <File Path="tests/Directory.Build.props" />
     <Project Path="tests/LudumDare60.Engine.Platform.Browser.Tests/LudumDare60.Engine.Platform.Browser.Tests.csproj" />
     <Project Path="tests/LudumDare60.Engine.Tests/LudumDare60.Engine.Tests.csproj" />
+    <Project Path="tests/LudumDare60.Samples.InputMonitor.Tests/LudumDare60.Samples.InputMonitor.Tests.csproj" />
   </Folder>
 </Solution>

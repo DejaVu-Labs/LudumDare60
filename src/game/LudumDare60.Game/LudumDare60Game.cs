@@ -1,4 +1,5 @@
 using LudumDare60.Engine;
+using LudumDare60.Engine.Platform;
 
 namespace LudumDare60.Game;
 
@@ -11,7 +12,7 @@ public sealed class LudumDare60Game : IGame
     {
     }
 
-    public void Update(in FrameContext context)
+    public void Update(in FrameContext context, ReadOnlySpan<RawInputEvent> events)
     {
     }
 

@@ -36,7 +36,7 @@ function createScheduler() {
 }
 
 /**
- * @param {(dt: number) => void} onFrame
+ * @param {(dt: number, timestamp: number) => void} onFrame
  */
 function start(onFrame) {
   const scheduler = createScheduler();
@@ -74,6 +74,17 @@ test('createFrameLoop_Frames_ReportSecondsBetweenTimestamps', () => {
   scheduler.frame(1050);
 
   assert.deepEqual(deltas, [0, 0.016, 0.034, 0]);
+});
+
+test('createFrameLoop_Frames_PassTheirTimestamp', () => {
+  /** @type {number[]} */
+  const timestamps = [];
+  const { scheduler } = start((_, timestamp) => timestamps.push(timestamp));
+
+  scheduler.frame(1000);
+  scheduler.frame(1016.5);
+
+  assert.deepEqual(timestamps, [1000, 1016.5]);
 });
 
 test('createFrameLoop_EachFrame_SchedulesExactlyOneNextFrame', () => {

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+
+  <!-- Shared WebAssembly and Release AOT settings come from the root Directory.Build.props. -->
+  <PropertyGroup>
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LudumDare60.Samples.InputMonitor\LudumDare60.Samples.InputMonitor.csproj" />
+    <ProjectReference Include="..\..\..\src\engine\platforms\LudumDare60.Engine.Platform.Browser\LudumDare60.Engine.Platform.Browser.csproj" />
+  </ItemGroup>
+
+</Project>

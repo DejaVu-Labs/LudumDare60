@@ -1,8 +1,9 @@
 // @ts-check
 
 /**
- * Frame loop of the browser platform. Each animation frame, the loop calls `onFrame(dt)` once, with `dt` = seconds
- * since the previous frame. C# passes `onFrame` through `[JSImport]`, so a frame costs one JS -> .NET call.
+ * Frame loop of the browser platform. Each animation frame, the loop calls `onFrame(dt, timestamp)` once, with
+ * `dt` = seconds since the previous frame. C# passes `onFrame` through `[JSImport]`, so a frame costs one JS -> .NET
+ * call.
  */
 
 /**
@@ -24,7 +25,9 @@
 /**
  * Starts a frame loop on the given scheduler. The first frame reports `dt = 0`.
  *
- * @param {(dt: number) => void} onFrame Called once per frame with the seconds since the previous frame.
+ * @param {(dt: number, timestamp: number) => void} onFrame Called once per frame with the seconds since the previous
+ *   frame and the frame's timestamp in milliseconds (the `requestAnimationFrame` timestamp, on the
+ *   `performance.now()` timeline).
  * @param {RequestFrame} requestFrame Usually `requestAnimationFrame`.
  * @param {CancelFrame} cancelFrame Usually `cancelAnimationFrame`.
  * @returns {FrameLoop}
@@ -55,7 +58,7 @@ export function createFrameLoop(onFrame, requestFrame, cancelFrame) {
     previousTimestamp = timestamp;
 
     try {
-      onFrame(dt);
+      onFrame(dt, timestamp);
     } catch (error) {
       running = false;
       rejectDone(error);
@@ -86,7 +89,7 @@ export function createFrameLoop(onFrame, requestFrame, cancelFrame) {
 /**
  * Runs the frame loop on `requestAnimationFrame` until `onFrame` throws. Bound from C# with `[JSImport]`.
  *
- * @param {(dt: number) => void} onFrame
+ * @param {(dt: number, timestamp: number) => void} onFrame
  * @returns {Promise<void>} Rejects with the error thrown by `onFrame`.
  */
 export function run(onFrame) {

@@ -1,3 +1,7 @@
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using LudumDare60.Engine.Platform;
+
 namespace LudumDare60.Engine.Tests;
 
 public sealed class GameEngineTests
@@ -71,7 +75,7 @@ public sealed class GameEngineTests
     }
 
     [Fact]
-    public void Update_NotRunning_Throws() => Assert.Throws<InvalidOperationException>(() => _engine.Update(F));
+    public void Update_NotRunning_Throws() => Assert.Throws<InvalidOperationException>(() => _engine.Update(F, []));
 
     [Fact]
     public void Render_NotRunning_Throws() => Assert.Throws<InvalidOperationException>(_engine.Render);
@@ -81,7 +85,7 @@ public sealed class GameEngineTests
     {
         await RunFramesAsync();
 
-        Assert.Throws<InvalidOperationException>(() => _engine.Update(F));
+        Assert.Throws<InvalidOperationException>(() => _engine.Update(F, []));
     }
 
     [Fact]
@@ -205,5 +209,67 @@ public sealed class GameEngineTests
         Assert.Equal(0.5 * F, context.TotalTime, Tolerance);
         Assert.Empty(secondGame.FixedUpdates);
         Assert.Equal(0.5, Assert.Single(secondGame.Alphas), 1e-6);
+    }
+
+    [Fact]
+    public async Task Update_PassesEachFrameEventsToGameUpdate()
+    {
+        RawInputEvent[] first = [KeyDown(Key.W), KeyDown(Key.A)];
+        RawInputEvent[] third = [new(RawInputEventKind.KeyUp, 0, (ushort)Key.W, 0, -0.004f, 0, 0, 0)];
+
+        await _engine.RunAsync(_game, ScriptedPlatform.FromFrames(new(0.02, first), new(0.02, []), new(0.02, third)));
+
+        Assert.Equal(3, _game.UpdateEvents.Count);
+        Assert.Equal(first, _game.UpdateEvents[0]);
+        Assert.Empty(_game.UpdateEvents[1]);
+        Assert.Equal(third, _game.UpdateEvents[2]);
+    }
+
+    [Fact]
+    public async Task Update_PassesPlatformMemoryWithoutCopying()
+    {
+        RawInputEvent[] events = [KeyDown(Key.Space)];
+        var game = new SpanIdentityGame(events);
+
+        await _engine.RunAsync(game, ScriptedPlatform.FromFrames(new ScriptedFrame(0.01, events)));
+
+        Assert.True(game.SawPlatformMemory);
+    }
+
+    [Fact]
+    public async Task Update_EventsAndFixedSteps_PassesEventsOnlyOnceToUpdate()
+    {
+        await _engine.RunAsync(_game, ScriptedPlatform.FromFrames(new ScriptedFrame(3.5 * F, [KeyDown(Key.D)])));
+
+        Assert.Equal(3, _game.FixedUpdates.Count);
+        Assert.Equal([KeyDown(Key.D)], Assert.Single(_game.UpdateEvents));
+    }
+
+    private static RawInputEvent KeyDown(Key key) => new(RawInputEventKind.KeyDown, 0, (ushort)key, 0, -0.008f, 0, 0, 0);
+
+    /// <summary>
+    /// Checks that <see cref="IGame.Update"/> sees the platform's own memory, not a copy.
+    /// </summary>
+    private sealed class SpanIdentityGame(RawInputEvent[] platformEvents) : IGame
+    {
+        public bool SawPlatformMemory { get; private set; }
+
+        public void FixedUpdate(in FrameContext context)
+        {
+        }
+
+        public void Update(in FrameContext context, ReadOnlySpan<RawInputEvent> events)
+        {
+            SawPlatformMemory = events.Length == platformEvents.Length
+                && Unsafe.AreSame(ref MemoryMarshal.GetReference(events), ref platformEvents[0]);
+        }
+
+        public void PrepareRender(double alpha)
+        {
+        }
+
+        public void Render()
+        {
+        }
     }
 }

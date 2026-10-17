@@ -5,12 +5,28 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LudumDare60</title>
+  <style>
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+    }
+
+    #screen {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
   <link rel="preload" id="webassembly" />
   <script type="importmap"></script>
   <script type="module" src="main#[.{fingerprint}].js"></script>
 </head>
 
 <body>
+  <canvas id="screen"></canvas>
 </body>
 
 </html>

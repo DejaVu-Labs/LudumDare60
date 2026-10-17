@@ -61,8 +61,10 @@ public sealed class GameEngine : IFrameSink
     /// </summary>
     /// <param name="dt">Time since the previous frame, in seconds. Clamped to [0, <see cref="MaxDeltaTime"/>];
     /// NaN counts as zero.</param>
+    /// <param name="events">Raw input events of this frame. Passed to <see cref="IGame.Update"/> as is, without
+    /// copying.</param>
     /// <exception cref="InvalidOperationException">No game is running.</exception>
-    public void Update(double dt)
+    public void Update(double dt, ReadOnlySpan<RawInputEvent> events)
     {
         var game = GetRunningGame();
         var deltaTime = double.IsNaN(dt) ? 0 : Math.Clamp(dt, 0, MaxDeltaTime);
@@ -78,7 +80,7 @@ public sealed class GameEngine : IFrameSink
 
         _totalTime += deltaTime;
         var context = new FrameContext(deltaTime, _totalTime, _frameIndex);
-        game.Update(in context);
+        game.Update(in context, events);
         _frameIndex++;
 
         game.PrepareRender(_accumulator / FixedDeltaTime);

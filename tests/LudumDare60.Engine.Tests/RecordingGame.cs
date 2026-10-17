@@ -1,3 +1,5 @@
+using LudumDare60.Engine.Platform;
+
 namespace LudumDare60.Engine.Tests;
 
 /// <summary>
@@ -17,6 +19,11 @@ internal sealed class RecordingGame : IGame
 
     public List<FrameContext> Updates { get; } = [];
 
+    /// <summary>
+    /// A copy of the events passed to each <see cref="Update"/>.
+    /// </summary>
+    public List<RawInputEvent[]> UpdateEvents { get; } = [];
+
     public List<double> Alphas { get; } = [];
 
     public void FixedUpdate(in FrameContext context)
@@ -25,10 +32,11 @@ internal sealed class RecordingGame : IGame
         FixedUpdates.Add(context);
     }
 
-    public void Update(in FrameContext context)
+    public void Update(in FrameContext context, ReadOnlySpan<RawInputEvent> events)
     {
         Record(nameof(Update));
         Updates.Add(context);
+        UpdateEvents.Add(events.ToArray());
     }
 
     public void PrepareRender(double alpha)
