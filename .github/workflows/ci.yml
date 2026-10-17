@@ -33,10 +33,15 @@ jobs:
         with:
           node-version: 24
 
+      # global.json pins the workload set (sdk.workloadVersion), and the SDK refuses to evaluate any project until
+      # that set is installed. Installing wasm-tools installs the pinned set; it also keeps the implicit
+      # Microsoft.NET.Sdk.WebAssembly.Pack version, which is in the lock files, the same as in the deploy job.
+      - name: Install wasm-tools workload
+        run: dotnet workload install wasm-tools
+
       - name: Restore
         run: dotnet restore
 
-      # Debug does not relink the native runtime, so the wasm-tools workload is not needed here.
       - name: Build
         run: dotnet build --no-restore
 

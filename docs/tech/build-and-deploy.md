@@ -3,9 +3,15 @@
 ## Toolchain
 
 - .NET SDK 10.0.402+ (pinned in `global.json`, `rollForward: latestFeature`).
-- `wasm-tools` workload, needed for Release AOT: `dotnet workload install wasm-tools`. The workload set version is
-  pinned in `global.json` (`sdk.workloadVersion`), so local and CI builds use the same runtime pack. To move to a
-  newer set, run `dotnet workload update`, check `dotnet workload --version` and update `global.json`.
+- `wasm-tools` workload: `dotnet workload install wasm-tools`, run from the repository root. The workload set is
+  pinned in `global.json` (`sdk.workloadVersion`), and the SDK refuses to build any project in the repository until
+  that set is installed (`dotnet workload --version` then prints it without "(not installed)").
+  - Keep the set equal to the SDK version (SDK `10.0.402` -> set `10.0.402`). The set decides the version of the
+    implicit `Microsoft.NET.Sdk.WebAssembly.Pack` reference, which is recorded in
+    `src/game/LudumDare60.Game.Browser/packages.lock.json`; a set that lags behind the SDK resolves an older pack
+    and breaks the locked restore in CI.
+  - To upgrade: change `sdk.version` and `sdk.workloadVersion` together, run `dotnet workload install wasm-tools`,
+    then `dotnet restore --force-evaluate` to refresh the lock files, and commit all of it.
 - Node.js 20+ for JS tests (CI uses 24).
 - `butler` (itch.io CLI) on `PATH`. Run `butler login` once locally. CI uses the `BUTLER_API_KEY` secret.
 
@@ -101,7 +107,7 @@ Two GitHub Actions workflows live in `.github/workflows/`:
 
 | Workflow | Runs on | Does |
 | --- | --- | --- |
-| `ci.yml` | pull requests, manual runs, and as the first job of `deploy.yml` | Locked restore (`CI=true`), Debug build, `dotnet test`, `npm test`, `dotnet format --verify-no-changes`. No workload needed: Debug does not relink the native runtime. |
+| `ci.yml` | pull requests, manual runs, and as the first job of `deploy.yml` | Installs `wasm-tools` (the pinned workload set is required for any build), then locked restore (`CI=true`), Debug build, `dotnet test`, `npm test`, `dotnet format --verify-no-changes`. |
 | `deploy.yml` | push to `main`, tags `v*`, manual runs | Runs `ci.yml`, publishes Release AOT, checks the itch.io limits, uploads the build as the `html5` workflow artifact, then pushes it with butler. |
 
 Where a build goes:

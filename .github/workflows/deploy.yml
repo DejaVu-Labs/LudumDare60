@@ -92,7 +92,7 @@ jobs:
           cache: true
           cache-dependency-path: '**/packages.lock.json'
 
-      # AOT needs the wasm-tools workload. Its version comes from sdk.workloadVersion in global.json, so CI and
+      # AOT needs the wasm-tools workload. The workload set comes from sdk.workloadVersion in global.json, so CI and
       # local builds use the same runtime pack and toolchain.
       - name: Install wasm-tools workload
         run: dotnet workload install wasm-tools
