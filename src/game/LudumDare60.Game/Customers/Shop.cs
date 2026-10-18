@@ -7,9 +7,9 @@ namespace LudumDare60.Game.Customers;
 
 /// <summary>
 /// The shop loop of docs/gamedesign/core-loop.md, one customer at a time: the door opens and the customer walks to
-/// the counter, the revolver lands on the mat, the player repairs it on the <see cref="OrderBench"/>, the customer
-/// holds out a hand, the player drags the whole revolver up to them, they thank the player and leave, and the next
-/// customer comes in. The orders come in the order of the <see cref="OrderBook"/>; at the first one the bench cannot
+/// the counter, the revolver lands on the mat, the player repairs it on the <see cref="OrderBench"/> and tests it
+/// (<see cref="ActionTest"/>: cock the hammer, pull the trigger), the customer holds out a hand, the player drags the
+/// whole revolver up to them, they thank the player and leave, and the next customer comes in. The orders come in the order of the <see cref="OrderBook"/>; at the first one the bench cannot
 /// play yet, the shop closes. Advance it once per fixed step with <see cref="Step"/>.
 /// </summary>
 public sealed class Shop
@@ -52,12 +52,12 @@ public sealed class Shop
     /// <summary>
     /// Where the player drags the revolver to hand it back: up to the customer's hand, relative to where it lies.
     /// </summary>
-    public static readonly Vector2 HandBackOffset = new(0, -62);
+    public static readonly Vector2 HandBackOffset = new(0, -48);
 
     /// <summary>
-    /// The point of the revolver the player grabs to hand it back: the middle of the frame.
+    /// The point of the revolver the player grabs to hand it back: the middle of the cylinder in its frame.
     /// </summary>
-    public static readonly Vector2 GunGrip = BenchLayout.FramePosition + new Vector2(PlaceholderParts.Frame.Width / 2f, PlaceholderParts.Frame.Height / 2f);
+    public static readonly Vector2 GunGrip = BenchLayout.CylinderSeated;
 
     // The revolver goes up without breakaway: nothing holds it to the mat.
     private static readonly DragFeel s_handBackFeel = new() { BreakawayAtStart = 0 };
@@ -93,6 +93,12 @@ public sealed class Shop
     public PartDrag? HandBack { get; private set; }
 
     /// <summary>
+    /// The hammer and trigger of the current customer's revolver, tested once it is back together. Null when there is
+    /// no customer.
+    /// </summary>
+    public ActionTest? Test { get; private set; }
+
+    /// <summary>
     /// What happened in the last step.
     /// </summary>
     public ShopEvents Events { get; private set; }
@@ -103,14 +109,19 @@ public sealed class Shop
     public bool BenchStepped { get; private set; }
 
     /// <summary>
+    /// Whether the last step advanced the test, so its events belong to that step.
+    /// </summary>
+    public bool TestStepped { get; private set; }
+
+    /// <summary>
     /// Whether a customer stands in the shop.
     /// </summary>
-    public bool HasCustomer => Phase is ShopPhase.Arriving or ShopPhase.Working or ShopPhase.Ready or ShopPhase.Thanking or ShopPhase.Leaving;
+    public bool HasCustomer => Phase is not (ShopPhase.Waiting or ShopPhase.Closed);
 
     /// <summary>
     /// Whether the revolver lies on the mat: from the moment it is put down until the customer takes it.
     /// </summary>
-    public bool HasGun => Phase is ShopPhase.Working or ShopPhase.Ready;
+    public bool HasGun => Phase is ShopPhase.Working or ShopPhase.Testing or ShopPhase.Ready;
 
     public Expression Expression => Phase is ShopPhase.Thanking or ShopPhase.Leaving ? Expression.Thankful : Expression.Neutral;
 
@@ -154,6 +165,7 @@ public sealed class Shop
     {
         Events = ShopEvents.None;
         BenchStepped = false;
+        TestStepped = false;
         PhaseTime += deltaTime;
         switch (Phase)
         {
@@ -165,6 +177,16 @@ public sealed class Shop
                 break;
             case ShopPhase.Working:
                 Work(input, deltaTime);
+                break;
+            case ShopPhase.Testing:
+                Test!.Step(input, deltaTime);
+                TestStepped = true;
+                if (Test.IsFired)
+                {
+                    Events |= ShopEvents.Repaired;
+                    Enter(ShopPhase.Ready);
+                }
+
                 break;
             case ShopPhase.Ready:
                 if ((HandBack!.Step(input, deltaTime) & DragEvents.SnappedEnd) != DragEvents.None)
@@ -181,6 +203,7 @@ public sealed class Shop
                 Events |= ShopEvents.CustomerLeft;
                 Bench = null;
                 HandBack = null;
+                Test = null;
                 OrderIndex++;
                 Enter(ShopPhase.Waiting);
                 break;
@@ -207,7 +230,8 @@ public sealed class Shop
         }
 
         Bench = new OrderBench(_book.Orders[OrderIndex]);
-        HandBack = new PartDrag(new LinePath(GunGrip, GunGrip + HandBackOffset), grabRadius: 18, s_handBackFeel);
+        HandBack = new PartDrag(new LinePath(GunGrip, GunGrip + HandBackOffset), grabRadius: 24, s_handBackFeel);
+        Test = new ActionTest();
         Events |= ShopEvents.CustomerEntered;
         Enter(ShopPhase.Arriving);
     }
@@ -230,8 +254,8 @@ public sealed class Shop
         BenchStepped = true;
         if (Bench.IsDone)
         {
-            Events |= ShopEvents.Repaired;
-            Enter(ShopPhase.Ready);
+            Events |= ShopEvents.Assembled;
+            Enter(ShopPhase.Testing);
         }
     }
 

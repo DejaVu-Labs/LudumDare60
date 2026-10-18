@@ -90,6 +90,19 @@ public sealed class ShopTests
         return seen;
     }
 
+    /// <summary>
+    /// Cocks the hammer and pulls the trigger, and returns every event seen.
+    /// </summary>
+    private static ShopEvents FireTest(Shop shop)
+    {
+        var hammer = shop.Test!.Hammer;
+        var seen = Drag(shop, hammer.Path.Start, hammer.Path.End + (hammer.Path.Direction * 10));
+        shop.Step(Press(ActionTest.TriggerCenter), Dt);
+        seen |= shop.Events;
+        shop.Step(Release(ActionTest.TriggerCenter), Dt);
+        return seen | shop.Events;
+    }
+
     private static ShopEvents HandBack(Shop shop) => Drag(shop, Shop.GunGrip, Shop.GunGrip + Shop.HandBackOffset - new Vector2(0, 30));
 
     [Fact]
@@ -153,22 +166,86 @@ public sealed class ShopTests
     }
 
     [Fact]
-    public void Step_RepairDone_CustomerHoldsOutAHandAndPartsStayPut()
+    public void Step_BackTogether_TestBeginsAndPartsStayPut()
     {
         var events = Repair(_shop);
 
-        Assert.True((events & ShopEvents.Repaired) != ShopEvents.None);
-        Assert.Equal(ShopPhase.Ready, _shop.Phase);
-        Assert.True(_shop.IsHandOut);
+        Assert.True((events & ShopEvents.Assembled) != ShopEvents.None);
+        Assert.Equal(ShopPhase.Testing, _shop.Phase);
+        Assert.False(_shop.IsHandOut);
+        Assert.True(_shop.HasGun);
 
         Drag(_shop, BenchLayout.PinSeated, BenchLayout.PinOut);
         Assert.Equal(PartStop.Start, _shop.Bench!.Part(RevolverParts.BasePin).Stop);
     }
 
     [Fact]
+    public void HasCustomer_FromComingInToLeaving_InEveryPhase()
+    {
+        var phases = new HashSet<ShopPhase>();
+        var shop = new Shop(s_shipped);
+        void note()
+        {
+            if (shop.HasCustomer)
+            {
+                phases.Add(shop.Phase);
+            }
+            else
+            {
+                Assert.True(shop.Phase is ShopPhase.Waiting or ShopPhase.Closed, $"No customer while {shop.Phase}.");
+            }
+        }
+
+        note();
+        Repair(shop);
+        note();
+        FireTest(shop);
+        note();
+        HandBack(shop);
+        for (var t = 0f; t < Shop.ThankSeconds + Shop.WalkSeconds + Shop.WaitSeconds + 0.5f; t += Dt)
+        {
+            shop.Step(s_idle, Dt);
+            note();
+        }
+
+        Assert.Equal(
+            [ShopPhase.Testing, ShopPhase.Ready, ShopPhase.Thanking, ShopPhase.Leaving],
+            phases.Order());
+    }
+
+    [Fact]
+    public void Step_Testing_OnlyTheTriggerAfterTheHammerFinishesIt()
+    {
+        Repair(_shop);
+        _shop.Step(Press(ActionTest.TriggerCenter), Dt);
+        _shop.Step(Release(ActionTest.TriggerCenter), Dt);
+        Assert.Equal(ShopPhase.Testing, _shop.Phase);
+
+        var events = FireTest(_shop);
+
+        Assert.Equal(ShopEvents.Repaired, events);
+        Assert.Equal(ShopPhase.Ready, _shop.Phase);
+        Assert.True(_shop.IsHandOut);
+    }
+
+    [Fact]
+    public void Step_Testing_RunsTheTestOnlyThen()
+    {
+        Wait(_shop, Shop.WaitSeconds + Shop.WalkSeconds + 1);
+        Assert.False(_shop.TestStepped);
+
+        Repair(_shop);
+        _shop.Step(s_idle, Dt);
+
+        Assert.True(_shop.TestStepped);
+        Assert.False(_shop.BenchStepped);
+    }
+
+    [Fact]
     public void Step_DragTheRevolverUp_HandsItBackAndTheCustomerThanks()
     {
         Repair(_shop);
+        FireTest(_shop);
 
         var events = HandBack(_shop);
 
@@ -182,6 +259,7 @@ public sealed class ShopTests
     public void Step_RevolverLetGoHalfway_StaysWithThePlayer()
     {
         Repair(_shop);
+        FireTest(_shop);
 
         _shop.Step(Press(Shop.GunGrip), Dt);
         for (var i = 0; i < 10; i++)
@@ -199,6 +277,7 @@ public sealed class ShopTests
     public void Step_AfterThanking_CustomerLeavesAndTheLastPlayableOrderClosesTheShop()
     {
         Repair(_shop);
+        FireTest(_shop);
         HandBack(_shop);
 
         var events = Wait(_shop, Shop.ThankSeconds + Shop.WalkSeconds + Shop.WaitSeconds + 0.2f);
@@ -215,6 +294,7 @@ public sealed class ShopTests
     {
         var shop = new Shop(TwoPlayableOrders());
         Repair(shop);
+        FireTest(shop);
         HandBack(shop);
 
         var events = Wait(shop, Shop.ThankSeconds + Shop.WalkSeconds + Shop.WaitSeconds + 0.2f);
@@ -222,6 +302,7 @@ public sealed class ShopTests
         Assert.Equal(ShopEvents.CustomerLeft | ShopEvents.CustomerEntered, events);
         Assert.Equal(ShopPhase.Arriving, shop.Phase);
         Assert.Equal("hoodie-again", shop.Bench!.Order.Id);
+        Assert.False(shop.Test!.IsFired);
         Assert.Equal(PartStop.Start, shop.Bench.Part(RevolverParts.Cylinder).Stop);
         Assert.False(shop.Bench.Dirt(RevolverParts.Cylinder)!.IsClean);
     }

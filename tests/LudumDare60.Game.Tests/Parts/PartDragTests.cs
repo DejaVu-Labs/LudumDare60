@@ -342,6 +342,24 @@ public sealed class PartDragTests
     }
 
     [Fact]
+    public void ReturnTo_HeldHalfway_LetsGoAndSitsInTheStopWithoutMotion()
+    {
+        GrabAndBreakFree();
+        _part.Step(Hold(80), Dt);
+
+        _part.ReturnTo(PartStop.Start);
+
+        Assert.False(_part.IsHeld);
+        Assert.Equal(PartStop.Start, _part.Stop);
+        Assert.Equal(0, _part.Distance);
+        Assert.Equal(_part.Position, _part.GetRenderPosition(0));
+    }
+
+    [Fact]
+    public void ReturnTo_Loose_Throws()
+        => Assert.Throws<ArgumentOutOfRangeException>(() => _part.ReturnTo(PartStop.None));
+
+    [Fact]
     public void GetRenderPosition_Alpha_InterpolatesTheLastStep()
     {
         GrabAndBreakFree();

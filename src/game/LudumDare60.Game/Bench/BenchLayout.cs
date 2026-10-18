@@ -7,40 +7,50 @@ using LudumDare60.Game.Parts;
 namespace LudumDare60.Game.Bench;
 
 /// <summary>
-/// The bench in code until the real art and its layout exist: where the frame, each part and the brush lie, and the
+/// The bench in code until the real art and its layout exist: where the revolver, each part and the brush lie, and the
 /// placeholder sprites and dirt for them. Only the parts that have a layout here can be played.
 /// </summary>
 public static class BenchLayout
 {
     /// <summary>
-    /// Top-left corner of the frame block on the mat.
+    /// Top-left corner of the revolver on the mat, as the customer puts it down.
     /// </summary>
-    public static readonly Vector2 FramePosition = new(250, 226);
+    public static readonly Vector2 GunPosition = new(170, 186);
 
     /// <summary>
-    /// The base pin's head when it is seated: just outside the bore in the frame's left edge.
+    /// The base pin's head when it is seated: just in front of the frame, on the cylinder's axis.
     /// </summary>
-    public static readonly Vector2 PinSeated = FramePosition + new Vector2(-2, PlaceholderParts.BoreRow);
+    public static readonly Vector2 PinSeated = GunPosition + PlaceholderParts.PinInBody;
 
     /// <summary>
-    /// The base pin's head when it is pulled out: the whole rod is out of the frame.
+    /// The base pin's head when it is pulled out: the whole rod is out of the frame, under the ejector housing.
     /// </summary>
     public static readonly Vector2 PinOut = PinSeated - new Vector2(PlaceholderParts.Pin.Width - 4, 0);
 
     /// <summary>
     /// The cylinder's middle when it is seated in the frame's window, on the pin's axis.
     /// </summary>
-    public static readonly Vector2 CylinderSeated = FramePosition + PlaceholderParts.CylinderInFrame + PlaceholderParts.CylinderOrigin;
+    public static readonly Vector2 CylinderSeated = GunPosition + PlaceholderParts.CylinderInBody;
 
     /// <summary>
-    /// The cylinder's middle when it is out: below the frame, on the mat.
+    /// The cylinder's middle when it is out: below the revolver, on the mat, clear of the trigger guard.
     /// </summary>
-    public static readonly Vector2 CylinderOut = CylinderSeated + new Vector2(0, 36);
+    public static readonly Vector2 CylinderOut = CylinderSeated + new Vector2(0, 64);
 
     /// <summary>
-    /// Where the brush's bristles are while it lies at its place, beside the cylinder's spot on the mat.
+    /// The hammer's pivot on the mat.
     /// </summary>
-    public static readonly Vector2 BrushRest = new(330, 292);
+    public static readonly Vector2 HammerPivot = GunPosition + PlaceholderParts.HammerInBody;
+
+    /// <summary>
+    /// The trigger's pivot on the mat.
+    /// </summary>
+    public static readonly Vector2 TriggerPivot = GunPosition + PlaceholderParts.TriggerInBody;
+
+    /// <summary>
+    /// Where the brush's bristles are while it lies at its place, right of the cylinder's spot on the mat.
+    /// </summary>
+    public static readonly Vector2 BrushRest = new(390, 296);
 
     /// <summary>
     /// The brush's grab area around its bristles: the bristles and the handle to the right.
@@ -68,7 +78,8 @@ public static class BenchLayout
         PlaceholderParts.CylinderGlow,
         PlaceholderParts.CylinderOrigin,
         UnderFrame: false,
-        ClickPitch: 0.8f);
+        ClickPitch: 0.8f,
+        PlaceholderParts.CylinderTurned);
 
     /// <summary>
     /// The layout of part <paramref name="id"/>, if it has one yet.

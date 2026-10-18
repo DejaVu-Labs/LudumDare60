@@ -181,6 +181,26 @@ public sealed class LudumDare60GameTests
         TakeApart();
         ScrubCylinderClean();
         PutBack();
+        Assert.Equal(ShopPhase.Testing, Shop.Phase);
+    }
+
+    private void CockHammer()
+    {
+        var hammer = Shop.Test!.Hammer;
+        Drag(hammer.Path.Start, hammer.Path.End + (hammer.Path.Direction * 10));
+    }
+
+    private void PullTrigger()
+    {
+        _platform.Frame(Step, PointerDown(ActionTest.TriggerCenter));
+        _platform.Frame(Step, PointerUp(ActionTest.TriggerCenter));
+    }
+
+    private void RepairAndTest()
+    {
+        Repair();
+        CockHammer();
+        PullTrigger();
         Assert.Equal(ShopPhase.Ready, Shop.Phase);
     }
 
@@ -260,17 +280,21 @@ public sealed class LudumDare60GameTests
     }
 
     [Fact]
-    public void PartsTexture_FrameWindowIsOpenAndTheFrameGlowGoesAroundTheOutside()
+    public void PartsTexture_WindowAndPinGapAreOpenAndTheGlowGoesAroundTheRevolver()
     {
         _platform.Frame(0);
 
         var pixels = _platform.Backend.Textures[0];
-        var inWindow = PlaceholderParts.CylinderInFrame + new Vector2(5, 5);
-        var glow = PlaceholderParts.FrameGlow;
-        Assert.Equal(0, AlphaAt(pixels, PlaceholderParts.Width, (int)inWindow.X, (int)inWindow.Y));
-        Assert.Equal(255, AlphaAt(pixels, PlaceholderParts.Width, 5, 5));
-        Assert.Equal(255, AlphaAt(pixels, PlaceholderParts.Width, glow.X + 10, glow.Y));
-        Assert.Equal(0, AlphaAt(pixels, PlaceholderParts.Width, glow.X + 10, glow.Y + 10));
+        var window = PlaceholderParts.CylinderInBody;
+        var pinHead = PlaceholderParts.PinInBody;
+        var glow = PlaceholderParts.BodyGlow;
+        Assert.Equal(0, AlphaAt(pixels, PlaceholderParts.Width, (int)window.X, (int)window.Y));
+        Assert.Equal(0, AlphaAt(pixels, PlaceholderParts.Width, (int)pinHead.X, (int)pinHead.Y));
+        Assert.Equal(255, AlphaAt(pixels, PlaceholderParts.Width, 50, 18));
+
+        // The barrel's top edge is at row 14: its glow one row above, none inside.
+        Assert.Equal(255, AlphaAt(pixels, PlaceholderParts.Width, glow.X + 51, glow.Y + 14));
+        Assert.Equal(0, AlphaAt(pixels, PlaceholderParts.Width, glow.X + 51, glow.Y + 19));
     }
 
     [Fact]
@@ -302,7 +326,7 @@ public sealed class LudumDare60GameTests
         Assert.Contains(_platform.AudioBackend.AllCommands(), c => c.Kind == AudioCommandKind.Play && (int)c.Arguments[0] == DoorBellSound);
         Assert.InRange(entering.Position.X, Shop.CounterX + 50, Shop.DoorX);
         Assert.Equal(new Vector2(Shop.CounterX, LudumDare60Game.CustomerBottom), arrived.Position);
-        Assert.Contains($"create {RustTexture} 24x18", _platform.Backend.Calls, StringComparer.Ordinal);
+        Assert.Contains($"create {RustTexture} {PlaceholderParts.Cylinder.Width}x{PlaceholderParts.Cylinder.Height}", _platform.Backend.Calls, StringComparer.Ordinal);
     }
 
     [Fact]
@@ -322,10 +346,10 @@ public sealed class LudumDare60GameTests
     {
         StartWithSound();
 
-        Assert.Equal(BenchLayout.FramePosition, Drawn(LastFrame, PlaceholderParts.Frame).Position);
+        Assert.Equal(BenchLayout.GunPosition, Drawn(LastFrame, PlaceholderParts.Body).Position);
         Assert.Equal(BenchLayout.CylinderSeated, Drawn(LastFrame, PlaceholderParts.Cylinder).Position);
         Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.CylinderGlow).Tint.A);
-        Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.FrameGlow).Tint.A);
+        Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.BodyGlow).Tint.A);
         Assert.Equal(BenchLayout.BrushRest, Drawn(LastFrame, PlaceholderParts.Brush).Position);
         Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.BrushGlow).Tint.A);
     }
@@ -541,7 +565,7 @@ public sealed class LudumDare60GameTests
     }
 
     [Fact]
-    public void Repaired_TheRevolverShinesAndTheCustomerHoldsOutAHand()
+    public void BackTogether_TheHammerGlowsForTheTest()
     {
         StartWithSound();
         var before = PlayCount();
@@ -551,51 +575,93 @@ public sealed class LudumDare60GameTests
 
         var cylinderClicks = PlayedPitches(before).Where(p => Math.Abs(p - 1.0) < 1e-6 || Math.Abs(p - 0.6) < 1e-6);
         Assert.Equal([1.0, 0.6], cylinderClicks, (a, b) => Math.Abs(a - b) < 1e-6);
-        Assert.Contains(1.5, PlayedPitches(before));
-        Assert.InRange(Drawn(LastFrame, PlaceholderParts.FrameGlow).Tint.A, 1, 255);
-        Assert.NotNull(Sprite(LastFrame, PlaceholderCustomers.Hand));
-        Assert.Null(Sprite(LastFrame, PlaceholderCustomers.Bubble));
+        Assert.InRange(Drawn(LastFrame, PlaceholderParts.HammerGlow).Tint.A, 1, 255);
+        Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.TriggerGlow).Tint.A);
         Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.PinGlow).Tint.A);
+        Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.BodyGlow).Tint.A);
+        Assert.Null(Sprite(LastFrame, PlaceholderCustomers.Hand));
+        Assert.Equal(new Vector2(Shop.CounterX, LudumDare60Game.CustomerBottom), Drawn(LastFrame, PlaceholderCustomers.Bust("hoodie")).Position);
+        Assert.Equal(BenchLayout.HammerPivot, Drawn(LastFrame, PlaceholderParts.Hammer).Position);
+        Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.Hammer).Rotation);
     }
 
     [Fact]
-    public void Repaired_TheRevolverFlashesAtOnce()
-    {
-        StartWithSound();
-        TakeApart();
-        ScrubCylinderClean();
-        Drag(BenchLayout.CylinderOut, BenchLayout.CylinderSeated - new Vector2(0, 20));
-
-        // The pin snaps in on its way: let go before the flash is over.
-        _platform.Frame(Step, PointerDown(BenchLayout.PinOut));
-        for (var i = 0; i < 90 && Shop.Phase != ShopPhase.Ready; i++)
-        {
-            HoldAt(BenchLayout.PinSeated + new Vector2(20, 0), 1);
-        }
-
-        Assert.Equal(255, Drawn(LastFrame, PlaceholderParts.FrameGlow).Tint.A);
-    }
-
-    [Fact]
-    public void HandingBack_TheRevolverRisesWithTheFrameAndTheSeatedParts()
+    public void TriggerBeforeTheHammer_GivesADullTickAndFlashesTheHammer()
     {
         StartWithSound();
         Repair();
+        var before = PlayCount();
+
+        _platform.Frame(Step, PointerDown(ActionTest.TriggerCenter));
+        var flash = Drawn(LastFrame, PlaceholderParts.HammerGlow).Tint.A;
+
+        Assert.Equal([0.4], PlayedPitches(before), (a, b) => Math.Abs(a - b) < 1e-6);
+        Assert.Equal(255, flash);
+        Assert.Equal(ShopPhase.Testing, Shop.Phase);
+    }
+
+    [Fact]
+    public void CockTheHammer_RatchetClicksTurnTheCylinderAndTheTriggerGlows()
+    {
+        StartWithSound();
+        Repair();
+        var before = PlayCount();
+
+        CockHammer();
+
+        var pitches = PlayedPitches(before).Select(p => Math.Round(p, 3)).ToList();
+        Assert.Contains(1.1, pitches);
+        Assert.Contains(0.9, pitches);
+        Assert.Contains(1.3, pitches);
+        Assert.Equal(ActionTest.CockAngle, Drawn(LastFrame, PlaceholderParts.Hammer).Rotation, 1e-4);
+        Assert.Equal(BenchLayout.CylinderSeated, Drawn(LastFrame, PlaceholderParts.CylinderTurned).Position);
+        Assert.Null(Sprite(LastFrame, PlaceholderParts.Cylinder));
+        Assert.InRange(Drawn(LastFrame, PlaceholderParts.TriggerGlow).Tint.A, 1, 255);
+        Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.HammerGlow).Tint.A);
+    }
+
+    [Fact]
+    public void PullTheTriggerWhenCocked_DryFiresAndTheCustomerHoldsOutAHand()
+    {
+        StartWithSound();
+        Repair();
+        CockHammer();
+        var before = PlayCount();
+
+        PullTrigger();
+
+        var pitches = PlayedPitches(before).Select(p => Math.Round(p, 3)).ToList();
+        Assert.Contains(1.7, pitches);
+        Assert.Contains(1.5, pitches);
+        Assert.Equal(ShopPhase.Ready, Shop.Phase);
+        Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.Hammer).Rotation);
+        Assert.True(Drawn(LastFrame, PlaceholderParts.Trigger).Rotation < 0, "The trigger is still pulled back.");
+        Assert.InRange(Drawn(LastFrame, PlaceholderParts.BodyGlow).Tint.A, 1, 255);
+        Assert.NotNull(Sprite(LastFrame, PlaceholderCustomers.Hand));
+        Assert.Null(Sprite(LastFrame, PlaceholderCustomers.Bubble));
+    }
+
+    [Fact]
+    public void HandingBack_TheRevolverRisesWithItsSeatedPartsHammerAndTrigger()
+    {
+        StartWithSound();
+        RepairAndTest();
 
         _platform.Frame(Step, PointerDown(Shop.GunGrip));
         HoldAt(Shop.GunGrip + new Vector2(0, -30), 20);
 
-        var frame = Drawn(LastFrame, PlaceholderParts.Frame).Position;
-        var pin = Drawn(LastFrame, PlaceholderParts.Pin).Position;
-        Assert.InRange(frame.Y, BenchLayout.FramePosition.Y - 40, BenchLayout.FramePosition.Y - 10);
-        Assert.Equal(frame - BenchLayout.FramePosition, pin - BenchLayout.PinSeated);
+        var lift = Drawn(LastFrame, PlaceholderParts.Body).Position - BenchLayout.GunPosition;
+        Assert.InRange(lift.Y, -40, -10);
+        Assert.Equal(lift, Drawn(LastFrame, PlaceholderParts.Pin).Position - BenchLayout.PinSeated);
+        Assert.Equal(lift, Drawn(LastFrame, PlaceholderParts.Hammer).Position - BenchLayout.HammerPivot);
+        Assert.Equal(lift, Drawn(LastFrame, PlaceholderParts.Trigger).Position - BenchLayout.TriggerPivot);
     }
 
     [Fact]
     public void HandBack_TheCustomerTakesTheRevolverAndSmiles()
     {
         StartWithSound();
-        Repair();
+        RepairAndTest();
         var before = PlayCount();
 
         HandBack();
@@ -603,7 +669,8 @@ public sealed class LudumDare60GameTests
         Assert.Equal(ShopPhase.Thanking, Shop.Phase);
         Assert.Contains(0.9, PlayedPitches(before).Select(p => Math.Round(p, 3)));
         Assert.NotNull(Sprite(LastFrame, PlaceholderCustomers.Face(Expression.Thankful)));
-        Assert.Null(Sprite(LastFrame, PlaceholderParts.Frame));
+        Assert.Null(Sprite(LastFrame, PlaceholderParts.Body));
+        Assert.Null(Sprite(LastFrame, PlaceholderParts.Hammer));
         Assert.Null(Sprite(LastFrame, PlaceholderParts.Brush));
     }
 
@@ -611,7 +678,7 @@ public sealed class LudumDare60GameTests
     public void AfterHandBack_TheCustomerLeavesWithTheBellAndTheShopCloses()
     {
         StartWithSound();
-        Repair();
+        RepairAndTest();
         HandBack();
 
         Idle((int)((Shop.ThankSeconds + Shop.WalkSeconds + Shop.WaitSeconds) * 60) + 10);

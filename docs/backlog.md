@@ -91,8 +91,8 @@ order their blocking graph allows (`Parts/PartAssembly`). Still to do:
 Customers come in, hand over the revolver and take it back (`Customers/Shop`, see
 [core-loop.md](gamedesign/core-loop.md#what-is-built)). Still to do:
 
-- The test before handing back: cock the hammer (the cylinder turns one chamber), click the trigger. The repair
-  counts as done without it today.
+- The hammer's drag follows the chord of its arc (`Bench/ActionTest`); try a real arc path (see the touch loop
+  follow-ups) once it exists, and tune how hard the mainspring holds the hammer down.
 - Finds: the find pops out of its part, opens over the bench, flies into the finds box; the customer's surprised
   face (`Expression.Surprised` exists, nothing sets it yet).
 - The phone message after the customer leaves, and the counter bell that calls the next customer at once.

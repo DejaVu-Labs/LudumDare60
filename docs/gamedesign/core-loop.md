@@ -59,12 +59,15 @@ The player controls the pace. Nothing in the loop has a timer, and nothing in it
 
 `Customers/Shop` runs the loop on the orders of `orders.json`, one customer at a time. After a moment the door bell
 rings and the customer walks from the door to the counter; the revolver drops onto the mat with a thud, and a
-bubble shows the symptom icon. The repair counts as done when every part of the order has been out, is back in its
-seat, and every dirty part is clean (the test with the hammer comes later). Then the revolver shines, the
-customer holds out a hand, and the parts stay put: the player drags the whole revolver up to the hand. The customer
-smiles, takes it, walks out with the door bell, and the next order comes in. At the first order the bench cannot
-play yet the shop stays empty. Finds, the test, the phone message and the counter bell are not built yet (see
-[backlog](../backlog.md#shop-loop-follow-ups)).
+bubble shows the symptom icon. Once every part of the order has been out, is back in its seat, and every dirty part
+is clean, the parts stay put and the test begins (`Bench/ActionTest`): the hammer glows, the player drags its spur
+back (it turns around its pivot; a ratchet click at half cock, and at full cock the cylinder turns one chamber), then
+the trigger glows and a click on it drops the hammer with a dry-fire click. A trigger pulled with the hammer down
+does nothing on a single-action revolver: a dull tick, and the hammer flashes; a hammer let go before full cock
+springs back down. Then the revolver shines, the customer holds out a hand, and the player drags the whole revolver
+up to it. The customer smiles, takes it, walks out with the door bell, and the next order comes in. At the first
+order the bench cannot play yet the shop stays empty. Finds, the phone message and the counter bell are not built
+yet (see [backlog](../backlog.md#shop-loop-follow-ups)).
 
 ## Rules
 

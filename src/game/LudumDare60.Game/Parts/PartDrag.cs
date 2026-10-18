@@ -195,6 +195,25 @@ public sealed class PartDrag
         return events;
     }
 
+    /// <summary>
+    /// Puts the part into <paramref name="stop"/> at once and out of the player's hand, without events: a spring or
+    /// another part moved it.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="stop"/> is not an end.</exception>
+    public void ReturnTo(PartStop stop)
+    {
+        if (stop is not (PartStop.Start or PartStop.End))
+        {
+            throw new ArgumentOutOfRangeException(nameof(stop), stop, "A part returns to one of the ends.");
+        }
+
+        Stop = stop;
+        Distance = PreviousDistance = StopDistance(stop);
+        IsHeld = false;
+        IsHovered = false;
+        _leftStop = PartStop.None;
+    }
+
     private DragEvents SnapTo(PartStop stop)
     {
         Stop = stop;

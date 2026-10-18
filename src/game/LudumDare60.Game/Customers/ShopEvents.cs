@@ -19,17 +19,22 @@ public enum ShopEvents
     GunLanded = 2,
 
     /// <summary>
-    /// The repair is done; the customer holds out a hand.
+    /// The revolver is back together; the test begins.
     /// </summary>
-    Repaired = 4,
+    Assembled = 4,
+
+    /// <summary>
+    /// The test is done; the customer holds out a hand.
+    /// </summary>
+    Repaired = 8,
 
     /// <summary>
     /// The player handed the revolver back.
     /// </summary>
-    HandedBack = 8,
+    HandedBack = 16,
 
     /// <summary>
     /// The door closed behind the customer.
     /// </summary>
-    CustomerLeft = 16,
+    CustomerLeft = 32,
 }

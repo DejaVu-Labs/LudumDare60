@@ -16,6 +16,8 @@ namespace LudumDare60.Game.Bench;
 /// <param name="Origin">The grab point in sprite pixels: the sprite is drawn with it at the part's position.</param>
 /// <param name="UnderFrame">Whether the frame is drawn over the part, hiding what of it is still inside.</param>
 /// <param name="ClickPitch">Pitch of the part's clicks: heavier parts click lower.</param>
+/// <param name="TurnedSprite">How the part looks one chamber further round, for the cylinder; null for parts that do
+/// not turn.</param>
 public sealed record PartLayout(
     LinePath Path,
     float GrabRadius,
@@ -24,4 +26,5 @@ public sealed record PartLayout(
     IntRect Glow,
     Vector2 Origin,
     bool UnderFrame,
-    float ClickPitch);
+    float ClickPitch,
+    IntRect? TurnedSprite = null);

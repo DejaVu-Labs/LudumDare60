@@ -17,8 +17,8 @@ namespace LudumDare60.Game;
 /// <see cref="Customers.Shop"/> run on the orders of <c>orders.json</c>: a customer comes in through the door, puts the
 /// revolver on the mat and shows what is wrong with it; the player repairs it on the <see cref="OrderBench"/> (parts
 /// come off in the order their blocks allow, a dirty part out on the mat is rubbed clean with the brush, the parts go
-/// back in reverse order), drags the whole revolver up to the customer's hand, and the customer thanks the player and
-/// leaves. Parts that can move glow, a press on a blocked part flashes what blocks it, every snap clicks, and the
+/// back in reverse order), tests it (cocks the hammer, pulls the trigger), drags the whole revolver up to the
+/// customer's hand, and the customer thanks the player and leaves. Parts that can move glow, a press on a blocked part flashes what blocks it, every snap clicks, and the
 /// brush rasps louder the faster it rubs. Customers, parts, the brush, the dirt and the sounds are placeholders until
 /// the real art and recordings arrive.
 /// </summary>
@@ -73,6 +73,14 @@ public sealed class LudumDare60Game : IGame
     private static readonly SoundOptions s_repaired = new() { Pitch = 1.5f, Volume = 0.5f };
     private static readonly SoundOptions s_handedBack = new() { Pitch = 0.9f, Volume = 0.6f };
     private static readonly SoundOptions s_doorBell = new() { Volume = 0.5f };
+    private static readonly SoundOptions s_halfCock = new() { Pitch = 1.1f, Volume = 0.5f };
+    private static readonly SoundOptions s_cocked = new() { Pitch = 0.9f, Volume = 0.9f };
+    private static readonly SoundOptions s_cylinderTurn = new() { Pitch = 1.3f, Volume = 0.45f };
+    private static readonly SoundOptions s_dryFire = new() { Pitch = 1.7f, Volume = 1f };
+    private static readonly SoundOptions s_hammerEased = new() { Pitch = 0.6f, Volume = 0.4f };
+
+    // How far back the trigger turns when pulled, in radians (counterclockwise: its tip goes towards the grip).
+    private const float TriggerPullAngle = -0.35f;
     private static readonly SoundOptions s_silent = new() { Volume = 0 };
 
     // The hand held out, and the bubble with the symptom, relative to the customer's bottom middle.
@@ -96,10 +104,15 @@ public sealed class LudumDare60Game : IGame
     private Voice _scrubVoice;
     private bool _hasScrubVoice;
     private float _brushHint;
-    private float _frameHint;
+    private float _bodyHint;
+    private float _hammerHint;
     private Vector2 _brushDrawPosition;
     private byte _brushGlow;
-    private byte _frameGlow;
+    private byte _bodyGlow;
+    private byte _hammerGlow;
+    private byte _triggerGlow;
+    private float _hammerAngle;
+    private float _triggerAngle;
     private Vector2 _gunOffset;
     private float _time;
 
@@ -154,11 +167,17 @@ public sealed class LudumDare60Game : IGame
         var deltaTime = (float)context.DeltaTime;
         shop.Step(PointerSample.From(context.Input), deltaTime);
         PlayShopSounds(shop.Events);
-        _frameHint = MathF.Max(0, _frameHint - deltaTime);
+        _bodyHint = MathF.Max(0, _bodyHint - deltaTime);
+        _hammerHint = MathF.Max(0, _hammerHint - deltaTime);
         if ((shop.Events & ShopEvents.Repaired) != ShopEvents.None)
         {
             // The revolver shines once; the customer holds out a hand.
-            _frameHint = HintSeconds;
+            _bodyHint = HintSeconds;
+        }
+
+        if (shop.TestStepped)
+        {
+            PlayTestSounds(shop.Test!.Events);
         }
 
         if (shop.Bench is not { } bench || bench != _shownBench)
@@ -260,9 +279,22 @@ public sealed class LudumDare60Game : IGame
         }
 
         var handBack = shop.HandBack!;
-        _frameGlow = shop.Phase != ShopPhase.Ready ? (byte)0
-            : _frameHint > 0 ? Blink(_frameHint)
+        _bodyGlow = shop.Phase != ShopPhase.Ready ? (byte)0
+            : _bodyHint > 0 ? Blink(_bodyHint)
             : handBack.IsHeld || handBack.IsHovered ? GlowActive
+            : idleGlow;
+
+        // The test: first the hammer glows, once it is cocked the trigger.
+        var test = shop.Test!;
+        var testing = shop.Phase == ShopPhase.Testing;
+        _hammerAngle = test.GetHammerAngle((float)alpha);
+        _triggerAngle = test.TriggerPull * TriggerPullAngle;
+        _hammerGlow = !testing || test.IsCocked ? (byte)0
+            : _hammerHint > 0 ? Blink(_hammerHint)
+            : test.Hammer.IsHeld || test.Hammer.IsHovered ? GlowActive
+            : idleGlow;
+        _triggerGlow = !testing || !test.IsCocked ? (byte)0
+            : test.IsTriggerHovered ? GlowActive
             : idleGlow;
 
         var brush = bench.Brush;
@@ -300,9 +332,9 @@ public sealed class LudumDare60Game : IGame
         }
 
         // Parts under the frame first, so what of them is still inside is hidden; the rest over it.
-        var frame = BenchLayout.FramePosition + _gunOffset;
-        var frameGlow = new SpriteOptions { Origin = Vector2.One, Tint = Color.White.WithAlpha(_frameGlow) };
-        batch.Draw(_parts, PlaceholderParts.FrameGlow, frame, frameGlow);
+        var gun = BenchLayout.GunPosition + _gunOffset;
+        var bodyGlow = new SpriteOptions { Origin = Vector2.One, Tint = Color.White.WithAlpha(_bodyGlow) };
+        batch.Draw(_parts, PlaceholderParts.BodyGlow, gun, bodyGlow);
         for (var i = 0; i < bench.Count; i++)
         {
             if (bench.LayoutAt(i).UnderFrame)
@@ -311,7 +343,7 @@ public sealed class LudumDare60Game : IGame
             }
         }
 
-        batch.Draw(_parts, PlaceholderParts.Frame, frame);
+        batch.Draw(_parts, PlaceholderParts.Body, gun);
         for (var i = 0; i < bench.Count; i++)
         {
             if (!bench.LayoutAt(i).UnderFrame)
@@ -319,6 +351,10 @@ public sealed class LudumDare60Game : IGame
                 DrawPart(batch, bench, i);
             }
         }
+
+        // The hammer and the trigger turn around their pivots.
+        DrawTurning(batch, PlaceholderParts.Hammer, PlaceholderParts.HammerGlow, PlaceholderParts.HammerOrigin, BenchLayout.HammerPivot, _hammerAngle, _hammerGlow);
+        DrawTurning(batch, PlaceholderParts.Trigger, PlaceholderParts.TriggerGlow, PlaceholderParts.TriggerOrigin, BenchLayout.TriggerPivot, _triggerAngle, _triggerGlow);
 
         // The brush lies on top of everything, and in the hand it is above the parts it scrubs.
         var brushGlow = new SpriteOptions { Origin = PlaceholderParts.BrushOrigin + Vector2.One, Tint = Color.White.WithAlpha(_brushGlow) };
@@ -431,15 +467,26 @@ public sealed class LudumDare60Game : IGame
         }
     }
 
+    private void DrawTurning(SpriteBatch batch, IntRect sprite, IntRect glow, Vector2 origin, Vector2 pivot, float angle, byte glowAlpha)
+    {
+        var position = pivot + _gunOffset;
+        var glowOptions = new SpriteOptions { Origin = origin + Vector2.One, Rotation = angle, Tint = Color.White.WithAlpha(glowAlpha) };
+        batch.Draw(_parts, glow, position, glowOptions);
+        batch.Draw(_parts, sprite, position, new SpriteOptions { Origin = origin, Rotation = angle });
+    }
+
     private void DrawPart(SpriteBatch batch, OrderBench bench, int part)
     {
         var layout = bench.LayoutAt(part);
+
+        // The cylinder shows which chamber the last cock turned it to.
+        var sprite = layout.TurnedSprite is { } turned && Shop!.Test is { Chamber: var chamber } && chamber % 2 == 1 ? turned : layout.Sprite;
 
         // A part in the gun moves with it; one out on the mat stays where it lies.
         var position = _drawPositions[part] + (bench.Gun[part].Stop == PartStop.Start ? _gunOffset : Vector2.Zero);
         var glow = new SpriteOptions { Origin = layout.Origin + Vector2.One, Tint = Color.White.WithAlpha(_glowAlphas[part]) };
         batch.Draw(_parts, layout.Glow, position, glow);
-        batch.Draw(_parts, layout.Sprite, position, new SpriteOptions { Origin = layout.Origin });
+        batch.Draw(_parts, sprite, position, new SpriteOptions { Origin = layout.Origin });
         if (_hasDirtTexture[part] && _dirtFades[part] > 0)
         {
             var dirt = new SpriteOptions { Origin = layout.Origin, Tint = Color.White.WithAlpha((byte)(255 * _dirtFades[part])) };
@@ -488,6 +535,43 @@ public sealed class LudumDare60Game : IGame
             {
                 _hints[i] = HintSeconds;
             }
+        }
+    }
+
+    private void PlayTestSounds(TestEvents events)
+    {
+        if (events == TestEvents.None)
+        {
+            return;
+        }
+
+        if ((events & TestEvents.HalfCock) != TestEvents.None)
+        {
+            PlaySound(s_halfCock);
+        }
+
+        if ((events & TestEvents.Cocked) != TestEvents.None)
+        {
+            // Full cock, and the cylinder's ratchet turns it one chamber.
+            PlaySound(s_cocked);
+            PlaySound(s_cylinderTurn);
+        }
+
+        if ((events & TestEvents.HammerEased) != TestEvents.None)
+        {
+            PlaySound(s_hammerEased);
+        }
+
+        if ((events & TestEvents.DryFire) != TestEvents.None)
+        {
+            PlaySound(s_dryFire);
+        }
+
+        if ((events & TestEvents.TriggerRefused) != TestEvents.None)
+        {
+            // Single action: the hammer comes first, and it flashes.
+            _hammerHint = HintSeconds;
+            PlaySound(s_refusedClick);
         }
     }
 
