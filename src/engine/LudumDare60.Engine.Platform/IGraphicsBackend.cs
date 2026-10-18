@@ -17,6 +17,16 @@ public interface IGraphicsBackend
     void CreateTexture(int id, int width, int height, ReadOnlySpan<byte> pixels);
 
     /// <summary>
+    /// Replaces whole rows of texture <paramref name="id"/>'s pixels, for textures that change while the game runs.
+    /// </summary>
+    /// <param name="id">A live texture.</param>
+    /// <param name="y">The first row to replace, from the top.</param>
+    /// <param name="height">How many rows, at least 1; <c>y + height</c> is at most the texture's height.</param>
+    /// <param name="rows"><c>textureWidth * height * 4</c> bytes in the layout of <see cref="CreateTexture"/>. Read
+    /// during the call only.</param>
+    void UpdateTexture(int id, int y, int height, ReadOnlySpan<byte> rows);
+
+    /// <summary>
     /// Deletes texture <paramref name="id"/>. The id may be created again afterwards.
     /// </summary>
     void DestroyTexture(int id);

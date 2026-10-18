@@ -65,6 +65,17 @@ internal static class PlaceholderParts
     private static readonly Color s_steelLight = Color.FromRgb(0xb3a99b);
     private static readonly Color s_glow = Color.FromRgb(0xfbe099);
 
+    // Rust, dark to light, from the walnut, rust and copper ramp.
+    private static readonly Color[] s_rust =
+    [
+        Color.FromRgb(0x622a14), Color.FromRgb(0x823d1e), Color.FromRgb(0x944f2d), Color.FromRgb(0xa1603b), Color.FromRgb(0xb37149),
+    ];
+
+    /// <summary>
+    /// How much of the cylinder rust covers, from 0 (all of it) to 1 (none): pixels whose blotch value lies above it.
+    /// </summary>
+    private const float RustCutoff = 0.3f;
+
     public static Image Create()
     {
         var pixels = new byte[Width * Height * Image.BytesPerPixel];
@@ -74,6 +85,48 @@ internal static class PlaceholderParts
         FillGlow(pixels, PinGlow, IsPin);
         FillGlow(pixels, CylinderGlow, IsCylinder);
         return new Image(Width, Height, pixels);
+    }
+
+    /// <summary>
+    /// Rust over the cylinder, for a <see cref="Cleaning.DirtLayer"/>: blotches over most of it, the cylinder's size and
+    /// origin. The same pixels every time.
+    /// </summary>
+    public static Image CreateCylinderRust()
+    {
+        var pixels = new byte[CylinderWidth * CylinderHeight * Image.BytesPerPixel];
+        for (var y = 0; y < CylinderHeight; y++)
+        {
+            for (var x = 0; x < CylinderWidth; x++)
+            {
+                // Coarse blotches of 3x3 pixels, broken up per pixel.
+                var value = (Hash(x / 3, y / 3) * 0.6f) + (Hash(x + 100, y + 100) * 0.4f);
+                if (!IsCylinder(x, y) || value <= RustCutoff)
+                {
+                    continue;
+                }
+
+                var shade = Math.Min(s_rust.Length - 1, (int)((value - RustCutoff) / (1 - RustCutoff) * s_rust.Length));
+                var i = ((y * CylinderWidth) + x) * Image.BytesPerPixel;
+                var color = s_rust[shade];
+                pixels[i] = color.R;
+                pixels[i + 1] = color.G;
+                pixels[i + 2] = color.B;
+                pixels[i + 3] = color.A;
+            }
+        }
+
+        return new Image(CylinderWidth, CylinderHeight, pixels);
+    }
+
+    /// <summary>
+    /// A deterministic value in [0, 1) per integer point.
+    /// </summary>
+    private static float Hash(int x, int y)
+    {
+        var h = unchecked(((uint)x * 374761393u) + ((uint)y * 668265263u));
+        h = unchecked((h ^ (h >> 13)) * 1274126177u);
+        h ^= h >> 16;
+        return (h >> 8) / (float)(1 << 24);
     }
 
     private static IntRect Around(IntRect part, int x, int y) => new(x, y, part.Width + 2, part.Height + 2);

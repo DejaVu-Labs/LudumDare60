@@ -13,7 +13,7 @@ LudumDare60.Game.Browser ──► LudumDare60.Game ──► LudumDare60.Engine
 | `src/engine/LudumDare60.Engine.Platform` | `Microsoft.NET.Sdk` | Platform contracts: `IPlatform`, `IFrameSink`, raw input (`RawInputEvent`, `RawInputEventKind`, `Key`, `PointerType`), asset reads (`IAssetSource`, `AssetLoadException`), the GPU (`IGraphicsBackend`, `RenderCommandKind`, `SpriteInstance`, `Color`), sound output (`IAudioBackend`, `AudioCommandKind`, `AudioBus`, `AudioEvent`, `AudioEventKind`, `AudioLimits`). No dependencies. |
 | `src/engine/LudumDare60.Engine` | `Microsoft.NET.Sdk` | `GameEngine`, `IGame`, `FrameContext`, `Input/` (`InputState`, `PointerButton`), `Assets/` (`AssetManager` and loaders), `Rendering/` (`PixelViewport`, `Graphics`, `Texture`, `SpriteBatch`, `SpriteOptions`, `IntRect`), `Sounds/` (`Audio`, `Sound`, `SoundState`, `Voice`, `SoundOptions`). Depends only on the platform contracts and the managed `StbImageSharp` package (image decoding). |
 | `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `Microsoft.NET.Sdk.StaticWebAssets` | `BrowserPlatform : IPlatform` and its JS: `wwwroot/boot.js` (runtime start), `wwwroot/frame-loop.js`, `wwwroot/input.js`, `wwwroot/assets.js`, `wwwroot/webgl2.js` (renderer, shaders in `wwwroot/shaders/`) and `wwwroot/webaudio.js` (sound). Its `wwwroot/` ships with the app under `_content/LudumDare60.Engine.Platform.Browser/`. |
-| `src/game/LudumDare60.Game` | `Microsoft.NET.Sdk` | `LudumDare60Game : IGame`, `Parts/` (the touch loop: `PartDrag` moves a part along a `LinePath` with the `DragFeel` it is given, fed one `PointerSample` per fixed step; `PartAssembly` steps the parts of a gun and enforces which part blocks which), and placeholder parts and sounds generated in code. No platform dependency. |
+| `src/game/LudumDare60.Game` | `Microsoft.NET.Sdk` | `LudumDare60Game : IGame`, `Parts/` (the touch loop: `PartDrag` moves a part along a `LinePath` with the `DragFeel` it is given, fed one `PointerSample` per fixed step; `PartAssembly` steps the parts of a gun and enforces which part blocks which), `Cleaning/` (`DirtLayer`: dirt pixels scrubbed off a part and counted), and placeholder parts and sounds generated in code. No platform dependency. |
 | `src/game/LudumDare60.Game.Browser` | `Microsoft.NET.Sdk.WebAssembly` | Entry point, host page and `main.js`. Only wires the game and the browser platform together. |
 
 The engine and the game never reference a concrete platform. Only the entry-point project chooses one:
@@ -387,8 +387,11 @@ each), rotation (`float`), tint (4 bytes), source x, y, width, height (`ushort` 
 `RenderCommandKind` and `SpriteInstance`. `tests/fixtures/render-frame.json` holds one encoded frame that both
 `SpriteBatchTests` (C# must write these bytes) and `tests/js/webgl2.test.mjs` (the backend must run them) check.
 
-Textures are created and destroyed through their own calls (`IGraphicsBackend.CreateTexture`, `DestroyTexture`),
-outside the stream, because the pixels would not fit in it.
+Textures are created, updated and destroyed through their own calls (`IGraphicsBackend.CreateTexture`,
+`UpdateTexture`, `DestroyTexture`), outside the stream, because the pixels would not fit in it.
+`Graphics.UpdateTexture(texture, image, firstRow, rowCount)` replaces whole rows from an image of the texture's size,
+for pixels that change while the game runs (a part scrubbed clean): one interop call and one `texSubImage2D` per call,
+so gather a frame's changes into one range. Sprites drawn with the texture in that frame show the new rows.
 
 ### Browser renderer
 

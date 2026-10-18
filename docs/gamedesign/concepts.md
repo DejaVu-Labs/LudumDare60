@@ -159,9 +159,11 @@ Pixel art drives the renderer:
   sprites with the same texture. See [architecture.md](../tech/architecture.md#rendering).
 - **Palette in the art, not in the shader.** Assets are plain RGBA. Palette swaps (grip materials, customer
   clothes and skin, time of day) are separate sprites or a per-sprite tint, not indexed colors.
-- **Dirt masks.** One mask per part at sprite resolution, so cleaning works pixel by pixel. The brush erases
-  mask pixels with a little dither, and the CPU counts clean pixels exactly. Dirty rows are re-uploaded with
-  `texSubImage2D` only when they change. Not built yet (see [docs/backlog.md](../backlog.md#dirt-masks)).
+- **Dirt layers.** Dirt or rust is its own RGBA sprite over the part, at the part's size, so cleaning works pixel
+  by pixel and the art can be drawn as a layer. The brush erases its pixels with a little dither, and the CPU
+  counts the dirt left exactly (`Cleaning/DirtLayer`). Changed rows are re-uploaded with `texSubImage2D`
+  (`Graphics.UpdateTexture`), one range per frame. A mask sampled by the sprite shader would have needed a bigger
+  instance format; the layer needs none.
 - **WebGL2 only for the Compo**, behind the backend-neutral renderer interface. WebGPU follows later with the
   same command stream and instance format.
 

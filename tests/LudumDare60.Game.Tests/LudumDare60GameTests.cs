@@ -64,8 +64,10 @@ public sealed class LudumDare60GameTests
         var commands = frame.Decode();
         Assert.Equal(RenderCommandKind.Clear, commands[1].Kind);
         Assert.Equal(BitConverter.ToInt32([0x0b, 0x4f, 0x45, 0xff]), commands[1].Arguments[0]);
-        Assert.Equal(5, frame.Instances.Length);
+        Assert.Equal(6, frame.Instances.Length);
         Assert.Equal(new RenderCommand(RenderCommandKind.DrawSprites, [0, 0, 5]), commands[2]);
+        Assert.Equal(new RenderCommand(RenderCommandKind.DrawSprites, [1, 5, 1]), commands[3]);
+        Assert.Equal("create 1 24x18", _platform.Backend.Calls[1]);
     }
 
     [Fact]
@@ -99,7 +101,7 @@ public sealed class LudumDare60GameTests
         _platform.Frame(0);
         _platform.Frame(0.01);
 
-        Assert.Single(_platform.Backend.Textures);
+        Assert.Equal(2, _platform.Backend.Textures.Count);
         Assert.Single(_platform.AudioBackend.Sounds);
         Assert.Equal(2, _platform.Backend.Frames.Count);
     }
@@ -215,6 +217,7 @@ public sealed class LudumDare60GameTests
 
         Assert.True(_game.Gun.AllAt(PartStop.End));
         Assert.Equal(LudumDare60Game.CylinderOut, _platform.Backend.Frames[^1].Instances[4].Position);
+        ScrubCylinderClean();
 
         Drag(LudumDare60Game.CylinderOut, LudumDare60Game.CylinderSeated - new Vector2(0, 20));
         Drag(LudumDare60Game.PinOut, LudumDare60Game.PinSeated + new Vector2(20, 0));
@@ -222,6 +225,89 @@ public sealed class LudumDare60GameTests
         Assert.True(_game.Gun.AllAt(PartStop.Start));
         var cylinderClicks = PlayedPitches().Where(p => Math.Abs(p - 1.0) < 1e-6 || Math.Abs(p - 0.6) < 1e-6);
         Assert.Equal([1.0, 0.6], cylinderClicks, (a, b) => Math.Abs(a - b) < 1e-6);
+    }
+
+    [Fact]
+    public void RustyCylinderOut_PressAndRub_ScrubsInsteadOfDragging()
+    {
+        StartWithSound();
+        TakeApart();
+        var rustBefore = _game.CylinderRust.Dirt;
+
+        Drag(LudumDare60Game.CylinderOut, LudumDare60Game.CylinderSeated - new Vector2(0, 20));
+
+        Assert.True(_game.Gun.IsLocked(LudumDare60Game.CylinderIndex));
+        Assert.Equal(PartStop.End, _game.Cylinder.Stop);
+        Assert.True(_game.CylinderRust.Dirt < rustBefore);
+        Assert.Contains(_platform.Backend.Calls, call => call.StartsWith("update 1 rows ", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void RustyCylinderSeated_IsDraggedNotScrubbed()
+    {
+        StartWithSound();
+        Drag(LudumDare60Game.PinSeated, LudumDare60Game.PinOut - new Vector2(20, 0));
+
+        Drag(LudumDare60Game.CylinderSeated, LudumDare60Game.CylinderOut + new Vector2(0, 20));
+
+        Assert.Equal(PartStop.End, _game.Cylinder.Stop);
+        Assert.Equal(_game.CylinderRust.InitialDirt, _game.CylinderRust.Dirt);
+    }
+
+    [Fact]
+    public void RubWithoutPressingOnTheCylinder_ErasesNothing()
+    {
+        StartWithSound();
+        TakeApart();
+
+        // Pressed beside the cylinder, then rubbed over it.
+        _platform.Frame(Step, PointerDown(LudumDare60Game.CylinderOut + new Vector2(60, 0)));
+        HoldAt(LudumDare60Game.CylinderOut, 5);
+        HoldAt(LudumDare60Game.CylinderOut + new Vector2(5, 3), 5);
+
+        Assert.Equal(_game.CylinderRust.InitialDirt, _game.CylinderRust.Dirt);
+    }
+
+    [Fact]
+    public void ScrubCylinderClean_ChimesFadesTheRustAndUnlocksIt()
+    {
+        StartWithSound();
+        TakeApart();
+
+        ScrubCylinderClean();
+        HoldAt(new Vector2(500, 300), 40);
+
+        Assert.True(_game.CylinderRust.IsClean);
+        Assert.False(_game.Gun.IsLocked(LudumDare60Game.CylinderIndex));
+        Assert.Contains(2.0, PlayedPitches());
+        Assert.Equal(5, _platform.Backend.Frames[^1].Instances.Length);
+    }
+
+    private void TakeApart()
+    {
+        Drag(LudumDare60Game.PinSeated, LudumDare60Game.PinOut - new Vector2(20, 0));
+        Drag(LudumDare60Game.CylinderSeated, LudumDare60Game.CylinderOut + new Vector2(0, 20));
+    }
+
+    /// <summary>
+    /// Rubs back and forth over the cylinder, row by row, until the rust counts as clean.
+    /// </summary>
+    private void ScrubCylinderClean()
+    {
+        var center = LudumDare60Game.CylinderOut;
+        for (var pass = 0; pass < 4 && !_game.CylinderRust.IsClean; pass++)
+        {
+            _platform.Frame(Step, PointerDown(center));
+            for (var y = -9; y <= 9 && !_game.CylinderRust.IsClean; y += 2)
+            {
+                _platform.Frame(Step, PointerMove(center + new Vector2(-13, y)));
+                _platform.Frame(Step, PointerMove(center + new Vector2(13, y)));
+            }
+
+            _platform.Frame(Step, PointerUp(center));
+        }
+
+        Assert.True(_game.CylinderRust.IsClean);
     }
 
     /// <summary>
@@ -253,7 +339,7 @@ public sealed class LudumDare60GameTests
         _platform.Frame(0);
 
         Assert.False(_game.HasBackground);
-        Assert.Single(_platform.Backend.Textures);
+        Assert.Equal(2, _platform.Backend.Textures.Count);
     }
 
     [Fact]
@@ -264,7 +350,7 @@ public sealed class LudumDare60GameTests
         platform.Frame(0);
 
         Assert.True(game.HasBackground);
-        Assert.Contains($"create 1 {LudumDare60Game.VirtualWidth}x{LudumDare60Game.VirtualHeight}", platform.Backend.Calls, StringComparer.Ordinal);
+        Assert.Contains($"create 2 {LudumDare60Game.VirtualWidth}x{LudumDare60Game.VirtualHeight}", platform.Backend.Calls, StringComparer.Ordinal);
     }
 
     [Fact]
@@ -275,15 +361,16 @@ public sealed class LudumDare60GameTests
         platform.Frame(0);
 
         var frame = Assert.Single(platform.Backend.Frames);
-        Assert.Equal(6, frame.Instances.Length);
+        Assert.Equal(7, frame.Instances.Length);
         var background = frame.Instances[0];
         Assert.Equal(Vector2.Zero, background.Position);
         Assert.Equal(LudumDare60Game.VirtualWidth, background.SourceWidth);
         Assert.Equal(LudumDare60Game.VirtualHeight, background.SourceHeight);
         var commands = frame.Decode();
         Assert.Equal(RenderCommandKind.Clear, commands[1].Kind);
-        Assert.Equal(new RenderCommand(RenderCommandKind.DrawSprites, [1, 0, 1]), commands[2]);
+        Assert.Equal(new RenderCommand(RenderCommandKind.DrawSprites, [2, 0, 1]), commands[2]);
         Assert.Equal(new RenderCommand(RenderCommandKind.DrawSprites, [0, 1, 5]), commands[3]);
+        Assert.Equal(new RenderCommand(RenderCommandKind.DrawSprites, [1, 6, 1]), commands[4]);
     }
 
     [Fact]
@@ -294,8 +381,8 @@ public sealed class LudumDare60GameTests
         platform.Frame(0);
         platform.Frame(0.01);
 
-        Assert.Equal(2, platform.Backend.Textures.Count);
-        Assert.Equal(6, platform.Backend.Frames[1].Instances.Length);
+        Assert.Equal(3, platform.Backend.Textures.Count);
+        Assert.Equal(7, platform.Backend.Frames[1].Instances.Length);
     }
 
     private static (ManualPlatform Platform, LudumDare60Game Game) StartWithShippedAssets()

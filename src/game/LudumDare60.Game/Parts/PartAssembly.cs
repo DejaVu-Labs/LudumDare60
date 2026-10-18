@@ -12,6 +12,7 @@ public sealed class PartAssembly
 {
     private readonly PartDrag[] _parts;
     private readonly DragEvents[] _events;
+    private readonly bool[] _locked;
     private readonly List<Block> _blocks = [];
 
     /// <param name="parts">The parts. Where grab areas overlap, the earlier part wins.</param>
@@ -34,6 +35,7 @@ public sealed class PartAssembly
         }
 
         _events = new DragEvents[_parts.Length];
+        _locked = new bool[_parts.Length];
     }
 
     public int Count => _parts.Length;
@@ -64,6 +66,14 @@ public sealed class PartAssembly
     }
 
     /// <summary>
+    /// Locks or unlocks <paramref name="part"/>: a locked part cannot be grabbed, for example while the player scrubs
+    /// it clean, and a press on it is not <see cref="DragEvents.Refused"/>. A held part stays held until it is let go.
+    /// </summary>
+    public void SetLocked(int part, bool locked) => _locked[part] = locked;
+
+    public bool IsLocked(int part) => _locked[part];
+
+    /// <summary>
     /// Whether <paramref name="other"/> keeps <paramref name="part"/> from moving right now: <paramref name="other"/>
     /// blocks it and is not out yet, or <paramref name="part"/> blocks <paramref name="other"/> and
     /// <paramref name="other"/> is not back in yet.
@@ -88,13 +98,19 @@ public sealed class PartAssembly
     }
 
     /// <summary>
-    /// Whether <paramref name="part"/> can move: it is held, or no other part <see cref="Holds"/> it.
+    /// Whether <paramref name="part"/> can move: it is held, or it is not locked and no other part
+    /// <see cref="Holds"/> it.
     /// </summary>
     public bool CanMove(int part)
     {
         if (_parts[part].IsHeld)
         {
             return true;
+        }
+
+        if (_locked[part])
+        {
+            return false;
         }
 
         for (var i = 0; i < _parts.Length; i++)
@@ -144,7 +160,7 @@ public sealed class PartAssembly
             var part = _parts[i];
             var canMove = CanMove(i);
             var events = part.Step(input, deltaTime, canMove && !claimed);
-            if (!canMove && !claimed && input.IsPressed && part.IsUnder(input.Position))
+            if (!canMove && !claimed && !_locked[i] && input.IsPressed && part.IsUnder(input.Position))
             {
                 events |= DragEvents.Refused;
                 claimed = true;

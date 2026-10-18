@@ -160,6 +160,29 @@ public sealed class PartAssemblyTests
     }
 
     [Fact]
+    public void SetLocked_FreePart_CannotBeGrabbedAndIsNotRefused()
+    {
+        _gun.SetLocked(Pin, locked: true);
+
+        var events = Drag(Pin, new Vector2(0, 50));
+
+        Assert.True(_gun.IsLocked(Pin));
+        Assert.False(_gun.CanMove(Pin));
+        Assert.Equal(DragEvents.None, events);
+        Assert.Equal(PartStop.Start, _pin.Stop);
+    }
+
+    [Fact]
+    public void SetLocked_Unlocked_MovesAgain()
+    {
+        _gun.SetLocked(Pin, locked: true);
+        _gun.SetLocked(Pin, locked: false);
+
+        Assert.True(_gun.CanMove(Pin));
+        Assert.Equal(DragEvents.SnappedEnd, Drag(Pin, new Vector2(0, 50)) & DragEvents.SnappedEnd);
+    }
+
+    [Fact]
     public void Events_NextStep_StartsEmpty()
     {
         _gun.Step(Press(_cylinder.Position), Dt);

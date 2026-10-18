@@ -70,8 +70,11 @@ The player controls the pace. Nothing in the loop has a timer, and nothing in it
   (seated) click at different pitches, and coming loose gives a soft tick.
 - **A part is in one of five states:** blocked, available (glows), held (being dragged), off (on the mat),
   back (in its slot).
-- **Dirty parts:** each has a dirt mask and a clean threshold (about 90 % of mask pixels). Past the threshold the
-  rest of the dirt fades out with a glint and a chime, so the player never hunts for the last pixel.
+- **Dirty parts:** each has a dirt layer and a clean threshold (about 90 % of its pixels). A dirty part out on the
+  mat cannot be dragged: a press on it starts a brush stroke, which erases dirt along the pointer's path while the
+  button stays down, with a quiet scratch. Past the threshold the rest of the dirt fades out with a glint and a
+  chime, so the player never hunts for the last pixel, and the part can be dragged again. A dirty part still in the
+  gun is dragged as usual.
 - **Broken parts:** the drawer at the right of the tool strip pulses while a broken part is off. Dragging the
   new part from the drawer onto the broken one swaps them.
 - **One find per order** (two at most), attached to a part. The find is part of the order, not a random drop.

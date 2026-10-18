@@ -72,6 +72,36 @@ public sealed class Graphics
     }
 
     /// <summary>
+    /// Uploads rows <paramref name="firstRow"/> to <c>firstRow + rowCount - 1</c> of <paramref name="image"/> into
+    /// <paramref name="texture"/>, for pixels that change while the game runs (a part being scrubbed clean). Sprites
+    /// drawn with the texture this frame show the new pixels. One upload per call: gather the changed rows of a frame
+    /// into one range.
+    /// </summary>
+    /// <param name="texture">A live texture.</param>
+    /// <param name="image">The texture's new pixels, the texture's size. Only the given rows are read.</param>
+    /// <param name="firstRow">The first changed row, from the top.</param>
+    /// <param name="rowCount">How many rows changed, at least 1.</param>
+    /// <exception cref="InvalidOperationException">The handle is stale.</exception>
+    /// <exception cref="ArgumentException"><paramref name="image"/> is not the texture's size.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">The rows reach outside the texture, or <paramref name="rowCount"/>
+    /// is less than 1.</exception>
+    public void UpdateTexture(Texture texture, Image image, int firstRow, int rowCount)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        Validate(texture);
+        if (image.Width != texture.Width || image.Height != texture.Height)
+        {
+            throw new ArgumentException(
+                $"The image is {image.Width}x{image.Height}, the texture {texture.Width}x{texture.Height}.", nameof(image));
+        }
+
+        ArgumentOutOfRangeException.ThrowIfLessThan(rowCount, 1);
+        ArgumentOutOfRangeException.ThrowIfNegative(firstRow);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(rowCount, texture.Height - firstRow);
+        Backend.UpdateTexture(texture.Id, firstRow, rowCount, image.Pixels.Slice(firstRow * image.Stride, rowCount * image.Stride));
+    }
+
+    /// <summary>
     /// Destroys <paramref name="texture"/>. The handle is stale at once; sprites already drawn with it this frame still
     /// show, because the GPU texture is deleted after the frame is submitted.
     /// </summary>

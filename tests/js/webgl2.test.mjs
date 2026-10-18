@@ -277,6 +277,41 @@ test('createTexture_ExistingId_Throws', () => {
   assert.throws(() => renderer.createTexture(0, 1, 1, new Uint8Array(4)), /Texture 0 already exists/);
 });
 
+test('updateTexture_UploadsTheRowsWithTexSubImage2D', () => {
+  const { calls, renderer } = setUp();
+  renderer.createTexture(5, 2, 3, new Uint8Array(2 * 3 * 4));
+  calls.length = 0;
+  const rows = new Uint8Array(2 * 2 * 4);
+
+  renderer.updateTexture(5, 1, 2, rows);
+
+  assert.deepEqual(named(calls, 'texSubImage2D'), [
+    ['texSubImage2D', 'TEXTURE_2D', 0, 0, 1, 2, 2, 'RGBA', 'UNSIGNED_BYTE', rows],
+  ]);
+  assert.equal(named(calls, 'bindTexture').length, 1);
+});
+
+test('updateTexture_RowsOutside_Throws', () => {
+  const { renderer } = setUp();
+  renderer.createTexture(5, 2, 3, new Uint8Array(2 * 3 * 4));
+
+  assert.throws(() => renderer.updateTexture(5, 2, 2, new Uint8Array(16)), /Rows 2\+2 lie outside texture 5/);
+  assert.throws(() => renderer.updateTexture(5, 0, 0, new Uint8Array(0)), /Rows 0\+0 lie outside texture 5/);
+});
+
+test('updateTexture_WrongByteCount_Throws', () => {
+  const { renderer } = setUp();
+  renderer.createTexture(5, 2, 3, new Uint8Array(2 * 3 * 4));
+
+  assert.throws(() => renderer.updateTexture(5, 0, 1, new Uint8Array(4)), /1 rows of texture 5 need 8 bytes, not 4/);
+});
+
+test('updateTexture_UnknownId_Throws', () => {
+  const { renderer } = setUp();
+
+  assert.throws(() => renderer.updateTexture(9, 0, 1, new Uint8Array(4)), /Texture 9 does not exist/);
+});
+
 test('destroyTexture_FreesIdForReuse', () => {
   const { calls, renderer } = setUp();
 

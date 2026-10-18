@@ -4,15 +4,17 @@ using LudumDare60.Engine.Assets;
 using LudumDare60.Engine.Platform;
 using LudumDare60.Engine.Rendering;
 using LudumDare60.Engine.Sounds;
+using LudumDare60.Game.Cleaning;
 using LudumDare60.Game.Parts;
 
 namespace LudumDare60.Game;
 
 /// <summary>
 /// The Ludum Dare 60 game. For now the bench background (the cutting mat color until it loads) with the parts of
-/// order 1 on it: a block of frame steel holding a cylinder on a base pin. The pin comes out first, then the cylinder;
-/// they go back in reverse order. Parts that can move glow, a press on a blocked part flashes what blocks it, and every
-/// snap clicks. The parts and the click are placeholders until the real art and recordings arrive.
+/// order 1 on it: a block of frame steel holding a rusty cylinder on a base pin. The pin comes out first, then the
+/// cylinder; out on the mat, the rusty cylinder is scrubbed instead of dragged until it is clean; then the parts go back
+/// in reverse order. Parts that can move glow, a press on a blocked part flashes what blocks it, and every snap clicks.
+/// The parts, the rust and the sounds are placeholders until the real art and recordings arrive.
 /// </summary>
 public sealed class LudumDare60Game : IGame
 {
@@ -69,7 +71,20 @@ public sealed class LudumDare60Game : IGame
     /// </summary>
     public const float HintSeconds = 0.6f;
 
+    /// <summary>
+    /// Radius of the scrubbing brush in virtual pixels.
+    /// </summary>
+    public const float BrushRadius = 2.5f;
+
+    /// <summary>
+    /// How long the last rust takes to fade once the cylinder counts as clean, in seconds.
+    /// </summary>
+    public const float RustFadeSeconds = 0.5f;
+
     private const int PartCount = 2;
+
+    // At most one scratch sound per this many seconds while the brush erases rust.
+    private const float BrushTickSeconds = 0.07f;
 
     // Glow alpha of a part that can move, pulsing, and of the part under the pointer or in the hand.
     private const float GlowIdleBase = 70;
@@ -87,6 +102,8 @@ public sealed class LudumDare60Game : IGame
     private static readonly float[] s_pitches = [1, 0.8f];
 
     private static readonly SoundOptions s_refusedClick = new() { Pitch = 0.4f, Volume = 0.3f };
+    private static readonly SoundOptions s_brushTick = new() { Pitch = 2.4f, Volume = 0.12f };
+    private static readonly SoundOptions s_cleanChime = new() { Pitch = 2f, Volume = 0.6f };
 
     private readonly Vector2[] _drawPositions = new Vector2[PartCount];
     private readonly byte[] _glowAlphas = new byte[PartCount];
@@ -101,6 +118,12 @@ public sealed class LudumDare60Game : IGame
     private bool _hasParts;
     private Sound _click;
     private bool _hasClick;
+    private Texture _rust;
+    private float _rustFade = 1;
+    private bool _brushing;
+    private bool _brushHover;
+    private Vector2 _lastBrush;
+    private float _brushCooldown;
     private float _time;
 
     public LudumDare60Game()
@@ -120,6 +143,16 @@ public sealed class LudumDare60Game : IGame
     /// The parts of the gun on the bench, indexed by <see cref="BasePinIndex"/> and <see cref="CylinderIndex"/>.
     /// </summary>
     public PartAssembly Gun { get; }
+
+    /// <summary>
+    /// The rust on the cylinder. The cylinder cannot go back in before it is clean.
+    /// </summary>
+    public DirtLayer CylinderRust { get; } = new(PlaceholderParts.CreateCylinderRust());
+
+    /// <summary>
+    /// Whether the cylinder is out and rusty, so the pointer scrubs it instead of dragging it.
+    /// </summary>
+    public bool IsScrubbingCylinder => Cylinder.Stop == PartStop.End && !Cylinder.IsHeld && !CylinderRust.IsClean;
 
     /// <summary>
     /// The base pin, seated at <see cref="PinSeated"/> and out at <see cref="PinOut"/>.
@@ -144,10 +177,28 @@ public sealed class LudumDare60Game : IGame
     public void FixedUpdate(in FrameContext context)
     {
         var deltaTime = (float)context.DeltaTime;
-        Gun.Step(PointerSample.From(context.Input), deltaTime);
+        var input = PointerSample.From(context.Input);
+        var scrubbing = IsScrubbingCylinder;
+        Gun.SetLocked(CylinderIndex, scrubbing);
+        Gun.Step(input, deltaTime);
         for (var i = 0; i < PartCount; i++)
         {
             _hints[i] = MathF.Max(0, _hints[i] - deltaTime);
+        }
+
+        _brushCooldown = MathF.Max(0, _brushCooldown - deltaTime);
+        if (scrubbing)
+        {
+            Scrub(input);
+        }
+        else
+        {
+            _brushing = _brushHover = false;
+        }
+
+        if (CylinderRust.IsClean)
+        {
+            _rustFade = MathF.Max(0, _rustFade - (deltaTime / RustFadeSeconds));
         }
 
         var events = Gun.Events;
@@ -171,6 +222,12 @@ public sealed class LudumDare60Game : IGame
             _hasParts = true;
             _click = _audio!.CreateSound(PlaceholderSounds.CreateClick());
             _hasClick = true;
+            _rust = _graphics.CreateTexture(CylinderRust.Image);
+        }
+        else if (CylinderRust.TryTakeChangedRows(out var firstRow, out var rowCount))
+        {
+            // The rows the brush erased during this frame's steps, in one upload.
+            _graphics!.UpdateTexture(_rust, CylinderRust.Image, firstRow, rowCount);
         }
 
         if (!HasBackground && _assets!.TryGet(_benchImage, out var bench))
@@ -200,6 +257,11 @@ public sealed class LudumDare60Game : IGame
                 : Gun.CanMove(i) ? idleGlow
                 : (byte)0;
         }
+
+        if (IsScrubbingCylinder)
+        {
+            _glowAlphas[CylinderIndex] = _brushing || _brushHover ? GlowActive : idleGlow;
+        }
     }
 
     public void Render(SpriteBatch batch)
@@ -221,6 +283,63 @@ public sealed class LudumDare60Game : IGame
         DrawPart(batch, BasePinIndex);
         batch.Draw(_parts, PlaceholderParts.Frame, FramePosition);
         DrawPart(batch, CylinderIndex);
+        if (_rustFade > 0)
+        {
+            var rust = new SpriteOptions { Origin = PlaceholderParts.CylinderOrigin, Tint = Color.White.WithAlpha((byte)(255 * _rustFade)) };
+            batch.Draw(_rust, _drawPositions[CylinderIndex], rust);
+        }
+    }
+
+    /// <summary>
+    /// Rubs the brush over the rusty cylinder: a press on it starts a stroke, and the stroke erases rust along the
+    /// pointer's path for as long as the button stays down.
+    /// </summary>
+    private void Scrub(in PointerSample input)
+    {
+        // Cylinder pixels: the cylinder lies still at its end while it is scrubbed.
+        var local = input.Position - CylinderOut + PlaceholderParts.CylinderOrigin;
+        var image = CylinderRust.Image;
+        _brushHover = local.X >= -BrushRadius && local.Y >= -BrushRadius
+            && local.X <= image.Width + BrushRadius && local.Y <= image.Height + BrushRadius;
+        if (!input.IsDown)
+        {
+            _brushing = false;
+            return;
+        }
+
+        if (input.IsPressed && _brushHover)
+        {
+            _brushing = true;
+            _lastBrush = local;
+        }
+
+        if (!_brushing)
+        {
+            return;
+        }
+
+        var erased = CylinderRust.Scrub(_lastBrush, local, BrushRadius);
+        _lastBrush = local;
+        if (CylinderRust.IsClean)
+        {
+            // The last rust fades out with a glint and a chime.
+            _brushing = false;
+            _hints[CylinderIndex] = HintSeconds;
+            PlaySound(s_cleanChime);
+        }
+        else if (erased > 0 && _brushCooldown <= 0)
+        {
+            _brushCooldown = BrushTickSeconds;
+            PlaySound(s_brushTick);
+        }
+    }
+
+    private void PlaySound(in SoundOptions options)
+    {
+        if (_hasClick)
+        {
+            _audio!.Play(_click, AudioBus.Sfx, options);
+        }
     }
 
     private void DrawPart(SpriteBatch batch, int part)

@@ -66,6 +66,51 @@ public sealed class GraphicsTests
     }
 
     [Fact]
+    public void UpdateTexture_Rows_UploadsOnlyThoseRows()
+    {
+        var texture = _graphics.CreateTexture(SolidImage(2, 4, 0));
+        var changed = SolidImage(2, 4, 9);
+
+        _graphics.UpdateTexture(texture, changed, 1, 2);
+
+        Assert.Equal("update 0 rows 1+2", _backend.Calls[^1]);
+        var pixels = _backend.Textures[0];
+        Assert.All(pixels.AsSpan(0, 8).ToArray(), b => Assert.Equal(0, b));
+        Assert.All(pixels.AsSpan(8, 16).ToArray(), b => Assert.Equal(9, b));
+        Assert.All(pixels.AsSpan(24, 8).ToArray(), b => Assert.Equal(0, b));
+    }
+
+    [Fact]
+    public void UpdateTexture_WrongImageSize_Throws()
+    {
+        var texture = _graphics.CreateTexture(SolidImage(2, 4));
+
+        Assert.Throws<ArgumentException>(() => _graphics.UpdateTexture(texture, SolidImage(4, 2), 0, 1));
+    }
+
+    [Theory]
+    [InlineData(-1, 1)]
+    [InlineData(0, 0)]
+    [InlineData(3, 2)]
+    [InlineData(4, 1)]
+    public void UpdateTexture_RowsOutsideTexture_Throws(int firstRow, int rowCount)
+    {
+        var texture = _graphics.CreateTexture(SolidImage(2, 4));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => _graphics.UpdateTexture(texture, SolidImage(2, 4), firstRow, rowCount));
+        Assert.Equal(["create 0 2x4"], _backend.Calls);
+    }
+
+    [Fact]
+    public void UpdateTexture_StaleHandle_Throws()
+    {
+        var texture = _graphics.CreateTexture(SolidImage(2, 4));
+        _graphics.DestroyTexture(texture);
+
+        Assert.Throws<InvalidOperationException>(() => _graphics.UpdateTexture(texture, SolidImage(2, 4), 0, 1));
+    }
+
+    [Fact]
     public void IsAlive_Default_IsFalse() => Assert.False(_graphics.IsAlive(default));
 
     [Fact]

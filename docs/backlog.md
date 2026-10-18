@@ -84,15 +84,17 @@ order their blocking graph allows (`Parts/PartAssembly`). Still to do:
   `LudumDare60Game`.
 - Replace the code-generated frame, pin, cylinder and click with the real sprites and recordings.
 
-## Dirt masks
+## Cleaning follow-ups
 
-Cleaning works pixel by pixel (see [concepts.md](gamedesign/concepts.md#rendering)). Deferred when the WebGL2 renderer
-shipped:
+Scrubbing works on order 1's cylinder (`Cleaning/DirtLayer`, see [concepts.md](gamedesign/concepts.md#rendering)).
+Still to do:
 
-- One mask per part at sprite resolution, in a second texture the sprite shader samples (`R8`), and a mask
-  rectangle in `SpriteInstance` (grows past 40 bytes: change C#, `webgl2.js`, the shader and the fixture together).
-- `Graphics.UpdateTexture(texture, rows)` that re-uploads only changed rows with `texSubImage2D`.
-- The brush erases mask pixels with a little dither; the CPU keeps the mask and counts clean pixels exactly.
+- A brush cursor over a dirty part (needs the cursor visibility command from
+  [Platform commands](#platform-commands-game-to-platform)), and a brush loop sound instead of the scratch ticks.
+- A dirty part that is dragged back to its slot bounces back and its dirt flashes (core-loop step 4). Today a dirty
+  part out on the mat cannot be dragged at all.
+- Several dirt layers per order, from the order data, and dirt drawn as real art (an Aseprite layer per part).
+- Oiling (order 4).
 
 ## Animation frames
 

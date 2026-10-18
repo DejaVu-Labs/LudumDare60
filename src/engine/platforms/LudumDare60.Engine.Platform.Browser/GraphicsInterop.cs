@@ -37,6 +37,10 @@ internal static partial class GraphicsInterop
     [JSImport("createTexture", ModuleName)]
     public static partial void CreateTexture(int id, int width, int height, [JSMarshalAs<JSType.MemoryView>] Span<byte> pixels);
 
+    /// <inheritdoc cref="IGraphicsBackend.UpdateTexture"/>
+    [JSImport("updateTexture", ModuleName)]
+    public static partial void UpdateTexture(int id, int y, int height, [JSMarshalAs<JSType.MemoryView>] Span<byte> rows);
+
     /// <inheritdoc cref="IGraphicsBackend.DestroyTexture"/>
     [JSImport("destroyTexture", ModuleName)]
     public static partial void DestroyTexture(int id);

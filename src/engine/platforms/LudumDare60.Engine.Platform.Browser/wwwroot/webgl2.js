@@ -51,6 +51,8 @@ export const CONTEXT_ATTRIBUTES = Object.freeze({
  * @typedef {object} Renderer
  * @property {(id: number, width: number, height: number, pixels: Uint8Array) => void} createTexture Uploads RGBA8
  *   pixels, rows from the top, straight alpha.
+ * @property {(id: number, y: number, height: number, rows: Uint8Array) => void} updateTexture Replaces whole rows
+ *   of a texture, from row `y` down.
  * @property {(id: number) => void} destroyTexture
  * @property {(commands: Uint8Array, instances: Uint8Array) => void} submit Runs one frame. Both arrays are read during
  *   the call only.
@@ -161,6 +163,22 @@ export function createRenderer(gl, surface) {
       textureSizes[2 * id] = width;
       textureSizes[2 * id + 1] = height;
       textureCount++;
+    },
+
+    updateTexture(id, y, height, rows) {
+      const texture = textures[id];
+      if (texture === undefined) {
+        throw new Error(`Texture ${id} does not exist.`);
+      }
+      const width = textureSizes[2 * id];
+      if (height < 1 || y < 0 || y + height > textureSizes[2 * id + 1]) {
+        throw new Error(`Rows ${y}+${height} lie outside texture ${id}.`);
+      }
+      if (rows.byteLength !== width * height * 4) {
+        throw new Error(`${height} rows of texture ${id} need ${width * height * 4} bytes, not ${rows.byteLength}.`);
+      }
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, y, width, height, gl.RGBA, gl.UNSIGNED_BYTE, rows);
     },
 
     destroyTexture(id) {
@@ -383,6 +401,17 @@ export function init(canvasId) {
  */
 export function createTexture(id, width, height, pixels) {
   getRenderer().createTexture(id, width, height, pixels._unsafe_create_view());
+}
+
+/**
+ * Bound from C# with `[JSImport]`.
+ * @param {number} id
+ * @param {number} y
+ * @param {number} height
+ * @param {MemoryView} rows
+ */
+export function updateTexture(id, y, height, rows) {
+  getRenderer().updateTexture(id, y, height, rows._unsafe_create_view());
 }
 
 /**

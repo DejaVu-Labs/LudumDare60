@@ -60,7 +60,7 @@ internal sealed record SubmittedFrame(byte[] Commands, SpriteInstance[] Instance
 internal sealed class FakeGraphicsBackend : IGraphicsBackend
 {
     /// <summary>
-    /// Every call in order: <c>create {id} {w}x{h}</c>, <c>destroy {id}</c>, <c>submit</c>.
+    /// Every call in order: <c>create {id} {w}x{h}</c>, <c>update {id} rows {y}+{h}</c>, <c>destroy {id}</c>, <c>submit</c>.
     /// </summary>
     public List<string> Calls { get; } = [];
 
@@ -84,6 +84,23 @@ internal sealed class FakeGraphicsBackend : IGraphicsBackend
         }
 
         Calls.Add($"create {id} {width}x{height}");
+    }
+
+    public void UpdateTexture(int id, int y, int height, ReadOnlySpan<byte> rows)
+    {
+        Calls.Add($"update {id} rows {y}+{height}");
+        if (!Textures.TryGetValue(id, out var pixels))
+        {
+            throw new InvalidOperationException($"Texture {id} does not exist.");
+        }
+
+        var stride = rows.Length / height;
+        if (stride * height != rows.Length || (y + height) * stride > pixels.Length)
+        {
+            throw new InvalidOperationException($"Rows {y}+{height} do not fit texture {id}.");
+        }
+
+        rows.CopyTo(pixels.AsSpan(y * stride));
     }
 
     public void DestroyTexture(int id)

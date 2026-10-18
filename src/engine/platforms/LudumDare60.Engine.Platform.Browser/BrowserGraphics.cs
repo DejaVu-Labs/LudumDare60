@@ -27,6 +27,12 @@ internal sealed class BrowserGraphics : IGraphicsBackend
         GraphicsInterop.CreateTexture(id, width, height, AsWritable(pixels));
     }
 
+    public void UpdateTexture(int id, int y, int height, ReadOnlySpan<byte> rows)
+    {
+        EnsureInitialized();
+        GraphicsInterop.UpdateTexture(id, y, height, AsWritable(rows));
+    }
+
     public void DestroyTexture(int id)
     {
         EnsureInitialized();
