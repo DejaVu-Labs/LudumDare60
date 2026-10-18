@@ -7,11 +7,26 @@ namespace LudumDare60.Game.Parts;
 /// docs/gamedesign/core-loop.md. Snapped into an end, the part sticks until it is pulled
 /// <see cref="DragFeel.BreakawayAtStart"/> pixels and only strains towards the pointer; loose, it follows the pointer
 /// with friction; moving into an end, it snaps there and the player lets go of it. A part let go between the ends
-/// stays where it is, unless it is within an end's snap zone. Advance it once per fixed step with <see cref="Step(in PointerSample, float, bool)"/>.
+/// stays where it is, unless it is within an end's snap zone. Advance it once per fixed step with
+/// <see cref="Step(in PointerSample, float, bool, bool)"/>.
+/// <para>With a <see cref="FreeMove"/>, a part that clicks out at the end of its rail stays in the hand and can be
+/// carried anywhere on the work surface and put down there. Brought back close enough to its rail it sticks to it and
+/// can be pushed in again; pulled off to the side near the end of the rail, it comes loose again.</para>
 /// </summary>
 public sealed class PartDrag
 {
+    // How fast a loose part follows the hand: the gap shrinks to 1/e in 1/FreeFollow seconds.
+    private const float FreeFollow = 30;
+
+    private readonly FreeMove? _free;
     private float _grabOffset;
+    private Vector2 _freePosition;
+    private Vector2 _freeGrab;
+
+    // A part that just left its rail cannot stick to it again before it has left the dock zone, so it does not cling
+    // to the rail it is being pulled off.
+    private bool _dockBlocked;
+    private bool _wasInDockZone;
 
     // The stop the part last broke out of. It cannot snap back there before it has left that stop's snap zone, so
     // that jitter right after breaking free does not click it back in.
@@ -21,9 +36,10 @@ public sealed class PartDrag
     /// <param name="grabRadius">How close to <see cref="Position"/> the pointer must be to grab the part.</param>
     /// <param name="feel">Breakaway, friction and snapping.</param>
     /// <param name="stop">Where the part starts: <see cref="PartStop.Start"/> or <see cref="PartStop.End"/>.</param>
+    /// <param name="free">How the part moves once it is out, or null to keep it on its rail.</param>
     /// <exception cref="ArgumentOutOfRangeException">A distance, rate or speed is negative or not a number, the strain
     /// is outside [0, 1], the snap zones of the two ends touch, or <paramref name="stop"/> is not an end.</exception>
-    public PartDrag(LinePath path, float grabRadius, in DragFeel feel, PartStop stop = PartStop.Start)
+    public PartDrag(LinePath path, float grabRadius, in DragFeel feel, PartStop stop = PartStop.Start, FreeMove? free = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(grabRadius);
         ArgumentOutOfRangeException.ThrowIfNegative(feel.BreakawayAtStart, nameof(feel));
@@ -50,7 +66,9 @@ public sealed class PartDrag
         GrabRadius = grabRadius;
         Feel = feel;
         Stop = stop;
+        _free = free;
         Distance = PreviousDistance = StopDistance(stop);
+        PreviousPosition = Position;
     }
 
     public LinePath Path { get; }
@@ -70,9 +88,20 @@ public sealed class PartDrag
     public float PreviousDistance { get; private set; }
 
     /// <summary>
-    /// The end the part is snapped into, or <see cref="PartStop.None"/> while it is loose.
+    /// The end the part is snapped into, or <see cref="PartStop.None"/> while it is loose on its rail. A part off its
+    /// rail is out: <see cref="PartStop.End"/>.
     /// </summary>
     public PartStop Stop { get; private set; }
+
+    /// <summary>
+    /// Whether the part is off its rail, loose on the work surface.
+    /// </summary>
+    public bool IsFree { get; private set; }
+
+    /// <summary>
+    /// <see cref="Position"/> before the last step, for interpolated rendering.
+    /// </summary>
+    public Vector2 PreviousPosition { get; private set; }
 
     /// <summary>
     /// Whether the player is dragging the part.
@@ -87,13 +116,13 @@ public sealed class PartDrag
     /// <summary>
     /// Where the part is, in virtual pixels.
     /// </summary>
-    public Vector2 Position => Path.PointAt(Distance);
+    public Vector2 Position => IsFree ? _freePosition : Path.PointAt(Distance);
 
     /// <summary>
     /// Where to draw the part, <paramref name="alpha"/> of the way from its position before the last step to its
     /// current one.
     /// </summary>
-    public Vector2 GetRenderPosition(float alpha) => Path.PointAt(float.Lerp(PreviousDistance, Distance, alpha));
+    public Vector2 GetRenderPosition(float alpha) => Vector2.Lerp(PreviousPosition, Position, alpha);
 
     /// <summary>
     /// Whether <paramref name="point"/> lies within <see cref="GrabRadius"/> of the part.
@@ -106,7 +135,10 @@ public sealed class PartDrag
     /// <param name="input">The pointer at the end of the step.</param>
     /// <param name="deltaTime">The step's length in seconds.</param>
     /// <returns>What happened during the step.</returns>
-    public DragEvents Step(in PointerSample input, float deltaTime) => Step(input, deltaTime, canGrab: true);
+    public DragEvents Step(in PointerSample input, float deltaTime) => Step(input, deltaTime, canGrab: true, canDock: true);
+
+    /// <inheritdoc cref="Step(in PointerSample, float, bool, bool)"/>
+    public DragEvents Step(in PointerSample input, float deltaTime, bool canGrab) => Step(input, deltaTime, canGrab, canDock: true);
 
     /// <summary>
     /// Advances the part by one fixed step.
@@ -115,10 +147,13 @@ public sealed class PartDrag
     /// <param name="deltaTime">The step's length in seconds.</param>
     /// <param name="canGrab">Whether the part may be hovered and grabbed in this step: false while it is blocked, or
     /// while another part has the pointer. A part already held keeps moving either way.</param>
+    /// <param name="canDock">Whether a loose part may stick to its rail: false while something keeps it from going
+    /// back. Brought to its rail anyway, it reports <see cref="DragEvents.DockRefused"/>.</param>
     /// <returns>What happened during the step.</returns>
-    public DragEvents Step(in PointerSample input, float deltaTime, bool canGrab)
+    public DragEvents Step(in PointerSample input, float deltaTime, bool canGrab, bool canDock)
     {
         PreviousDistance = Distance;
+        PreviousPosition = Position;
         var events = DragEvents.None;
         if (!IsHeld)
         {
@@ -131,7 +166,16 @@ public sealed class PartDrag
             IsHeld = true;
             IsHovered = false;
             _grabOffset = Path.Project(input.Position) - Distance;
+            _freeGrab = input.Position - Position;
+            // Taken up by its rail, a part that may not go back says so at once.
+            _dockBlocked = false;
+            _wasInDockZone = false;
             events |= DragEvents.Grabbed;
+        }
+
+        if (IsFree)
+        {
+            return events | StepFree(input, deltaTime, canDock);
         }
 
         if (!input.IsDown)
@@ -155,6 +199,11 @@ public sealed class PartDrag
         }
 
         var target = Math.Clamp(Path.Project(input.Position) - _grabOffset, 0, Path.Length);
+        if (_free is { } free && Stop != PartStop.Start && Distance >= Path.Length - free.DockSpan && IsPulledOff(input, free))
+        {
+            return events | Leave();
+        }
+
         if (Stop != PartStop.None)
         {
             var atStart = Stop == PartStop.Start;
@@ -189,7 +238,14 @@ public sealed class PartDrag
 
         if (inEndZone && target > Distance && _leftStop != PartStop.End)
         {
-            return events | SnapTo(PartStop.End);
+            if (_free is null)
+            {
+                return events | SnapTo(PartStop.End);
+            }
+
+            // Out of the gun with a click, and still in the hand.
+            Distance = Path.Length;
+            return events | DragEvents.SnappedEnd | Leave();
         }
 
         return events;
@@ -208,7 +264,9 @@ public sealed class PartDrag
         }
 
         Stop = stop;
+        IsFree = false;
         Distance = PreviousDistance = StopDistance(stop);
+        PreviousPosition = Position;
         IsHeld = false;
         IsHovered = false;
         _leftStop = PartStop.None;
@@ -223,4 +281,83 @@ public sealed class PartDrag
     }
 
     private float StopDistance(PartStop stop) => stop == PartStop.End ? Path.Length : 0;
+
+    /// <summary>
+    /// Whether the hand pulls a part off its rail: off to the side by more than the dock tolerance plus the grab, or,
+    /// from the end of the rail, on out past it. A part moving out along the rail clicks out at the end instead.
+    /// </summary>
+    private bool IsPulledOff(in PointerSample input, FreeMove free)
+    {
+        var fromStart = input.Position - Path.Start;
+        var side = MathF.Abs((fromStart.X * Path.Direction.Y) - (fromStart.Y * Path.Direction.X));
+        var beyond = Path.Project(input.Position) - _grabOffset - Path.Length;
+        return side > free.DockRadius + GrabRadius || (Stop == PartStop.End && beyond > free.DockRadius);
+    }
+
+    /// <summary>
+    /// Takes the part off its rail, still in the hand.
+    /// </summary>
+    private DragEvents Leave()
+    {
+        _freePosition = Position;
+        IsFree = true;
+        Stop = PartStop.End;
+
+        // The hand keeps holding the part where it took it, along the rail: a part pulled off sideways catches up with
+        // the hand instead of keeping the gap.
+        _freeGrab = Path.Direction * _grabOffset;
+        _dockBlocked = true;
+        _wasInDockZone = true;
+        return DragEvents.None;
+    }
+
+    /// <summary>
+    /// Whether the loose part lies close enough to its rail to stick to it, and where on the rail.
+    /// </summary>
+    private bool InDockZone(out float distance)
+    {
+        var free = _free!.Value;
+        distance = Math.Clamp(Path.Project(_freePosition), Path.Length - free.DockSpan, Path.Length);
+        return Vector2.Distance(_freePosition, Path.PointAt(distance)) <= free.DockRadius;
+    }
+
+    private DragEvents StepFree(in PointerSample input, float deltaTime, bool canDock)
+    {
+        var free = _free!.Value;
+        if (!input.IsDown)
+        {
+            // Put down where it is.
+            IsHeld = false;
+            return DragEvents.Dropped;
+        }
+
+        var target = Vector2.Clamp(input.Position - _freeGrab, free.Min, free.Max);
+        _freePosition += (target - _freePosition) * (1 - MathF.Exp(-FreeFollow * deltaTime));
+        var inZone = InDockZone(out var dockAt);
+        var entered = inZone && !_wasInDockZone;
+        _wasInDockZone = inZone;
+        if (!inZone)
+        {
+            _dockBlocked = false;
+            return DragEvents.None;
+        }
+
+        if (_dockBlocked)
+        {
+            return DragEvents.None;
+        }
+
+        if (!canDock)
+        {
+            return entered ? DragEvents.DockRefused : DragEvents.None;
+        }
+
+        // It sticks to its rail and can be pushed in from here.
+        IsFree = false;
+        Distance = dockAt;
+        Stop = dockAt >= Path.Length ? PartStop.End : PartStop.None;
+        _leftStop = PartStop.None;
+        _grabOffset = Path.Project(input.Position) - Distance;
+        return DragEvents.Docked;
+    }
 }

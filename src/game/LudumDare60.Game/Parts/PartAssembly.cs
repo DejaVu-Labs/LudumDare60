@@ -13,6 +13,7 @@ public sealed class PartAssembly
     private readonly PartDrag[] _parts;
     private readonly DragEvents[] _events;
     private readonly bool[] _locked;
+    private readonly bool[] _undockable;
     private readonly List<Block> _blocks = [];
 
     /// <param name="parts">The parts. Where grab areas overlap, the earlier part wins.</param>
@@ -36,6 +37,7 @@ public sealed class PartAssembly
 
         _events = new DragEvents[_parts.Length];
         _locked = new bool[_parts.Length];
+        _undockable = new bool[_parts.Length];
     }
 
     public int Count => _parts.Length;
@@ -74,6 +76,17 @@ public sealed class PartAssembly
     public bool IsLocked(int part) => _locked[part];
 
     /// <summary>
+    /// Lets a loose part stick to its rail again, or not (a dirty part does not fit). Parts may dock by default.
+    /// </summary>
+    public void SetDockable(int part, bool dockable) => _undockable[part] = !dockable;
+
+    /// <summary>
+    /// Whether loose <paramref name="part"/> may stick to its rail now: it may dock, and no other part
+    /// <see cref="Holds"/> it.
+    /// </summary>
+    public bool CanDock(int part) => !_undockable[part] && !IsHeldBack(part);
+
+    /// <summary>
     /// Whether <paramref name="other"/> keeps <paramref name="part"/> from moving right now: <paramref name="other"/>
     /// blocks it and is not out yet, or <paramref name="part"/> blocks <paramref name="other"/> and
     /// <paramref name="other"/> is not back in yet.
@@ -108,20 +121,7 @@ public sealed class PartAssembly
             return true;
         }
 
-        if (_locked[part])
-        {
-            return false;
-        }
-
-        for (var i = 0; i < _parts.Length; i++)
-        {
-            if (i != part && Holds(i, part))
-            {
-                return false;
-            }
-        }
-
-        return true;
+        return !_locked[part] && !IsHeldBack(part);
     }
 
     /// <summary>
@@ -143,7 +143,9 @@ public sealed class PartAssembly
 
     /// <summary>
     /// Advances every part by one fixed step. At most one part has the pointer: the one held, else the first one
-    /// under it. A press on a part that cannot move reports <see cref="DragEvents.Refused"/> for it.
+    /// under it. A press on a part that cannot move reports <see cref="DragEvents.Refused"/> for it. A part loose on
+    /// the work surface can always be moved unless it is locked; whether it may go back onto its rail is
+    /// <see cref="CanDock"/>.
     /// </summary>
     /// <param name="input">The pointer at the end of the step.</param>
     /// <param name="deltaTime">The step's length in seconds.</param>
@@ -158,8 +160,8 @@ public sealed class PartAssembly
         for (var i = 0; i < _parts.Length; i++)
         {
             var part = _parts[i];
-            var canMove = CanMove(i);
-            var events = part.Step(input, deltaTime, canMove && !claimed);
+            var canMove = CanMove(i) || (part.IsFree && !_locked[i]);
+            var events = part.Step(input, deltaTime, canMove && !claimed, CanDock(i));
             if (!canMove && !claimed && !_locked[i] && input.IsPressed && part.IsUnder(input.Position))
             {
                 events |= DragEvents.Refused;
@@ -169,6 +171,19 @@ public sealed class PartAssembly
             claimed |= part.IsHeld || part.IsHovered;
             _events[i] = events;
         }
+    }
+
+    private bool IsHeldBack(int part)
+    {
+        for (var i = 0; i < _parts.Length; i++)
+        {
+            if (i != part && Holds(i, part))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     [StructLayout(LayoutKind.Auto)]

@@ -38,4 +38,15 @@ public enum DragEvents
     /// <see cref="PartAssembly"/>.
     /// </summary>
     Refused = 32,
+
+    /// <summary>
+    /// A loose part came close enough to its rail to stick to it.
+    /// </summary>
+    Docked = 64,
+
+    /// <summary>
+    /// A loose part came to its rail while something keeps it from going back (dirt, or a part that is still out).
+    /// Reported once each time it comes close.
+    /// </summary>
+    DockRefused = 128,
 }

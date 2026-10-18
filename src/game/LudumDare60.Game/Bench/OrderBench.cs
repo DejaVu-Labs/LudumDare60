@@ -8,8 +8,9 @@ namespace LudumDare60.Game.Bench;
 
 /// <summary>
 /// One order on the bench: the parts it unlocks with their blocks, the dirt on them, and the brush. It runs the rules
-/// of the order loop that do not depend on a browser: parts move as <see cref="PartAssembly"/> allows, a dirty part
-/// out on the mat is locked until the brush scrubs it clean, and bare hands do nothing to dirt. The game draws it and
+/// of the order loop that do not depend on a browser: nothing moves before the hammer is at half cock, parts move as
+/// <see cref="PartAssembly"/> allows and lie anywhere on the work surface once out, the brush scrubs whatever part
+/// out of the gun it rubs, and a dirty part does not go back onto its rail until it is clean. The game draws it and
 /// plays its sounds. Advance it once per fixed step with <see cref="Step(in PointerSample, float, bool)"/>.
 /// </summary>
 public sealed class OrderBench
@@ -51,7 +52,7 @@ public sealed class OrderBench
         {
             BenchLayout.TryGetPart(_ids[i], out var layout);
             _layouts[i] = layout!;
-            parts[i] = new PartDrag(layout!.Path, layout.GrabRadius, layout.Feel);
+            parts[i] = new PartDrag(layout!.Path, layout.GrabRadius, layout.Feel, PartStop.Start, layout.Free);
         }
 
         Gun = new PartAssembly(parts);
@@ -70,7 +71,7 @@ public sealed class OrderBench
             _dirt[IndexOf(dirt.Part)] = new DirtLayer(BenchLayout.CreateDirt(dirt.Part, dirt.Kind), dirt.Threshold);
         }
 
-        Brush = new BrushTool(BenchLayout.BrushRest, BenchLayout.BrushGrabMin, BenchLayout.BrushGrabMax);
+        Brush = new BrushTool(BenchLayout.BrushRest, BenchLayout.BrushGrabMin, BenchLayout.BrushGrabMax, BenchLayout.MatMin, BenchLayout.MatMax);
     }
 
     public Order Order { get; }
@@ -167,7 +168,8 @@ public sealed class OrderBench
     public DirtLayer? Dirt(string id) => _dirt[Find(id)];
 
     /// <summary>
-    /// Whether <paramref name="part"/> lies out on the mat with dirt still on it: it stays put until it is clean.
+    /// Whether <paramref name="part"/> lies out of the gun with dirt still on it: it does not go back before it is
+    /// clean.
     /// </summary>
     public bool NeedsScrubbing(int part) => _dirt[part] is { IsClean: false } && Gun[part].Stop == PartStop.End && !Gun[part].IsHeld;
 
@@ -209,7 +211,8 @@ public sealed class OrderBench
     /// <param name="input">The pointer at the end of the step.</param>
     /// <param name="deltaTime">The step's length in seconds.</param>
     /// <param name="hammerOpen">Whether the hammer is at half cock or further. While it is down, every part stays put,
-    /// and a press on one reports <see cref="BenchEvents.HammerFirst"/>.</param>
+    /// and a press on one reports <see cref="BenchEvents.HammerFirst"/>. A dirty part does not stick to its rail: it
+    /// reports <see cref="DragEvents.DockRefused"/> in <see cref="PartAssembly.Events"/>.</param>
     public void Step(in PointerSample input, float deltaTime, bool hammerOpen)
     {
         Events = BenchEvents.None;
@@ -217,12 +220,13 @@ public sealed class OrderBench
         var partHeld = false;
         for (var i = 0; i < Count; i++)
         {
-            Gun.SetLocked(i, !hammerOpen || NeedsScrubbing(i));
+            Gun.SetLocked(i, !hammerOpen);
+            Gun.SetDockable(i, _dirt[i] is not { IsClean: false });
             partHeld |= Gun[i].IsHeld;
         }
 
         // The brush first: a press on it takes it, and while it is in the hand no part sees the pointer.
-        BrushEvents = Brush.Step(input, deltaTime, canGrab: !partHeld);
+        BrushEvents = Brush.Step(input, canGrab: !partHeld);
         var brushTaken = Brush.IsHeld || (BrushEvents & BrushEvents.PickedUp) != BrushEvents.None;
         Gun.Step(brushTaken ? s_noPointer : input, deltaTime);
         if (!brushTaken && input.IsPressed)
@@ -237,12 +241,6 @@ public sealed class OrderBench
                 if (!hammerOpen)
                 {
                     Report(BenchEvents.HammerFirst, i);
-                    break;
-                }
-
-                if (NeedsScrubbing(i))
-                {
-                    Report(BenchEvents.BareHands, i);
                     break;
                 }
             }
@@ -281,8 +279,8 @@ public sealed class OrderBench
     }
 
     /// <summary>
-    /// The first part lying out on the mat whose sprite, widened by the bristles' radius, lies under the bristles; -1
-    /// when there is none.
+    /// The first part out of the gun whose sprite, widened by the bristles' radius, lies under the bristles; -1 when
+    /// there is none.
     /// </summary>
     private int PartUnderBristles()
     {

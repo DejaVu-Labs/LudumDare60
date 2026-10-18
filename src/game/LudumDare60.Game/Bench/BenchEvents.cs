@@ -12,17 +12,12 @@ public enum BenchEvents
     None = 0,
 
     /// <summary>
-    /// The player pressed a dirty part without the brush: bare hands do nothing to dirt.
-    /// </summary>
-    BareHands = 1,
-
-    /// <summary>
     /// The brush scrubbed a part past its clean threshold.
     /// </summary>
-    Cleaned = 2,
+    Cleaned = 1,
 
     /// <summary>
     /// The player pressed a part while the hammer was down: half cock comes first.
     /// </summary>
-    HammerFirst = 4,
+    HammerFirst = 2,
 }

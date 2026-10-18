@@ -15,9 +15,10 @@ namespace LudumDare60.Game;
 /// <summary>
 /// The Ludum Dare 60 game. For now the bench background (the cutting mat color until it loads) and the
 /// <see cref="Customers.Shop"/> run on the orders of <c>orders.json</c>: a customer comes in through the door, puts the
-/// revolver on the mat and shows what is wrong with it; the player repairs it on the <see cref="OrderBench"/> (parts
-/// come off in the order their blocks allow, a dirty part out on the mat is rubbed clean with the brush, the parts go
-/// back in reverse order), tests it (cocks the hammer, pulls the trigger), drags the whole revolver up to the
+/// revolver on the mat and shows what is wrong with it; the player repairs it on the <see cref="OrderBench"/> (half cock
+/// first, then parts come off in the order their blocks allow and can be laid anywhere on the mat, a dirty part is
+/// rubbed clean with the brush, the parts go back in reverse order, sticking to their rails when brought close), tests
+/// it (full cock, pulls the trigger), drags the whole revolver up to the
 /// customer's hand, and the customer thanks the player and leaves. Parts that can move glow, a press on a blocked part flashes what blocks it, every snap clicks, and the
 /// brush rasps louder the faster it rubs. Customers, parts, the brush, the dirt and the sounds are placeholders until
 /// the real art and recordings arrive.
@@ -333,13 +334,13 @@ public sealed class LudumDare60Game : IGame
             return;
         }
 
-        // Parts under the frame first, so what of them is still inside is hidden; the rest over it.
+        // Parts on their rails under the frame first, so what of them is still inside is hidden; the rest over it.
         var gun = BenchLayout.GunPosition + _gunOffset;
         var bodyGlow = new SpriteOptions { Origin = Vector2.One, Tint = Color.White.WithAlpha(_bodyGlow) };
         batch.Draw(_parts, PlaceholderParts.BodyGlow, gun, bodyGlow);
         for (var i = 0; i < bench.Count; i++)
         {
-            if (bench.LayoutAt(i).UnderFrame)
+            if (bench.LayoutAt(i).UnderFrame && !bench.Gun[i].IsFree)
             {
                 DrawPart(batch, bench, i);
             }
@@ -348,7 +349,7 @@ public sealed class LudumDare60Game : IGame
         batch.Draw(_parts, PlaceholderParts.Body, gun);
         for (var i = 0; i < bench.Count; i++)
         {
-            if (!bench.LayoutAt(i).UnderFrame)
+            if (!bench.LayoutAt(i).UnderFrame && !bench.Gun[i].IsFree)
             {
                 DrawPart(batch, bench, i);
             }
@@ -357,6 +358,15 @@ public sealed class LudumDare60Game : IGame
         // The hammer and the trigger turn around their pivots.
         DrawTurning(batch, PlaceholderParts.Hammer, PlaceholderParts.HammerGlow, PlaceholderParts.HammerOrigin, BenchLayout.HammerPivot, _hammerAngle, _hammerGlow);
         DrawTurning(batch, PlaceholderParts.Trigger, PlaceholderParts.TriggerGlow, PlaceholderParts.TriggerOrigin, BenchLayout.TriggerPivot, _triggerAngle, _triggerGlow);
+
+        // Parts loose on the mat lie on top of everything, even when put down on the revolver.
+        for (var i = 0; i < bench.Count; i++)
+        {
+            if (bench.Gun[i].IsFree)
+            {
+                DrawPart(batch, bench, i);
+            }
+        }
 
         // The brush lies on top of everything, and in the hand it is above the parts it scrubs.
         var brushGlow = new SpriteOptions { Origin = PlaceholderParts.BrushOrigin + Vector2.One, Tint = Color.White.WithAlpha(_brushGlow) };
@@ -506,6 +516,20 @@ public sealed class LudumDare60Game : IGame
                 Hint(bench, i);
             }
 
+            if ((events[i] & DragEvents.DockRefused) != DragEvents.None)
+            {
+                // It does not fit yet: a dirty part flashes with the brush, a held-back one flashes what holds it.
+                if (bench.DirtAt(i) is { IsClean: false })
+                {
+                    _hints[i] = HintSeconds;
+                    _brushHint = HintSeconds;
+                }
+                else
+                {
+                    Hint(bench, i);
+                }
+            }
+
             PlayClick(bench.LayoutAt(i).ClickPitch, events[i]);
         }
 
@@ -513,13 +537,6 @@ public sealed class LudumDare60Game : IGame
         {
             // Nothing comes out with the hammer down: it flashes.
             _hammerHint = HintSeconds;
-            PlaySound(s_refusedClick);
-        }
-
-        if ((bench.Events & BenchEvents.BareHands) != BenchEvents.None)
-        {
-            // Bare hands do nothing to dirt: the brush flashes.
-            _brushHint = HintSeconds;
             PlaySound(s_refusedClick);
         }
 
@@ -633,15 +650,14 @@ public sealed class LudumDare60Game : IGame
             }
         }
 
-        if ((events & BrushEvents.PutDown) != BrushEvents.None && _hasScrubVoice)
-        {
-            _audio!.Stop(_scrubVoice, fadeOutSeconds: 0.06f);
-            _hasScrubVoice = false;
-        }
-
-        if ((events & BrushEvents.Landed) != BrushEvents.None)
+        if ((events & BrushEvents.PutDown) != BrushEvents.None)
         {
             PlaySound(s_brushLand);
+            if (_hasScrubVoice)
+            {
+                _audio!.Stop(_scrubVoice, fadeOutSeconds: 0.06f);
+                _hasScrubVoice = false;
+            }
         }
     }
 
@@ -672,7 +688,11 @@ public sealed class LudumDare60Game : IGame
         {
             PlaySound(new SoundOptions { Pitch = 0.55f * pitch, Volume = 0.4f });
         }
-        else if ((events & DragEvents.Refused) != DragEvents.None)
+        else if ((events & DragEvents.Docked) != DragEvents.None)
+        {
+            PlaySound(new SoundOptions { Pitch = 1.05f * pitch, Volume = 0.35f });
+        }
+        else if ((events & (DragEvents.Refused | DragEvents.DockRefused)) != DragEvents.None)
         {
             PlaySound(s_refusedClick);
         }

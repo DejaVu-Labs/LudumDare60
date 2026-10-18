@@ -136,8 +136,8 @@ public sealed class LudumDare60GameTests
 
     private void TakeApart()
     {
-        Drag(BenchLayout.PinSeated, BenchLayout.PinOut - new Vector2(20, 0));
-        Drag(BenchLayout.CylinderSeated, BenchLayout.CylinderOut + new Vector2(0, 20));
+        Drag(BenchLayout.PinSeated, BenchLayout.PinOut);
+        Drag(BenchLayout.CylinderSeated, BenchLayout.CylinderOut);
     }
 
     private void PutBack()
@@ -179,7 +179,9 @@ public sealed class LudumDare60GameTests
                 _platform.Frame(Step, PointerMove(center + new Vector2(13, y)));
             }
 
-            _platform.Frame(Step, PointerUp(center));
+            // Put the brush back where it lies out of the way, not on the cylinder.
+            _platform.Frame(Step, PointerMove(BenchLayout.BrushRest));
+            _platform.Frame(Step, PointerUp(BenchLayout.BrushRest));
             Idle(30);
         }
 
@@ -377,7 +379,7 @@ public sealed class LudumDare60GameTests
 
         _platform.Frame(Step, PointerDown(BenchLayout.PinSeated));
         var flash = Drawn(LastFrame, PlaceholderParts.HammerGlow).Tint.A;
-        HoldAt(BenchLayout.PinOut - new Vector2(20, 0), 60);
+        HoldAt(BenchLayout.PinOut, 60);
 
         Assert.Equal(255, flash);
         Assert.Equal([0.4], PlayedPitches(before), (a, b) => Math.Abs(a - b) < 1e-6);
@@ -471,7 +473,7 @@ public sealed class LudumDare60GameTests
         StartWithSound();
         var before = PlayCount();
 
-        Drag(BenchLayout.PinSeated, BenchLayout.PinOut - new Vector2(20, 0));
+        Drag(BenchLayout.PinSeated, BenchLayout.PinOut);
 
         Assert.Equal(PartStop.End, Bench.Part(RevolverParts.BasePin).Stop);
         Assert.Equal(BenchLayout.PinOut, Drawn(LastFrame, PlaceholderParts.Pin).Position);
@@ -482,7 +484,7 @@ public sealed class LudumDare60GameTests
     public void PushPinBackIn_SeatsItWithALowClick()
     {
         StartWithSound();
-        Drag(BenchLayout.PinSeated, BenchLayout.PinOut - new Vector2(20, 0));
+        Drag(BenchLayout.PinSeated, BenchLayout.PinOut);
 
         Drag(BenchLayout.PinOut, BenchLayout.PinSeated + new Vector2(20, 0));
 
@@ -513,7 +515,7 @@ public sealed class LudumDare60GameTests
 
         _platform.Frame(Step, PointerDown(BenchLayout.CylinderSeated));
         var flash = Drawn(LastFrame, PlaceholderParts.PinGlow).Tint.A;
-        HoldAt(BenchLayout.CylinderOut + new Vector2(0, 20), 3);
+        HoldAt(BenchLayout.CylinderOut, 3);
 
         Assert.Equal(PartStop.Start, Bench.Part(RevolverParts.Cylinder).Stop);
         Assert.False(Bench.Part(RevolverParts.Cylinder).IsHeld);
@@ -534,20 +536,50 @@ public sealed class LudumDare60GameTests
     }
 
     [Fact]
-    public void RustyCylinderOut_BareHands_NeitherDragNorScrubButFlashTheBrush()
+    public void RustyCylinderOut_DoesNotGoBackAndTheBrushFlashes()
     {
         StartWithSound();
         TakeApart();
+        var before = PlayCount();
 
         _platform.Frame(Step, PointerDown(BenchLayout.CylinderOut));
         var flash = Drawn(LastFrame, PlaceholderParts.BrushGlow).Tint.A;
         HoldAt(BenchLayout.CylinderSeated - new Vector2(0, 20), 90);
 
-        Assert.True(Bench.Gun.IsLocked(Bench.IndexOf(RevolverParts.Cylinder)));
-        Assert.Equal(PartStop.End, Bench.Part(RevolverParts.Cylinder).Stop);
+        Assert.True(Bench.Part(RevolverParts.Cylinder).IsFree);
         Assert.Equal(Rust.InitialDirt, Rust.Dirt);
-        Assert.Equal(0.4, PlayedPitches()[^1], 1e-6);
+        Assert.Equal([0.4], PlayedPitches(before), (a, b) => Math.Abs(a - b) < 1e-6);
         Assert.Equal(255, flash);
+    }
+
+    [Fact]
+    public void LoosePartOnTheRevolver_IsDrawnOverIt()
+    {
+        StartWithSound();
+        TakeApart();
+
+        Drag(BenchLayout.CylinderOut, BenchLayout.GunPosition + new Vector2(60, 20));
+
+        var instances = LastFrame.Instances;
+        var body = Array.FindIndex(instances, i => i.SourceY == PlaceholderParts.Body.Y && i.SourceWidth == PlaceholderParts.Body.Width);
+        var cylinder = Array.FindIndex(instances, i => i.SourceY == PlaceholderParts.Cylinder.Y && i.SourceWidth == PlaceholderParts.Cylinder.Width && i.SourceX == PlaceholderParts.Cylinder.X);
+        Assert.True(cylinder > body, "The loose cylinder lies on top of the revolver.");
+    }
+
+    [Fact]
+    public void CleanCylinderBroughtBack_SticksWithAClick()
+    {
+        StartWithSound();
+        TakeApart();
+        ScrubCylinderClean();
+        Drag(BenchLayout.CylinderOut, new Vector2(150, 300));
+        var before = PlayCount();
+
+        _platform.Frame(Step, PointerDown(new Vector2(150, 300)));
+        HoldAt(BenchLayout.CylinderOut + new Vector2(3, 4), 60);
+
+        Assert.False(Bench.Part(RevolverParts.Cylinder).IsFree);
+        Assert.Contains(Math.Round(1.05 * 0.8, 3), PlayedPitches(before).Select(p => Math.Round(p, 3)));
     }
 
     [Fact]
@@ -611,7 +643,7 @@ public sealed class LudumDare60GameTests
     }
 
     [Fact]
-    public void PutBrushDown_StopsTheLoopAndItSlidesHome()
+    public void PutBrushDown_StopsTheLoopAndItLiesWhereItWasPut()
     {
         StartWithSound();
         _platform.Frame(Step, PointerDown(BenchLayout.BrushRest));
@@ -620,10 +652,10 @@ public sealed class LudumDare60GameTests
         _platform.Frame(Step, PointerUp(new Vector2(400, 200)));
         Idle(60);
 
-        Assert.True(Bench.Brush.IsResting);
+        Assert.False(Bench.Brush.IsHeld);
         Assert.Single(_platform.AudioBackend.AllCommands(), c => c.Kind == AudioCommandKind.StopVoice);
         Assert.Contains(0.7, PlayedPitches().Select(p => Math.Round(p, 3)));
-        Assert.Equal(BenchLayout.BrushRest, Drawn(LastFrame, PlaceholderParts.Brush).Position);
+        Assert.Equal(new Vector2(400, 200), Drawn(LastFrame, PlaceholderParts.Brush).Position);
     }
 
     [Fact]
@@ -633,7 +665,7 @@ public sealed class LudumDare60GameTests
         _platform.Frame(Step, PointerDown(BenchLayout.BrushRest));
 
         HoldAt(BenchLayout.PinSeated, 3);
-        HoldAt(BenchLayout.PinOut - new Vector2(20, 0), 60);
+        HoldAt(BenchLayout.PinOut, 60);
 
         Assert.False(Bench.Part(RevolverParts.BasePin).IsHovered);
         Assert.Equal(PartStop.Start, Bench.Part(RevolverParts.BasePin).Stop);

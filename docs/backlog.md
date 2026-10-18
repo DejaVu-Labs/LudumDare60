@@ -80,7 +80,7 @@ order their blocking graph allows (`Parts/PartAssembly`). Still to do:
 - Arc and circle paths for swing (loading gate, grip panel) and unscrew (circular motion around a screw).
 - A friction loop sound while a loose part moves, its pitch rising towards the snap, and a small screen shake on the
   snap.
-- Lift a free part off its path onto the mat, so the bench is not limited to one straight path per part.
+- Parts out on the mat could turn as they are carried, and lie at an angle; today they keep the angle of their rail.
 - Bench layouts for the other five parts (`Bench/BenchLayout`), so orders 2 to 5 of `orders.json` can be played:
   grip screw (unscrew: a circle path), grip panels (lift: an arc), mainspring, hammer screw, hammer. Orders 3 to 5
   also need the parts drawer and oiling.
@@ -109,8 +109,7 @@ Still to do:
   drives its volume and pitch.
 - Hide the system cursor while the brush is in the hand (needs the cursor visibility command from
   [Platform commands](#platform-commands-game-to-platform)).
-- A dirty part that is dragged back to its slot bounces back and its dirt flashes (core-loop step 4). Today a dirty
-  part out on the mat cannot be dragged at all.
+- A dirty part brought to its rail could bounce back a little instead of only not sticking (core-loop step 4).
 - Several dirt layers per order, from the order data, and dirt drawn as real art (an Aseprite layer per part).
 - Oiling (order 4).
 

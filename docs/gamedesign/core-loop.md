@@ -87,14 +87,20 @@ yet (see [backlog](../backlog.md#shop-loop-follow-ups)).
   (seated) click at different pitches, and coming loose gives a soft tick.
 - **A part is in one of five states:** blocked, available (glows), held (being dragged), off (on the mat),
   back (in its slot).
-- **Dirty parts:** each has a dirt layer and a clean threshold (about 90 % of its pixels). A dirty part out on the
-  mat cannot be dragged, and bare hands do nothing to it: a press on it gives a dull tick and flashes the wire
-  brush lying beside it on the bench. A press on the brush picks it up; while the button stays down its bristles
-  follow the pointer and erase dirt wherever they pass over the part. The scrub sound rasps louder and a little
-  higher the faster the brush moves over the metal, and falls silent when it stops or leaves the part; bare steel
-  sounds softer than rust. Let go, the brush slides back to its place with a clack. Past the threshold the rest of
-  the dirt fades out with a glint and a chime, so the player never hunts for the last pixel, and the part can be
-  dragged again. A dirty part still in the gun is dragged as usual.
+- **Parts out of the gun lie anywhere.** A part pulled to the end of its rail clicks out and stays in the hand; it can
+  be carried anywhere on the work surface and put down there. Brought back close to its rail it sticks to it
+  (`FreeMove` per part: the cylinder anywhere along its way out of the window, about 10 px off; the base pin only tip
+  first, at the mouth of the bore, within about 4 px), with a soft click, and can be pushed in from there; pulled
+  off to the side near the end of the rail it comes loose again. A part put down on the revolver lies on top of it.
+- **Dirty parts:** each has a dirt layer and a clean threshold (about 90 % of its pixels). A dirty part can be moved
+  like any other, but it does not fit: brought to its rail it does not stick, a dull tick plays and the part and the
+  wire brush flash. A press on the brush picks it up; while the button stays down its bristles follow the pointer
+  and erase dirt wherever they pass over a part out of the gun. The scrub sound rasps louder and a little higher the
+  faster the brush moves over the metal, and falls silent when it stops or leaves the part; bare steel sounds softer
+  than rust. Let go, the brush lies where it was put down, with a clack. Past the threshold the rest of the dirt
+  fades out with a glint and a chime, so the player never hunts for the last pixel, and the part fits again. A dirty
+  part still in the gun is dragged as usual. A part brought to its rail while another part keeps it out (the base pin
+  while the cylinder is still out) does not stick either, and what holds it flashes.
 - **Broken parts:** the drawer at the right of the tool strip pulses while a broken part is off. Dragging the
   new part from the drawer onto the broken one swaps them.
 - **One find per order** (two at most), attached to a part. The find is part of the order, not a random drop.

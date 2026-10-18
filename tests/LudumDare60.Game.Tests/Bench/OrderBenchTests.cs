@@ -57,8 +57,8 @@ public sealed class OrderBenchTests
 
     private void TakeApart()
     {
-        Drag(BenchLayout.PinSeated, BenchLayout.PinOut - new Vector2(20, 0));
-        Drag(BenchLayout.CylinderSeated, BenchLayout.CylinderOut + new Vector2(0, 20));
+        Drag(BenchLayout.PinSeated, BenchLayout.PinOut);
+        Drag(BenchLayout.CylinderSeated, BenchLayout.CylinderOut);
     }
 
     /// <summary>
@@ -86,7 +86,7 @@ public sealed class OrderBenchTests
         Assert.True(_bench.Gun.Holds(_bench.IndexOf(RevolverParts.BasePin), Cylinder));
         Assert.Null(_bench.Dirt(RevolverParts.BasePin));
         Assert.Equal(0.9f, Rust.CleanThreshold);
-        Assert.True(_bench.Brush.IsResting);
+        Assert.False(_bench.Brush.IsHeld);
         Assert.Equal(BenchLayout.BrushRest, _bench.Brush.Position);
     }
 
@@ -140,24 +140,48 @@ public sealed class OrderBenchTests
     [Fact]
     public void Step_DirtyPartStillInTheGun_DragsAsUsual()
     {
-        Drag(BenchLayout.PinSeated, BenchLayout.PinOut - new Vector2(20, 0));
+        Drag(BenchLayout.PinSeated, BenchLayout.PinOut);
 
-        Drag(BenchLayout.CylinderSeated, BenchLayout.CylinderOut + new Vector2(0, 20));
+        Drag(BenchLayout.CylinderSeated, BenchLayout.CylinderOut);
 
         Assert.Equal(PartStop.End, _bench.Part(RevolverParts.Cylinder).Stop);
         Assert.True(_bench.NeedsScrubbing(Cylinder));
     }
 
     [Fact]
-    public void Step_DirtyPartOut_StaysPutAndReportsBareHands()
+    public void Step_DirtyPartOut_MovesAnywhereButDoesNotGoBack()
+    {
+        TakeApart();
+        var elsewhere = new Vector2(200, 300);
+        Drag(BenchLayout.CylinderOut, elsewhere);
+        Assert.Equal(elsewhere.X, _bench.Part(RevolverParts.Cylinder).Position.X, 0.5f);
+
+        _bench.Step(Press(_bench.Part(RevolverParts.Cylinder).Position), Dt);
+        var refused = DragEvents.None;
+        for (var i = 0; i < 90; i++)
+        {
+            _bench.Step(Hold(BenchLayout.CylinderSeated), Dt);
+            refused |= _bench.Gun.Events[Cylinder];
+        }
+
+        _bench.Step(Release(BenchLayout.CylinderSeated), Dt);
+
+        Assert.True((refused & DragEvents.DockRefused) != DragEvents.None);
+        Assert.True(_bench.Part(RevolverParts.Cylinder).IsFree);
+        Assert.Equal(PartStop.End, _bench.Part(RevolverParts.Cylinder).Stop);
+        Assert.Equal(Rust.InitialDirt, Rust.Dirt);
+    }
+
+    [Fact]
+    public void Step_PinBackWhileTheCylinderIsOut_IsRefused()
     {
         TakeApart();
 
-        var events = Drag(BenchLayout.CylinderOut, BenchLayout.CylinderSeated);
+        _bench.Step(Press(BenchLayout.PinOut), Dt);
+        var events = _bench.Gun.Events[_bench.IndexOf(RevolverParts.BasePin)];
 
-        Assert.Equal(BenchEvents.BareHands, events);
-        Assert.Equal(PartStop.End, _bench.Part(RevolverParts.Cylinder).Stop);
-        Assert.Equal(Rust.InitialDirt, Rust.Dirt);
+        Assert.True((events & DragEvents.DockRefused) != DragEvents.None);
+        Assert.True(_bench.Part(RevolverParts.BasePin).IsFree);
     }
 
     [Fact]
@@ -234,7 +258,8 @@ public sealed class OrderBenchTests
             }
         }
 
-        _bench.Step(Release(BenchLayout.CylinderOut), Dt);
+        _bench.Step(Hold(BenchLayout.BrushRest), Dt);
+        _bench.Step(Release(BenchLayout.BrushRest), Dt);
         Assert.True(Rust.IsClean);
         Assert.Equal(1, cleaned);
         Assert.False(_bench.NeedsScrubbing(Cylinder));
@@ -248,7 +273,7 @@ public sealed class OrderBenchTests
     [Fact]
     public void IsDone_TakenApartAndBackButRusty_IsFalse()
     {
-        Drag(BenchLayout.PinSeated, BenchLayout.PinOut - new Vector2(20, 0));
+        Drag(BenchLayout.PinSeated, BenchLayout.PinOut);
         Drag(BenchLayout.PinOut, BenchLayout.PinSeated + new Vector2(20, 0));
 
         Assert.True(_bench.WasOut(_bench.IndexOf(RevolverParts.BasePin)));
@@ -266,7 +291,8 @@ public sealed class OrderBenchTests
             Rub(y);
         }
 
-        _bench.Step(Release(BenchLayout.CylinderOut), Dt);
+        _bench.Step(Hold(BenchLayout.BrushRest), Dt);
+        _bench.Step(Release(BenchLayout.BrushRest), Dt);
         Assert.False(_bench.IsDone);
 
         Drag(BenchLayout.CylinderOut, BenchLayout.CylinderSeated - new Vector2(0, 20));

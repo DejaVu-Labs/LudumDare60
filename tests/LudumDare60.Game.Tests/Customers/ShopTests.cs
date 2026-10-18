@@ -77,8 +77,8 @@ public sealed class ShopTests
     {
         var seen = Wait(shop, Shop.WaitSeconds + Shop.WalkSeconds + Shop.DropSeconds + 0.1f);
         seen |= PullHammer(shop);
-        seen |= Drag(shop, BenchLayout.PinSeated, BenchLayout.PinOut - new Vector2(20, 0));
-        seen |= Drag(shop, BenchLayout.CylinderSeated, BenchLayout.CylinderOut + new Vector2(0, 20));
+        seen |= Drag(shop, BenchLayout.PinSeated, BenchLayout.PinOut);
+        seen |= Drag(shop, BenchLayout.CylinderSeated, BenchLayout.CylinderOut);
 
         shop.Step(Press(BenchLayout.BrushRest), Dt);
         var rust = shop.Bench!.Dirt(RevolverParts.Cylinder)!;
@@ -91,7 +91,8 @@ public sealed class ShopTests
             }
         }
 
-        shop.Step(Release(BenchLayout.CylinderOut), Dt);
+        shop.Step(Hold(BenchLayout.BrushRest), Dt);
+        shop.Step(Release(BenchLayout.BrushRest), Dt);
         seen |= Wait(shop, 0.5f);
         seen |= Drag(shop, BenchLayout.CylinderOut, BenchLayout.CylinderSeated - new Vector2(0, 20));
         seen |= Drag(shop, BenchLayout.PinOut, BenchLayout.PinSeated + new Vector2(20, 0));
@@ -167,11 +168,11 @@ public sealed class ShopTests
     {
         Wait(_shop, Shop.WaitSeconds + Shop.WalkSeconds + 1);
 
-        Drag(_shop, BenchLayout.PinSeated, BenchLayout.PinOut - new Vector2(20, 0));
+        Drag(_shop, BenchLayout.PinSeated, BenchLayout.PinOut);
         Assert.Equal(PartStop.Start, _shop.Bench!.Part(RevolverParts.BasePin).Stop);
 
         PullHammer(_shop);
-        Drag(_shop, BenchLayout.PinSeated, BenchLayout.PinOut - new Vector2(20, 0));
+        Drag(_shop, BenchLayout.PinSeated, BenchLayout.PinOut);
 
         Assert.Equal(HammerState.HalfCock, _shop.Test!.State);
         Assert.Equal(PartStop.End, _shop.Bench.Part(RevolverParts.BasePin).Stop);

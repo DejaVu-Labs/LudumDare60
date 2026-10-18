@@ -13,6 +13,15 @@ namespace LudumDare60.Game.Bench;
 public static class BenchLayout
 {
     /// <summary>
+    /// The top-left corner of the work surface: parts out of the gun and the brush stay between it and
+    /// <see cref="MatMax"/>.
+    /// </summary>
+    public static readonly Vector2 MatMin = new(45, 165);
+
+    /// <inheritdoc cref="MatMin"/>
+    public static readonly Vector2 MatMax = new(485, 320);
+
+    /// <summary>
     /// Top-left corner of the revolver on the mat, as the customer puts it down.
     /// </summary>
     public static readonly Vector2 GunPosition = new(170, 186);
@@ -68,7 +77,8 @@ public static class BenchLayout
         PlaceholderParts.PinGlow,
         PlaceholderParts.PinOrigin,
         UnderFrame: true,
-        ClickPitch: 1);
+        ClickPitch: 1,
+        Free: new FreeMove(MatMin, MatMax, DockRadius: 4, DockSpan: 4));
 
     private static readonly PartLayout s_cylinder = new(
         new LinePath(CylinderSeated, CylinderOut),
@@ -79,7 +89,8 @@ public static class BenchLayout
         PlaceholderParts.CylinderOrigin,
         UnderFrame: false,
         ClickPitch: 0.8f,
-        PlaceholderParts.CylinderTurned);
+        PlaceholderParts.CylinderTurned,
+        new FreeMove(MatMin, MatMax, DockRadius: 10, DockSpan: CylinderOut.Y - CylinderSeated.Y));
 
     /// <summary>
     /// The layout of part <paramref name="id"/>, if it has one yet.

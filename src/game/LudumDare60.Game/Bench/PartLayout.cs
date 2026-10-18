@@ -18,6 +18,8 @@ namespace LudumDare60.Game.Bench;
 /// <param name="ClickPitch">Pitch of the part's clicks: heavier parts click lower.</param>
 /// <param name="TurnedSprite">How the part looks one chamber further round, for the cylinder; null for parts that do
 /// not turn.</param>
+/// <param name="Free">How the part moves on the work surface once it is out, and how close to its rail it must be put
+/// to stick to it again; null for a part that stays on its rail.</param>
 public sealed record PartLayout(
     LinePath Path,
     float GrabRadius,
@@ -27,4 +29,5 @@ public sealed record PartLayout(
     Vector2 Origin,
     bool UnderFrame,
     float ClickPitch,
-    IntRect? TurnedSprite = null);
+    IntRect? TurnedSprite = null,
+    FreeMove? Free = null);

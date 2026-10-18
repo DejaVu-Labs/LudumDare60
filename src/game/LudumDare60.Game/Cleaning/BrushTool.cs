@@ -4,31 +4,27 @@ using LudumDare60.Game.Parts;
 namespace LudumDare60.Game.Cleaning;
 
 /// <summary>
-/// The scrubbing brush, lying at its place on the bench. A press on it picks it up; while the button stays down its
-/// bristles follow the pointer, and let go it slides back to its place. Advanced once per fixed step.
+/// The scrubbing brush on the bench. A press on it picks it up; while the button stays down its bristles follow the
+/// pointer over the work surface, and let go it lies where it was put down. Advanced once per fixed step.
 /// </summary>
 public sealed class BrushTool
 {
-    /// <summary>
-    /// How fast a brush that was let go slides home: the gap shrinks to 1/e in <c>1 / ReturnRate</c> seconds.
-    /// </summary>
-    public const float ReturnRate = 18;
+    private readonly Vector2 _min;
+    private readonly Vector2 _max;
 
-    // Closer than this to its place, a returning brush lands.
-    private const float LandDistance = 0.5f;
-
-    /// <param name="rest">Where the bristles are while the brush lies at its place.</param>
+    /// <param name="rest">Where the bristles are at first.</param>
     /// <param name="grabMin">The top-left corner of the area that picks the brush up, relative to the bristles.</param>
     /// <param name="grabMax">The bottom-right corner of that area, relative to the bristles.</param>
-    public BrushTool(Vector2 rest, Vector2 grabMin, Vector2 grabMax)
+    /// <param name="min">The top-left corner of the work surface the bristles stay on.</param>
+    /// <param name="max">The bottom-right corner of that surface.</param>
+    public BrushTool(Vector2 rest, Vector2 grabMin, Vector2 grabMax, Vector2 min, Vector2 max)
     {
-        Rest = rest;
         GrabMin = grabMin;
         GrabMax = grabMax;
+        _min = min;
+        _max = max;
         Position = PreviousPosition = rest;
     }
-
-    public Vector2 Rest { get; }
 
     public Vector2 GrabMin { get; }
 
@@ -52,11 +48,6 @@ public sealed class BrushTool
     public bool IsHovered { get; private set; }
 
     /// <summary>
-    /// Whether the brush lies at its place.
-    /// </summary>
-    public bool IsResting => !IsHeld && Position == Rest;
-
-    /// <summary>
     /// Whether <paramref name="point"/> lies on the brush.
     /// </summary>
     public bool IsUnder(Vector2 point)
@@ -75,9 +66,8 @@ public sealed class BrushTool
     /// Advances the brush by one fixed step.
     /// </summary>
     /// <param name="input">The pointer at the end of the step.</param>
-    /// <param name="deltaTime">The step's length in seconds.</param>
     /// <param name="canGrab">Whether the brush may be hovered and picked up: false while the player holds a part.</param>
-    public BrushEvents Step(in PointerSample input, float deltaTime, bool canGrab)
+    public BrushEvents Step(in PointerSample input, bool canGrab)
     {
         PreviousPosition = Position;
         var events = BrushEvents.None;
@@ -86,7 +76,7 @@ public sealed class BrushTool
             IsHovered = canGrab && IsUnder(input.Position);
             if (!input.IsPressed || !IsHovered)
             {
-                return events | SlideHome(deltaTime);
+                return events;
             }
 
             IsHeld = true;
@@ -94,31 +84,14 @@ public sealed class BrushTool
             events |= BrushEvents.PickedUp;
         }
 
+        // In the hand, the bristles sit under the pointer, on the work surface.
+        Position = Vector2.Clamp(input.Position, _min, _max);
         if (!input.IsDown)
         {
             IsHeld = false;
-            return events | BrushEvents.PutDown;
+            events |= BrushEvents.PutDown;
         }
 
-        // In the hand, the bristles sit under the pointer.
-        Position = input.Position;
         return events;
-    }
-
-    private BrushEvents SlideHome(float deltaTime)
-    {
-        if (Position == Rest)
-        {
-            return BrushEvents.None;
-        }
-
-        Position = Vector2.Lerp(Position, Rest, 1 - MathF.Exp(-ReturnRate * deltaTime));
-        if (Vector2.DistanceSquared(Position, Rest) > LandDistance * LandDistance)
-        {
-            return BrushEvents.None;
-        }
-
-        Position = Rest;
-        return BrushEvents.Landed;
     }
 }

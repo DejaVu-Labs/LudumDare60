@@ -14,12 +14,7 @@ public enum BrushEvents
     PickedUp = 1,
 
     /// <summary>
-    /// The pointer went up and let the brush go; it slides back to its place.
+    /// The pointer went up and put the brush down where it is.
     /// </summary>
     PutDown = 2,
-
-    /// <summary>
-    /// The brush came to rest at its place.
-    /// </summary>
-    Landed = 4,
 }
