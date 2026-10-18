@@ -22,6 +22,13 @@ internal sealed class ControlledPlatform : IPlatform
 
     public Task RunAsync(IFrameSink frameSink) => _stopped.Task;
 
+    /// <summary>
+    /// Every <see cref="ReportError"/> call, in order.
+    /// </summary>
+    public List<(Exception Exception, bool Handled)> ReportedErrors { get; } = [];
+
+    public void ReportError(Exception exception, bool handled) => ReportedErrors.Add((exception, handled));
+
     public void Stop() => _stopped.SetResult();
 
     public void Fail(Exception exception) => _stopped.SetException(exception);

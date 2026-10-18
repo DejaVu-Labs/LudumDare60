@@ -255,6 +255,37 @@ public sealed class AssetManagerTests
     }
 
     [Fact]
+    public void Update_ReadFailed_CallsOnFailedOnceWithError()
+    {
+        var failures = new List<AssetLoadException>();
+        var assets = new AssetManager(_source, failures.Add);
+        assets.Register(_loader);
+        var handle = assets.Request<TextAsset>(Path);
+        _source.Fail(Path, new FileNotFoundException(Path));
+
+        assets.Update();
+        assets.Update();
+
+        var failure = Assert.Single(failures);
+        Assert.Same(assets.GetError(handle), failure);
+        Assert.Equal(Path, failure.AssetPath);
+    }
+
+    [Fact]
+    public void Update_ReadSucceeded_DoesNotCallOnFailed()
+    {
+        var failures = new List<AssetLoadException>();
+        var assets = new AssetManager(_source, failures.Add);
+        assets.Register(_loader);
+        assets.Request<TextAsset>(Path);
+        _source.Complete(Path, Utf8("bench"));
+
+        assets.Update();
+
+        Assert.Empty(failures);
+    }
+
+    [Fact]
     public void Update_ReadFailedWithAssetLoadException_KeepsIt()
     {
         var handle = _assets.Request<TextAsset>(Path);

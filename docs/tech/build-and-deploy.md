@@ -30,7 +30,7 @@ Game projects use `Sdk="Microsoft.NET.Sdk.WebAssembly"`. The root `Directory.Bui
 | `RunAOTCompilation` (Release) | `true` | IL is compiled to native Wasm. Much faster at runtime, slower to build. |
 | `WasmStripILAfterAOT` (Release) | `true` | Drops IL bodies that AOT has already compiled. |
 | `TrimMode` (Release) | `full` | Trims the whole app, not only the framework. |
-| Feature switches (Release) | off | `DebuggerSupport`, `EventSourceSupport`, `StackTraceSupport`, `MetricsSupport`, `UseSystemResourceKeys` reduce size. Exception messages become resource keys in Release builds. |
+| Feature switches (Release) | off | `DebuggerSupport`, `EventSourceSupport`, `MetricsSupport` reduce size. `StackTraceSupport` stays on and `UseSystemResourceKeys` off, so errors sent to Sentry have readable messages and managed stack traces (method names; no line numbers, since no PDBs ship). |
 
 ### Static web assets
 
@@ -215,8 +215,12 @@ What gets sent:
 
 - **Errors**: uncaught errors and unhandled rejections, including failed runtime downloads and .NET `ManagedError`s,
   plus startup failures from `boot`. Each message is sent once, at most 10 per page, with the last 30 load log lines
-  as breadcrumbs. Exception messages in Release are resource keys (`UseSystemResourceKeys`), for example
-  `AggregateException_ctor_DefaultMessage`.
+  as breadcrumbs.
+- **.NET errors** through `IPlatform.ReportError`: every asset that fails to load (mechanism `dotnet.handled`), and
+  exceptions no code catches, `AppDomain.UnhandledException` and `TaskScheduler.UnobservedTaskException`
+  (mechanism `dotnet.unhandled`). An exception that ends `Main`, including one thrown in a frame, arrives as a
+  `ManagedError` from `boot`. The event's type is the .NET type name (the inner exception of a one-item
+  `AggregateException`), its stack trace is the managed one, and `extra.dotnet` holds `Exception.ToString()`.
 - **Load timing**: one `load` transaction per page. Spans: page and `main.js`, `dotnet.js` import, runtime
   download (plus one `resource.wasm` span per file, with transfer and decoded sizes), runtime compile and start,
   `Main` to the first frame, the first asset batch. Measurements: `boot`, `runtime_downloaded`, `runtime_created`,

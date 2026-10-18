@@ -17,6 +17,7 @@ namespace LudumDare60.Engine.Assets;
 public sealed class AssetManager
 {
     private readonly IAssetSource _source;
+    private readonly Action<AssetLoadException>? _onFailed;
     private readonly Dictionary<Type, ILoaderAdapter> _loaders = [];
     private readonly Dictionary<string, int> _slotsByPath = new(StringComparer.Ordinal);
     private readonly Stack<int> _freeSlots = new();
@@ -27,10 +28,14 @@ public sealed class AssetManager
     /// <summary>
     /// Creates a manager with <see cref="RawBytesLoader"/> registered for <c>byte[]</c>.
     /// </summary>
-    public AssetManager(IAssetSource source)
+    /// <param name="source">Reads the files.</param>
+    /// <param name="onFailed">Called in <see cref="Update"/> with the error of every asset that becomes
+    /// <see cref="AssetState.Failed"/>, for example to report it.</param>
+    public AssetManager(IAssetSource source, Action<AssetLoadException>? onFailed = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         _source = source;
+        _onFailed = onFailed;
         Register(new RawBytesLoader());
     }
 
@@ -234,6 +239,10 @@ public sealed class AssetManager
             completed.Asset = asset;
             completed.Error = error;
             completed.State = error is null ? AssetState.Loaded : AssetState.Failed;
+            if (error is not null)
+            {
+                _onFailed?.Invoke(error);
+            }
         }
     }
 

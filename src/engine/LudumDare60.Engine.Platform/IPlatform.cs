@@ -26,4 +26,15 @@ public interface IPlatform
     /// </summary>
     /// <returns>A task that completes when the platform stops producing frames.</returns>
     Task RunAsync(IFrameSink frameSink);
+
+    /// <summary>
+    /// Reports an error to wherever the platform collects them (the browser platform sends it to Sentry when the page
+    /// is configured to). The engine calls it for failures it handles itself, such as an asset that failed to load.
+    /// Must not throw. The default implementation drops the error.
+    /// </summary>
+    /// <param name="exception">The error.</param>
+    /// <param name="handled"><see langword="true"/> when the run goes on after the error.</param>
+    void ReportError(Exception exception, bool handled)
+    {
+    }
 }

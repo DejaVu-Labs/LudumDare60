@@ -324,6 +324,24 @@ public sealed class GameEngineTests
     }
 
     [Fact]
+    public async Task Update_AssetFails_ReportsItToPlatformAsHandled()
+    {
+        var source = new FakeAssetSource();
+        var game = new AssetProbeGame("level.txt");
+        var platform = new ControlledPlatform { Assets = source };
+        var run = _engine.RunAsync(game, platform);
+        source.Fail("level.txt", new FileNotFoundException("level.txt"));
+
+        _engine.Update(0.01, []);
+
+        var (exception, handled) = Assert.Single(platform.ReportedErrors);
+        Assert.Same(game.Assets!.GetError(game.Handle), exception);
+        Assert.True(handled);
+        platform.Stop();
+        await run;
+    }
+
+    [Fact]
     public async Task RunAsync_PlatformFails_StillUnloadsAssets()
     {
         var source = new FakeAssetSource { Files = { ["level.txt"] = "level"u8.ToArray() } };

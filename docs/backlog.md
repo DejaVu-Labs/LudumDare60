@@ -159,9 +159,10 @@ Deferred when error and load reports shipped (see
 
 - A tunnel: post envelopes to a small endpoint on our own domain that forwards them to Sentry, so ad blockers stop
   dropping reports. Needs a server, which an itch.io game does not have.
-- Readable .NET exceptions: Release maps messages to resource keys and has no stack traces (`StackTraceSupport`
-  false). Decide whether a few hundred KB of messages are worth it during the jam.
-- Report caught game errors (a failed asset decode, a lost GPU) from C# through one `[JSImport]` call.
+- Measure what `StackTraceSupport` and the exception messages (`UseSystemResourceKeys` false) cost in download size,
+  from the deploy summary's build size before and after; turn them off again if it is more than a few hundred KB.
+- Report sounds the browser fails to decode (`AudioEventKind.SoundFailed`) with the asset path, through
+  `IPlatform.ReportError`.
 
 ## Browser E2E smoke tests
 

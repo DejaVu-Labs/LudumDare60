@@ -97,8 +97,9 @@
     <WasmStripILAfterAOT>true</WasmStripILAfterAOT>
     <DebuggerSupport>false</DebuggerSupport>
     <EventSourceSupport>false</EventSourceSupport>
-    <UseSystemResourceKeys>true</UseSystemResourceKeys>
-    <StackTraceSupport>false</StackTraceSupport>
+    <!-- Kept on so errors reported to Sentry (reporting.js) carry readable messages and managed stack traces. -->
+    <UseSystemResourceKeys>false</UseSystemResourceKeys>
+    <StackTraceSupport>true</StackTraceSupport>
     <MetricsSupport>false</MetricsSupport>
     <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
     <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 
 import { STEP } from '../../src/engine/platforms/LudumDare60.Engine.Platform.Browser/wwwroot/load-log.js';
 import {
+  captureManaged,
   createReporter,
   describeError,
   envelope,
@@ -373,4 +374,62 @@ test('isLoaded_NeedsFirstFrameAndFirstAssets', () => {
   assert.equal(isLoaded(loadedSnapshot), true);
   assert.equal(isLoaded({ ...loadedSnapshot, firstAssets: null }), false);
   assert.equal(isLoaded({ ...loadedSnapshot, steps: { [STEP.BOOT]: 1 } }), false);
+});
+
+test('parseStack_DotnetTrace_FramesWithFileAndLine', () => {
+  const stack = [
+    '   at LudumDare60.Game.Customers.Shop.Seat(Int32 index) in /src/Shop.cs:line 42',
+    '   at LudumDare60.Game.LudumDare60Game.Update(FrameContext& context, ReadOnlySpan`1 events)',
+    '   at System.Threading.Tasks.Task.Execute()',
+  ].join('\n');
+
+  assert.deepEqual(parseStack(stack), [
+    { function: 'System.Threading.Tasks.Task.Execute()', in_app: false },
+    { function: 'LudumDare60.Game.LudumDare60Game.Update(FrameContext& context, ReadOnlySpan`1 events)', in_app: true },
+    { function: 'LudumDare60.Game.Customers.Shop.Seat(Int32 index)', filename: '/src/Shop.cs', lineno: 42, in_app: true },
+  ]);
+});
+
+test('parseStack_ManagedErrorStack_JsAndDotnetFrames', () => {
+  const stack = [
+    'ManagedError: Value cannot be null.',
+    '   at LudumDare60.Engine.GameEngine.Update(Double dt)',
+    '    at https://x/_framework/dotnet.runtime.abc.js:3:100',
+  ].join('\n');
+
+  assert.deepEqual(parseStack(stack), [
+    { filename: 'https://x/_framework/dotnet.runtime.abc.js', lineno: 3, colno: 100, in_app: false },
+    { function: 'LudumDare60.Engine.GameEngine.Update(Double dt)', in_app: true },
+  ]);
+});
+
+test('captureException_Handled_MechanismHandledAndExtra', async () => {
+  const { reporter, sent } = createTestReporter(config);
+
+  reporter.captureException(
+    { type: 'LudumDare60.Engine.Platform.AssetLoadException', value: "Reading 'gun.png' failed.", frames: [] },
+    'dotnet.handled',
+    true,
+    { dotnet: "LudumDare60.Engine.Platform.AssetLoadException: Reading 'gun.png' failed." },
+  );
+  await reporter.idle;
+
+  const event = sent[0].lines[2];
+  assert.equal(event.exception.values[0].type, 'LudumDare60.Engine.Platform.AssetLoadException');
+  assert.deepEqual(event.exception.values[0].mechanism, { type: 'dotnet.handled', handled: true });
+  assert.equal(event.exception.values[0].stacktrace, undefined);
+  assert.deepEqual(event.extra, { dotnet: "LudumDare60.Engine.Platform.AssetLoadException: Reading 'gun.png' failed." });
+});
+
+test('captureError_NoExtra_EventWithoutExtra', async () => {
+  const { reporter, sent } = createTestReporter(config);
+
+  reporter.captureError(new Error('x'), 'onerror');
+  await reporter.idle;
+
+  assert.equal('extra' in sent[0].lines[2], false);
+});
+
+test('captureManaged_ReportingNotStarted_DoesNothing', () => {
+  captureManaged('System.Exception', 'x', null, 'System.Exception: x', false);
 });

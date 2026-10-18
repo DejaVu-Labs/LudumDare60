@@ -5,8 +5,10 @@
  * posted with one `fetch` each. Reporting is off unless the page ships a config file with a DSN (`reporting.json`, see
  * docs/tech/build-and-deploy.md#error-and-load-reports).
  *
- * Errors: uncaught errors and unhandled promise rejections (a failed runtime download, a .NET `ManagedError`), at
- * most `MAX_ERRORS` per page and each message once, with the load log's lines as breadcrumbs.
+ * Errors: uncaught errors and unhandled promise rejections (a failed runtime download, a .NET `ManagedError`), and
+ * .NET errors that `BrowserPlatform.ReportError` passes to `captureManaged` (failed asset loads, unhandled and
+ * unobserved exceptions). At most `MAX_ERRORS` per page and each message once, with the load log's lines as
+ * breadcrumbs.
  * Load timing: one `load` transaction per page, sent once the first frame ran and the first asset batch finished, or
  * on `pagehide` before that (status `cancelled`: the player left during loading). Switching tabs sends nothing.
  */
@@ -33,7 +35,7 @@ import { STEP } from './load-log.js';
 
 /**
  * A stack frame in Sentry's format.
- * @typedef {{ function?: string, filename: string, lineno: number, colno: number, in_app: boolean }} Frame
+ * @typedef {{ function?: string, filename?: string, lineno?: number, colno?: number, in_app: boolean }} Frame
  */
 
 /**
@@ -48,7 +50,9 @@ import { STEP } from './load-log.js';
 
 /**
  * @typedef {object} Reporter
- * @property {(error: unknown, mechanism: string) => void} captureError
+ * @property {(error: unknown, mechanism: string) => void} captureError Reports an uncaught JS error.
+ * @property {(error: { type: string, value: string, frames: Frame[] }, mechanism: string, handled: boolean, extra?: Record<string, string>) => void} captureException
+ *   Reports an error that is already described, with optional extra data shown on the event.
  * @property {(entry: LoadLogEntry) => void} addBreadcrumb
  * @property {(snapshot: LoadSnapshot, completed: boolean) => void} sendLoadTiming Sends once; later calls do nothing.
  * @property {Promise<void>} idle Resolves when every report so far was handed to `send` or dropped. For tests.
@@ -121,9 +125,19 @@ export function randomHex(length, random) {
 
 const V8_FRAME = /^\s*at (?:async )?(?:(.+?) \()?(.+?):(\d+):(\d+)\)?$/;
 const GECKO_FRAME = /^\s*(.*?)@(.+?):(\d+):(\d+)$/;
+const DOTNET_FRAME = /^\s*at ([^\s(]+\(.*?\))(?: in (.+):line (\d+))?\s*$/;
 
 /**
- * Parses a Chrome, Firefox or Safari `error.stack`.
+ * Namespaces of the .NET runtime and its libraries: their frames are not the game's code.
+ * @param {string} method
+ */
+function isFrameworkMethod(method) {
+  return method.startsWith('System.') || method.startsWith('Microsoft.') || method.startsWith('Interop.');
+}
+
+/**
+ * Parses a Chrome, Firefox or Safari `error.stack`, or a .NET stack trace (`   at Type.Method(Args) in File:line N`),
+ * which is also what a `ManagedError`'s stack ends with.
  *
  * @param {string | undefined} stack
  * @returns {Frame[]} Oldest call first, as Sentry expects. Lines that are not frames are skipped.
@@ -137,6 +151,16 @@ export function parseStack(stack) {
   for (const line of stack.split('\n')) {
     const match = V8_FRAME.exec(line) ?? GECKO_FRAME.exec(line);
     if (match === null) {
+      const dotnet = DOTNET_FRAME.exec(line);
+      if (dotnet !== null) {
+        /** @type {Frame} */
+        const frame = { function: dotnet[1], in_app: !isFrameworkMethod(dotnet[1]) };
+        if (dotnet[2] !== undefined) {
+          frame.filename = dotnet[2];
+          frame.lineno = Number(dotnet[3]);
+        }
+        frames.push(frame);
+      }
       continue;
     }
     /** @type {Frame} */
@@ -352,31 +376,43 @@ export function createReporter(config, deps) {
     });
   }
 
+  /**
+   * @param {{ type: string, value: string, frames: Frame[] }} error
+   * @param {string} mechanism
+   * @param {boolean} handled
+   * @param {Record<string, string>} [extra]
+   */
+  function captureException({ type, value, frames }, mechanism, handled, extra) {
+    const key = `${type}: ${value}`;
+    if (errorCount >= MAX_ERRORS || seen.has(key)) {
+      return;
+    }
+    errorCount++;
+    seen.add(key);
+    const crumbs = breadcrumbs.slice();
+    deliver('event', deps.clock.now(), () => ({
+      level: 'error',
+      exception: {
+        values: [
+          {
+            type,
+            value,
+            ...(frames.length > 0 ? { stacktrace: { frames } } : {}),
+            mechanism: { type: mechanism, handled },
+          },
+        ],
+      },
+      breadcrumbs: { values: crumbs },
+      ...(extra === undefined ? {} : { extra }),
+    }));
+  }
+
   return {
     captureError(error, mechanism) {
-      const { type, value, frames } = describeError(error);
-      const key = `${type}: ${value}`;
-      if (errorCount >= MAX_ERRORS || seen.has(key)) {
-        return;
-      }
-      errorCount++;
-      seen.add(key);
-      const crumbs = breadcrumbs.slice();
-      deliver('event', deps.clock.now(), () => ({
-        level: 'error',
-        exception: {
-          values: [
-            {
-              type,
-              value,
-              ...(frames.length > 0 ? { stacktrace: { frames } } : {}),
-              mechanism: { type: mechanism, handled: false },
-            },
-          ],
-        },
-        breadcrumbs: { values: crumbs },
-      }));
+      captureException(describeError(error), mechanism, false);
     },
+
+    captureException,
 
     addBreadcrumb(entry) {
       breadcrumbs.push({
@@ -435,6 +471,28 @@ export function isLoaded(snapshot) {
   return snapshot.steps[STEP.FIRST_FRAME] !== undefined && snapshot.firstAssets !== null;
 }
 
+/** @type {Reporter | null} */
+let pageReporter = null;
+
+/**
+ * Reports a .NET error to the page's reporter (see `startReporting`). Bound from C# with `[JSImport]`
+ * (`ReportingInterop.Capture`). Does nothing when reporting was not started.
+ *
+ * @param {string} type Full name of the exception type.
+ * @param {string} message
+ * @param {string | null} stackTrace The managed stack trace, if any.
+ * @param {string} details `Exception.ToString()`, with inner exceptions; sent as extra data.
+ * @param {boolean} handled Whether the game went on after the error.
+ */
+export function captureManaged(type, message, stackTrace, details, handled) {
+  pageReporter?.captureException(
+    { type, value: message, frames: parseStack(stackTrace ?? undefined) },
+    handled ? 'dotnet.handled' : 'dotnet.unhandled',
+    handled,
+    { dotnet: details },
+  );
+}
+
 /**
  * Starts reporting for the page: reads the config at `configUrl`, listens for uncaught errors and unhandled
  * rejections, turns the load log's lines into breadcrumbs, and sends load timing once loading finishes or the page
@@ -472,5 +530,6 @@ export function startReporting(configUrl, log) {
   });
   globalThis.addEventListener('pagehide', () => reporter.sendLoadTiming(log.snapshot(), false));
 
+  pageReporter = reporter;
   return reporter;
 }

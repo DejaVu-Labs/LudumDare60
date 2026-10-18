@@ -61,7 +61,8 @@ public sealed class GameEngine : IFrameSink
     /// accumulated time start from zero on every run. Each run gets a new <see cref="AssetManager"/> on
     /// <see cref="IPlatform.Assets"/>, a new <see cref="Graphics"/> on <see cref="IPlatform.Graphics"/> and a new
     /// <see cref="Audio"/> on <see cref="IPlatform.Audio"/>: all three are passed to <see cref="IGame.Initialize"/>
-    /// before the first frame, and everything they hold is unloaded or destroyed when the run ends.
+    /// before the first frame, and everything they hold is unloaded or destroyed when the run ends. Every asset that
+    /// fails to load is reported with <see cref="IPlatform.ReportError"/> as handled.
     /// </summary>
     /// <exception cref="InvalidOperationException">The engine is already running a game.</exception>
     public async Task RunAsync(IGame game, IPlatform platform)
@@ -74,7 +75,7 @@ public sealed class GameEngine : IFrameSink
             throw new InvalidOperationException("The engine is already running.");
         }
 
-        var assets = new AssetManager(platform.Assets);
+        var assets = new AssetManager(platform.Assets, error => platform.ReportError(error, handled: true));
         var graphics = new Graphics(platform.Graphics);
         var audio = new Audio(platform.Audio);
         _game = game;
