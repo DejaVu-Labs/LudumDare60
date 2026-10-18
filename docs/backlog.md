@@ -84,8 +84,20 @@ order their blocking graph allows (`Parts/PartAssembly`). Still to do:
 - Bench layouts for the other five parts (`Bench/BenchLayout`), so orders 2 to 5 of `orders.json` can be played:
   grip screw (unscrew: a circle path), grip panels (lift: an arc), mainspring, hammer screw, hammer. Orders 3 to 5
   also need the parts drawer and oiling.
-- The shop loop: take the orders of `orders.json` one after the other instead of only the first.
 - Replace the code-generated frame, pin, cylinder and click with the real sprites and recordings.
+
+## Shop loop follow-ups
+
+Customers come in, hand over the revolver and take it back (`Customers/Shop`, see
+[core-loop.md](gamedesign/core-loop.md#what-is-built)). Still to do:
+
+- The test before handing back: cock the hammer (the cylinder turns one chamber), click the trigger. The repair
+  counts as done without it today.
+- Finds: the find pops out of its part, opens over the bench, flies into the finds box; the customer's surprised
+  face (`Expression.Surprised` exists, nothing sets it yet).
+- The phone message after the customer leaves, and the counter bell that calls the next customer at once.
+- The shop's end once the orders run out; today it just stays empty (`ShopPhase.Closed`).
+- Real customer art: busts with a two-frame blink, a walk instead of a slide, the door opening.
 
 ## Cleaning follow-ups
 

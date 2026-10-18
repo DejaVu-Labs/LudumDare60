@@ -28,6 +28,7 @@ public sealed class OrderBench
     private readonly string[] _ids;
     private readonly PartLayout[] _layouts;
     private readonly DirtLayer?[] _dirt;
+    private readonly bool[] _wasOut;
     private Vector2 _lastBrush;
 
     /// <exception cref="NotSupportedException">The bench cannot play the order yet (see <see cref="CanSetUp"/>).</exception>
@@ -44,6 +45,7 @@ public sealed class OrderBench
         _ids = [.. order.Parts];
         _layouts = new PartLayout[count];
         _dirt = new DirtLayer?[count];
+        _wasOut = new bool[count];
         var parts = new PartDrag[count];
         for (var i = 0; i < count; i++)
         {
@@ -170,6 +172,31 @@ public sealed class OrderBench
     public bool NeedsScrubbing(int part) => _dirt[part] is { IsClean: false } && Gun[part].Stop == PartStop.End && !Gun[part].IsHeld;
 
     /// <summary>
+    /// Whether the repair is done: every part of the order has been out, is back in its seat, and every dirty part
+    /// is clean. The test with the hammer is not part of it yet.
+    /// </summary>
+    public bool IsDone
+    {
+        get
+        {
+            for (var i = 0; i < Count; i++)
+            {
+                if (!_wasOut[i] || Gun[i].Stop != PartStop.Start || Gun[i].IsHeld || _dirt[i] is { IsClean: false })
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Whether <paramref name="part"/> has been out of the gun in this order.
+    /// </summary>
+    public bool WasOut(int part) => _wasOut[part];
+
+    /// <summary>
     /// Advances the bench by one fixed step.
     /// </summary>
     /// <param name="input">The pointer at the end of the step.</param>
@@ -199,6 +226,11 @@ public sealed class OrderBench
                     break;
                 }
             }
+        }
+
+        for (var i = 0; i < Count; i++)
+        {
+            _wasOut[i] |= Gun[i].Stop == PartStop.End;
         }
 
         Scrub(deltaTime);

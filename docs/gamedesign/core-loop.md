@@ -55,6 +55,17 @@ SHOP (session)         order 1 -> order 2 -> order 3 -> order 4 -> order 5 -> en
 The player controls the pace. Nothing in the loop has a timer, and nothing in it can fail; the only friction is
 "this part does not fit yet".
 
+## What is built
+
+`Customers/Shop` runs the loop on the orders of `orders.json`, one customer at a time. After a moment the door bell
+rings and the customer walks from the door to the counter; the revolver drops onto the mat with a thud, and a
+bubble shows the symptom icon. The repair counts as done when every part of the order has been out, is back in its
+seat, and every dirty part is clean (the test with the hammer comes later). Then the revolver shines, the
+customer holds out a hand, and the parts stay put: the player drags the whole revolver up to the hand. The customer
+smiles, takes it, walks out with the door bell, and the next order comes in. At the first order the bench cannot
+play yet the shop stays empty. Finds, the test, the phone message and the counter bell are not built yet (see
+[backlog](../backlog.md#shop-loop-follow-ups)).
+
 ## Rules
 
 - **An order unlocks only the parts it needs.** Every other part of the revolver is fixed for that order. This

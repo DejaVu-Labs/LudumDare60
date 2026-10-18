@@ -29,6 +29,23 @@ public sealed class PlaceholderSoundsTests
     }
 
     [Fact]
+    public void CreateDoorBell_RingsAndDiesAway()
+    {
+        var bell = PlaceholderSounds.CreateDoorBell();
+        var samples = Samples(bell);
+        var rate = PlaceholderSounds.ScrubSampleRate;
+
+        Assert.Equal(bell, PlaceholderSounds.CreateDoorBell());
+        Assert.Equal((int)(rate * PlaceholderSounds.DoorBellSeconds), samples.Length);
+        Assert.All(samples, sample => Assert.InRange(MathF.Abs(sample), 0, 0.71f));
+        var start = Rms(samples.AsSpan(0, rate / 5));
+        var end = Rms(samples.AsSpan(samples.Length - (rate / 10)));
+        Assert.True(start > 0.1, $"The strikes ring at {start} RMS.");
+        Assert.True(end < start / 20, $"The tail is still at {end} RMS against {start}.");
+        Assert.InRange(MathF.Abs(samples[^1]), 0, 0.001f);
+    }
+
+    [Fact]
     public void CreateScrubLoop_IsMonoPcmAt44100()
     {
         Assert.Equal("RIFF"u8.ToArray(), s_scrub[..4]);

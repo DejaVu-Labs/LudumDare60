@@ -120,6 +120,73 @@ internal static class PlaceholderSounds
     }
 
     /// <summary>
+    /// Length of <see cref="CreateDoorBell"/> in seconds.
+    /// </summary>
+    public const float DoorBellSeconds = 1.6f;
+
+    /// <summary>
+    /// The little brass bell over the shop door: struck three times, softer each time, as the door swings. Each strike
+    /// rings a small bell's inharmonic partials, every one of them a pair of slightly detuned sines that beat. The same
+    /// bytes every time. Mono, at <see cref="ScrubSampleRate"/>.
+    /// </summary>
+    public static byte[] CreateDoorBell()
+    {
+        // Partials of a small bell: frequency, level, decay time in seconds.
+        ReadOnlySpan<float> partials =
+        [
+            1760, 1.00f, 0.50f,
+            4080, 0.55f, 0.28f,
+            7480, 0.30f, 0.15f,
+            11670, 0.15f, 0.08f,
+        ];
+
+        // Strikes as the door swings: time in seconds and strength.
+        ReadOnlySpan<float> strikes = [0, 1.0f, 0.13f, 0.6f, 0.31f, 0.3f];
+        var count = (int)(ScrubSampleRate * DoorBellSeconds);
+        var samples = new float[count];
+        for (var s = 0; s < strikes.Length; s += 2)
+        {
+            var start = (int)(strikes[s] * ScrubSampleRate);
+            var strength = strikes[s + 1];
+            for (var i = start; i < count; i++)
+            {
+                var t = (i - start) / (float)ScrubSampleRate;
+
+                // A two-millisecond attack keeps the strike from clicking.
+                var attack = MathF.Min(1, t / 0.002f);
+                var sample = 0f;
+                for (var p = 0; p < partials.Length; p += 3)
+                {
+                    var frequency = partials[p];
+                    var envelope = partials[p + 1] * MathF.Exp(-t / partials[p + 2]);
+                    sample += envelope * 0.5f * (MathF.Sin(2 * MathF.PI * frequency * t) + MathF.Sin(2 * MathF.PI * frequency * 1.004f * t));
+                }
+
+                samples[i] += sample * strength * attack;
+            }
+        }
+
+        var peak = 0f;
+        foreach (var sample in samples)
+        {
+            peak = MathF.Max(peak, MathF.Abs(sample));
+        }
+
+        var wav = new byte[HeaderSize + (count * sizeof(short))];
+        WriteHeader(wav, count, ScrubSampleRate);
+        var fadeStart = count - (ScrubSampleRate / 5);
+        for (var i = 0; i < count; i++)
+        {
+            // The last 200 ms fade to silence, so the sound never ends on a click.
+            var fade = i < fadeStart ? 1 : (count - i) / (float)(count - fadeStart);
+            var sample = samples[i] / peak * 0.7f * fade;
+            BinaryPrimitives.WriteInt16LittleEndian(wav.AsSpan(HeaderSize + (i * sizeof(short))), (short)(sample * short.MaxValue));
+        }
+
+        return wav;
+    }
+
+    /// <summary>
     /// The phase of a sine that makes <paramref name="cycles"/> whole cycles over the scrub loop, at time
     /// <paramref name="t"/>.
     /// </summary>

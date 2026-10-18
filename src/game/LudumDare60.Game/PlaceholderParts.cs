@@ -13,7 +13,7 @@ namespace LudumDare60.Game;
 /// </summary>
 internal static class PlaceholderParts
 {
-    public const int Width = 64;
+    public const int Width = 132;
     public const int Height = 80;
 
     /// <summary>
@@ -21,6 +21,11 @@ internal static class PlaceholderParts
     /// transparent.
     /// </summary>
     public static readonly IntRect Frame = new(0, 0, 64, 28);
+
+    /// <summary>
+    /// One pixel around the outside of <see cref="Frame"/>: the whole revolver glows when it is ready to hand back.
+    /// </summary>
+    public static readonly IntRect FrameGlow = Around(Frame, 64, 0);
 
     public static readonly IntRect Pin = new(0, 28, 40, 7);
 
@@ -105,6 +110,7 @@ internal static class PlaceholderParts
         FillGlow(pixels, PinGlow, IsPin);
         FillGlow(pixels, CylinderGlow, IsCylinder);
         FillGlow(pixels, BrushGlow, IsBrush);
+        FillGlow(pixels, FrameGlow, IsFrame);
         return new Image(Width, Height, pixels);
     }
 
@@ -177,6 +183,9 @@ internal static class PlaceholderParts
 
         return y == 1 ? s_steelMid : s_steel;
     }
+
+    // The frame's outline for its glow: the outside only, so the window gets none.
+    private static bool IsFrame(int x, int y) => (uint)x < (uint)Frame.Width && (uint)y < (uint)Frame.Height;
 
     private static bool IsPin(int x, int y)
         => (uint)x < (uint)Pin.Width && (uint)y < (uint)Pin.Height && (x < HeadWidth || Math.Abs(y - (int)PinOrigin.Y) <= 1);

@@ -242,6 +242,40 @@ public sealed class OrderBenchTests
     }
 
     [Fact]
+    public void IsDone_Untouched_IsFalse()
+        => Assert.False(_bench.IsDone);
+
+    [Fact]
+    public void IsDone_TakenApartAndBackButRusty_IsFalse()
+    {
+        Drag(BenchLayout.PinSeated, BenchLayout.PinOut - new Vector2(20, 0));
+        Drag(BenchLayout.PinOut, BenchLayout.PinSeated + new Vector2(20, 0));
+
+        Assert.True(_bench.WasOut(_bench.IndexOf(RevolverParts.BasePin)));
+        Assert.False(_bench.WasOut(Cylinder));
+        Assert.False(_bench.IsDone);
+    }
+
+    [Fact]
+    public void IsDone_EveryPartOutCleanedAndBack_IsTrue()
+    {
+        TakeApart();
+        _bench.Step(Press(BenchLayout.BrushRest), Dt);
+        for (var y = -10; y <= 10 && !Rust.IsClean; y++)
+        {
+            Rub(y);
+        }
+
+        _bench.Step(Release(BenchLayout.CylinderOut), Dt);
+        Assert.False(_bench.IsDone);
+
+        Drag(BenchLayout.CylinderOut, BenchLayout.CylinderSeated - new Vector2(0, 20));
+        Drag(BenchLayout.PinOut, BenchLayout.PinSeated + new Vector2(20, 0));
+
+        Assert.True(_bench.IsDone);
+    }
+
+    [Fact]
     public void Step_BrushInTheHand_PartsDoNotSeeThePointer()
     {
         _bench.Step(Press(BenchLayout.BrushRest), Dt);
