@@ -23,6 +23,10 @@ public sealed class LudumDare60GameTests
     private const int RobeCustomerTexture = 4;
     private const int RustTexture = 6;
 
+    // Textures the first frame creates without the background: the two placeholder sheets, and a sheet and its glow per
+    // drawn customer.
+    private static readonly int s_startTextures = 2 + (2 * AssetPaths.CustomerSheets.Count);
+
     // Sound ids in creation order.
     private const int DoorBellSound = 2;
 
@@ -358,7 +362,7 @@ public sealed class LudumDare60GameTests
         _platform.Frame(0);
         _platform.Frame(0.01);
 
-        Assert.Equal(4, _platform.Backend.Textures.Count);
+        Assert.Equal(s_startTextures, _platform.Backend.Textures.Count);
         Assert.Equal(3, _platform.AudioBackend.Sounds.Count);
         Assert.Equal(2, _platform.Backend.Frames.Count);
     }
@@ -1096,7 +1100,7 @@ public sealed class LudumDare60GameTests
         _platform.Frame(0);
 
         Assert.False(_game.HasBackground);
-        Assert.Equal(4, _platform.Backend.Textures.Count);
+        Assert.Equal(s_startTextures, _platform.Backend.Textures.Count);
     }
 
     [Fact]
@@ -1133,7 +1137,7 @@ public sealed class LudumDare60GameTests
         platform.Frame(0);
         platform.Frame(0.01);
 
-        Assert.Equal(5, platform.Backend.Textures.Count);
+        Assert.Equal(s_startTextures + 1, platform.Backend.Textures.Count);
         Assert.Single(platform.Backend.Frames[1].Instances);
     }
 
