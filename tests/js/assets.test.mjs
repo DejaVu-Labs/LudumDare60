@@ -108,3 +108,53 @@ test('take_WrongDestinationLength_ThrowsAndForgetsTheRead', async () => {
   assert.throws(() => reader.take(1, new Uint8Array(1)), /2 bytes/);
   assert.equal(reader.pendingCount, 0);
 });
+
+/** Read timing hooks that record every call; start times count up from 1. */
+function createTiming() {
+  /** @type {unknown[][]} */
+  const calls = [];
+  let next = 0;
+  return {
+    calls,
+    timing: {
+      assetStarted: () => {
+        next++;
+        calls.push(['started', next]);
+        return next;
+      },
+      /** @param {string} url @param {number} startTime @param {number} bytes */
+      assetFinished: (url, startTime, bytes) => calls.push(['finished', url, startTime, bytes]),
+    },
+  };
+}
+
+test('read_WithTiming_ReportsStartAndLength', async () => {
+  const { fetchFile } = createFetch({ 'https://html-classic.itch.zone/html/123/a.bin': new Uint8Array([1, 2, 3]) });
+  const { timing, calls } = createTiming();
+  const reader = createAssetReader(fetchFile, () => page, timing);
+
+  await reader.read(1, 'a.bin', false);
+
+  assert.deepEqual(calls, [['started', 1], ['finished', 'a.bin', 1, 3]]);
+});
+
+test('read_WithTimingHttpError_ReportsNegativeStatus', async () => {
+  const { fetchFile } = createFetch({});
+  const { timing, calls } = createTiming();
+  const reader = createAssetReader(fetchFile, () => page, timing);
+
+  assert.equal(await reader.read(1, 'missing.bin', false), -404);
+
+  assert.deepEqual(calls[1], ['finished', 'missing.bin', 1, -404]);
+});
+
+test('read_WithTimingNetworkError_ReportsFailureAndRejects', async () => {
+  const { timing, calls } = createTiming();
+  const reader = createAssetReader(async () => {
+    throw new TypeError('Failed to fetch');
+  }, () => page, timing);
+
+  await assert.rejects(reader.read(1, 'a.bin', false), TypeError);
+
+  assert.deepEqual(calls[1], ['finished', 'a.bin', 1, -1]);
+});

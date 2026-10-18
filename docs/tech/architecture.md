@@ -12,7 +12,7 @@ LudumDare60.Game.Browser ──► LudumDare60.Game ──► LudumDare60.Engine
 | --- | --- | --- |
 | `src/engine/LudumDare60.Engine.Platform` | `Microsoft.NET.Sdk` | Platform contracts: `IPlatform`, `IFrameSink`, raw input (`RawInputEvent`, `RawInputEventKind`, `Key`, `PointerType`), asset reads (`IAssetSource`, `AssetLoadException`), the GPU (`IGraphicsBackend`, `RenderCommandKind`, `SpriteInstance`, `Color`), sound output (`IAudioBackend`, `AudioCommandKind`, `AudioBus`, `AudioEvent`, `AudioEventKind`, `AudioLimits`). No dependencies. |
 | `src/engine/LudumDare60.Engine` | `Microsoft.NET.Sdk` | `GameEngine`, `IGame`, `FrameContext`, `Input/` (`InputState`, `PointerButton`), `Assets/` (`AssetManager` and loaders), `Rendering/` (`PixelViewport`, `Graphics`, `Texture`, `SpriteBatch`, `SpriteOptions`, `IntRect`), `Sounds/` (`Audio`, `Sound`, `SoundState`, `Voice`, `SoundOptions`). Depends only on the platform contracts and the managed `StbImageSharp` package (image decoding). |
-| `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `Microsoft.NET.Sdk.StaticWebAssets` | `BrowserPlatform : IPlatform` and its JS: `wwwroot/boot.js` (runtime start), `wwwroot/frame-loop.js`, `wwwroot/input.js`, `wwwroot/assets.js`, `wwwroot/webgl2.js` (renderer, shaders in `wwwroot/shaders/`) and `wwwroot/webaudio.js` (sound). Its `wwwroot/` ships with the app under `_content/LudumDare60.Engine.Platform.Browser/`. |
+| `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `Microsoft.NET.Sdk.StaticWebAssets` | `BrowserPlatform : IPlatform` and its JS: `wwwroot/boot.js` (runtime start), `wwwroot/load-log.js` (load timing), `wwwroot/frame-loop.js`, `wwwroot/input.js`, `wwwroot/assets.js`, `wwwroot/webgl2.js` (renderer, shaders in `wwwroot/shaders/`) and `wwwroot/webaudio.js` (sound). Its `wwwroot/` ships with the app under `_content/LudumDare60.Engine.Platform.Browser/`. |
 | `src/game/LudumDare60.Game` | `Microsoft.NET.Sdk` | `LudumDare60Game : IGame`, `Parts/` (the touch loop: `PartDrag` moves a part along a `PartPath` (a `LinePath`, or a screw turned by circling it) with the `DragFeel` it is given, fed one `PointerSample` per fixed step, and with a `FreeMove` lets it lie anywhere on the work surface once out and stick back to its rail, or drop straight into its seat; `PartAssembly` steps the parts of a gun and enforces which part blocks which), `Cleaning/` (`DirtLayer`: dirt pixels scrubbed off a part and counted; `BrushTool`: a tool the player picks up and puts down anywhere, the brush that scrubs and the oil can that oils), `Orders/` (the order data of `orders.json`, its loader and validation, and `RevolverParts`), `Bench/` (`OrderBench`: one order on the bench with its parts, dirt, oil, spares and tools; `ActionTest`: the hammer at half cock to take the revolver apart, then full cock and the trigger to test it; `BenchLayout`: where the revolver, its parts, the tools and the tray of spares lie), `Customers/` (`Shop`: customers coming in, the repair, the hand-back, the next customer), and placeholder parts and sounds generated in code. No platform dependency. |
 | `src/game/LudumDare60.Game.Browser` | `Microsoft.NET.Sdk.WebAssembly` | Entry point, host page and `main.js`. Only wires the game and the browser platform together. |
 
@@ -74,6 +74,34 @@ reports (see [Audio](#audio)).
    exception (a frame that throws stops the frame loop and ends `Main`). The error itself goes to the console. A
    module that knows why the game stopped sets a better message with `setErrorText` before it throws: `webgl2.js`
    does so when the browser has no WebGL2 and when the GPU context is lost.
+
+### Load log
+
+`load-log.js` records how startup goes on the player's network, in every build. Each step is a `performance.mark`
+named `[load] <step>` (DevTools: Performance > Timings) and a console line that starts with `[load]` and gives the
+time since the page started loading. Filter the console by `[load]` to see only these lines:
+
+```text
+[load] 180 ms  boot
+[load] 410 ms  runtime script imported
+[load] 2.0 s  dotnet.native.abc.wasm failed (TypeError: Failed to fetch), retry 1/4 in 1.0 s
+[load] 31.2 s  runtime downloaded: 20 files, 3.21 MB transferred, 9.30 MB decoded
+[load] 31.9 s  runtime created, running Main
+[load] 32.1 s  first frame
+[load] 33.4 s  assets: 12 files, 812.0 KB, in 1.2 s
+```
+
+- `boot`, `runtime script imported` and `runtime created, running Main` come from `boot.js`. The gap between the
+  last download and `runtime created` is compiling and starting the runtime.
+- `runtime downloaded` is a collapsed group. It holds a table with one row per `_framework/` file: start, duration,
+  bytes transferred (0 when served from the cache) and bytes decoded. The numbers come from the Resource Timing API.
+- A retry line is a warning, written by the resource loader before each wait.
+- `first frame` is written by `frame-loop.js` once the first `onFrame` returns.
+- `assets` comes from `assets.js` each time the in-flight asset reads drop to zero. Its table lists each file, with a
+  negative byte count for a failed read (`-404`, or `-1` for a network error).
+
+The log also keeps a snapshot (first time of each step, retry count, first asset batch) and notifies listeners of
+every line.
 
 ### Browser frame loop
 

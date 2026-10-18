@@ -1,5 +1,7 @@
 // @ts-check
 
+import { getLoadLog, STEP } from './load-log.js';
+
 /**
  * Frame loop of the browser platform. Each animation frame, the loop calls `onFrame(dt, timestamp)` once, with
  * `dt` = seconds since the previous frame. C# passes `onFrame` through `[JSImport]`, so a frame costs one JS -> .NET
@@ -87,14 +89,33 @@ export function createFrameLoop(onFrame, requestFrame, cancelFrame) {
 }
 
 /**
- * Runs the frame loop on `requestAnimationFrame` until `onFrame` throws. Bound from C# with `[JSImport]`.
+ * Wraps `onFrame` so that `onFirstFrame` runs once, after the first frame returns.
+ *
+ * @param {(dt: number, timestamp: number) => void} onFrame
+ * @param {() => void} onFirstFrame
+ * @returns {(dt: number, timestamp: number) => void}
+ */
+export function afterFirstFrame(onFrame, onFirstFrame) {
+  let first = true;
+  return (dt, timestamp) => {
+    onFrame(dt, timestamp);
+    if (first) {
+      first = false;
+      onFirstFrame();
+    }
+  };
+}
+
+/**
+ * Runs the frame loop on `requestAnimationFrame` until `onFrame` throws, and logs the end of the first frame to the
+ * load log. Bound from C# with `[JSImport]`.
  *
  * @param {(dt: number, timestamp: number) => void} onFrame
  * @returns {Promise<void>} Rejects with the error thrown by `onFrame`.
  */
 export function run(onFrame) {
   return createFrameLoop(
-    onFrame,
+    afterFirstFrame(onFrame, () => getLoadLog().step(STEP.FIRST_FRAME)),
     (callback) => globalThis.requestAnimationFrame(callback),
     (handle) => globalThis.cancelAnimationFrame(handle),
   ).done;

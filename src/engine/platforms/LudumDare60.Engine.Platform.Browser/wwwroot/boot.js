@@ -1,5 +1,7 @@
 // @ts-check
 
+import { getLoadLog, STEP } from './load-log.js';
+
 /**
  * Starts the .NET runtime and runs the app's `Main`. The host page's `main.js` calls `boot` with the folder that
  * holds the runtime (`dotnet.js` and the files it loads), so an app can ship several runtime builds side by side.
@@ -67,21 +69,27 @@ function isTransient(status) {
  * @param {FetchLike} fetchLike Usually `fetch`.
  * @param {(ms: number) => Promise<void>} sleep Usually `setTimeout`.
  * @param {readonly number[]} [delaysMs] One entry per retry.
+ * @param {(attempt: number, delayMs: number, reason: string) => void} [onRetry] Called before each wait, with the
+ *   1-based number of the retry that follows and why the request failed.
  * @returns {Promise<Response>} The last response. Rejects with the last network error.
  */
-export async function fetchWithRetry(url, init, fetchLike, sleep, delaysMs = RETRY_DELAYS_MS) {
+export async function fetchWithRetry(url, init, fetchLike, sleep, delaysMs = RETRY_DELAYS_MS, onRetry = () => {}) {
   for (let attempt = 0; ; attempt++) {
     const last = attempt >= delaysMs.length;
+    let reason = '';
     try {
       const response = await fetchLike(url, init);
       if (response.ok || last || !isTransient(response.status)) {
         return response;
       }
+      reason = `HTTP ${response.status}`;
     } catch (error) {
       if (last) {
         throw error;
       }
+      reason = String(error);
     }
+    onRetry(attempt + 1, delaysMs[attempt], reason);
     await sleep(delaysMs[attempt]);
   }
 }
@@ -95,14 +103,23 @@ export async function fetchWithRetry(url, init, fetchLike, sleep, delaysMs = RET
  *
  * @param {FetchLike} fetchLike
  * @param {(ms: number) => Promise<void>} sleep
+ * @param {(name: string, attempt: number, delayMs: number, reason: string) => void} [onRetry] Called before each
+ *   retry of the file `name` (see `fetchWithRetry`).
  * @returns {LoadBootResource}
  */
-export function createResourceLoader(fetchLike, sleep) {
-  return (type, _name, defaultUri, integrity) => {
+export function createResourceLoader(fetchLike, sleep, onRetry = () => {}) {
+  return (type, name, defaultUri, integrity) => {
     if (type === 'dotnetjs' || type === 'manifest') {
       return undefined;
     }
-    return fetchWithRetry(defaultUri, integrity ? { integrity } : {}, fetchLike, sleep);
+    return fetchWithRetry(
+      defaultUri,
+      integrity ? { integrity } : {},
+      fetchLike,
+      sleep,
+      RETRY_DELAYS_MS,
+      (attempt, delayMs, reason) => onRetry(name, attempt, delayMs, reason),
+    );
   };
 }
 
@@ -186,19 +203,37 @@ export async function runWithStatus(start, status, errorTextOf = getErrorText) {
 /**
  * Starts the runtime from `frameworkRoot` (relative to the page) and runs `Main`, with loading and error text in the
  * element with id `statusId`, if the page has one. Runtime files are downloaded with retries (`createResourceLoader`).
+ * Startup steps, retries and the runtime's downloads go to the load log (`load-log.js`).
  *
  * @param {string} [frameworkRoot] Runtime folder. Defaults to the SDK's `./_framework/`.
  * @param {string} [statusId] Id of the status element.
  * @returns {Promise<number>} The exit code of `Main`.
  */
 export function boot(frameworkRoot = './_framework/', statusId = 'status') {
+  const log = getLoadLog();
+  log.step(STEP.BOOT);
   return runWithStatus(
     (onReady) =>
       startRuntime(
         resolveRuntimeUrl(frameworkRoot, document.baseURI),
-        (url) => import(url),
-        onReady,
-        (dotnet) => dotnet.withResourceLoader(createResourceLoader((url, init) => fetch(url, init), delay)),
+        async (url) => {
+          const runtime = await import(url);
+          log.step(STEP.RUNTIME_IMPORTED);
+          return runtime;
+        },
+        () => {
+          log.downloads('/_framework/', 'runtime downloaded');
+          log.step(STEP.RUNTIME_CREATED);
+          onReady();
+        },
+        (dotnet) =>
+          dotnet.withResourceLoader(
+            createResourceLoader(
+              (url, init) => fetch(url, init),
+              delay,
+              (name, attempt, delayMs, reason) => log.retry(name, attempt, RETRY_DELAYS_MS.length, delayMs, reason),
+            ),
+          ),
       ),
     document.getElementById(statusId),
   );

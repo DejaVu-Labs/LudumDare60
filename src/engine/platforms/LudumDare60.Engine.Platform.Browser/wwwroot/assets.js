@@ -1,5 +1,7 @@
 // @ts-check
 
+import { getLoadLog } from './load-log.js';
+
 /**
  * Asset reads of the browser platform. C# starts a read with `read(id, url, noCache)`, which fetches the whole file
  * and keeps its bytes under `id`, then copies them into a `byte[]` of the reported length with `take(id, span)`. A file
@@ -28,12 +30,27 @@
  */
 
 /**
+ * Hooks that time each read (see `LoadLog` in `load-log.js`).
+ * @typedef {object} ReadTiming
+ * @property {() => number} assetStarted Returns the read's start time.
+ * @property {(url: string, startTime: number, bytes: number) => void} assetFinished `bytes` is negative for a failed
+ *   read.
+ */
+
+/** @type {ReadTiming} */
+const NO_TIMING = Object.freeze({
+  assetStarted: () => 0,
+  assetFinished: () => {},
+});
+
+/**
  * @param {Fetch} fetchFile Usually `fetch`.
  * @param {() => string} baseUri Usually the page's `document.baseURI`. Asset URLs are relative to the page, not to
  *   this module.
+ * @param {ReadTiming} [timing] Usually the load log.
  * @returns {AssetReader}
  */
-export function createAssetReader(fetchFile, baseUri) {
+export function createAssetReader(fetchFile, baseUri, timing = NO_TIMING) {
   /** @type {Map<number, Uint8Array>} */
   const files = new Map();
 
@@ -42,13 +59,21 @@ export function createAssetReader(fetchFile, baseUri) {
       if (files.has(id)) {
         throw new Error(`Asset read ${id} is already pending.`);
       }
-      const response = await fetchFile(new URL(url, baseUri()).href, { cache: noCache ? 'no-cache' : 'default' });
-      if (!response.ok) {
-        return -response.status;
+      const startTime = timing.assetStarted();
+      let length = -1;
+      try {
+        const response = await fetchFile(new URL(url, baseUri()).href, { cache: noCache ? 'no-cache' : 'default' });
+        if (!response.ok) {
+          length = -response.status;
+          return length;
+        }
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        files.set(id, bytes);
+        length = bytes.byteLength;
+        return length;
+      } finally {
+        timing.assetFinished(url, startTime, length);
       }
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      files.set(id, bytes);
-      return bytes.byteLength;
     },
     take(id, destination) {
       const bytes = files.get(id);
@@ -75,6 +100,7 @@ function getReader() {
   reader ??= createAssetReader(
     (url, init) => globalThis.fetch(url, init),
     () => globalThis.document.baseURI,
+    getLoadLog(),
   );
   return reader;
 }

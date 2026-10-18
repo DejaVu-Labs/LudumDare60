@@ -338,3 +338,29 @@ test('createResourceLoader_JsModuleOrManifest_LeavesDefault', () => {
   assert.equal(load('manifest', 'dotnet.boot.js', './_framework/dotnet.boot.js', ''), undefined);
   assert.equal(requests.length, 0);
 });
+
+test('fetchWithRetry_OnRetry_ReportsAttemptDelayAndReason', async () => {
+  const { fetchLike } = scriptedFetch([new TypeError('Failed to fetch'), 503, 200]);
+  const { sleep } = recordedSleep();
+  /** @type {unknown[][]} */
+  const retries = [];
+
+  await fetchWithRetry('a.wasm', {}, fetchLike, sleep, [10, 20], (...args) => retries.push(args));
+
+  assert.deepEqual(retries, [
+    [1, 10, 'TypeError: Failed to fetch'],
+    [2, 20, 'HTTP 503'],
+  ]);
+});
+
+test('createResourceLoader_OnRetry_ReportsFileName', async () => {
+  const { fetchLike } = scriptedFetch([new TypeError('Failed to fetch'), 200]);
+  const { sleep } = recordedSleep();
+  /** @type {unknown[][]} */
+  const retries = [];
+  const load = createResourceLoader(fetchLike, sleep, (...args) => retries.push(args));
+
+  await load('assembly', 'System.Linq.abc.wasm', './_framework/System.Linq.abc.wasm', '');
+
+  assert.deepEqual(retries, [['System.Linq.abc.wasm', 1, RETRY_DELAYS_MS[0], 'TypeError: Failed to fetch']]);
+});

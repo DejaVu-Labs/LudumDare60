@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createFrameLoop } from '../../src/engine/platforms/LudumDare60.Engine.Platform.Browser/wwwroot/frame-loop.js';
+import { afterFirstFrame, createFrameLoop } from '../../src/engine/platforms/LudumDare60.Engine.Platform.Browser/wwwroot/frame-loop.js';
 
 /** A manual stand-in for requestAnimationFrame: frames run only when the test calls `frame(timestamp)`. */
 function createScheduler() {
@@ -181,4 +181,33 @@ test('stop_AfterOnFrameThrew_DoesNotResolveDone', async () => {
   loop.stop();
 
   await assert.rejects(loop.done, (error) => error === failure);
+});
+
+test('afterFirstFrame_RunsHookOnceAfterFirstFrame', () => {
+  /** @type {string[]} */
+  const calls = [];
+  const onFrame = afterFirstFrame(
+    (dt) => calls.push(`frame ${dt}`),
+    () => calls.push('first'),
+  );
+
+  onFrame(0, 0);
+  onFrame(0.5, 500);
+
+  assert.deepEqual(calls, ['frame 0', 'first', 'frame 0.5']);
+});
+
+test('afterFirstFrame_FirstFrameThrows_HookNotRun', () => {
+  let hooked = false;
+  const onFrame = afterFirstFrame(
+    () => {
+      throw new Error('frame failed');
+    },
+    () => {
+      hooked = true;
+    },
+  );
+
+  assert.throws(() => onFrame(0, 0), /frame failed/);
+  assert.equal(hooked, false);
 });
