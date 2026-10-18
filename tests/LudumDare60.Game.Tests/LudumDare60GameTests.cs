@@ -1070,6 +1070,7 @@ public sealed class LudumDare60GameTests
         var outside = DrawnOn(frame, DogWalkerTextureWithBackground, CustomerSheet.Frame(CustomerPose.Waiting));
         Assert.Equal(spot.Bottom, outside.Position);
         Assert.Equal(new Vector2(spot.Scale), outside.Scale);
+        Assert.Equal(LudumDare60Game.OutsideTint, outside.Tint);
 
         // Street, then the customer, then the room over them; the bubble stays over the room.
         var textures = frame.Decode().Where(c => c.Kind == RenderCommandKind.DrawSprites).Select(c => c.Arguments[0]).ToList();

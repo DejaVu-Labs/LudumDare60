@@ -48,6 +48,12 @@ public sealed class LudumDare60Game : IGame
     public static readonly Vector2 StreetOffset = new(0, -125);
 
     /// <summary>
+    /// The tint of a customer waiting out in the street: darker and cooler, so they belong to the rainy night outside
+    /// and not to the warm lamp light of the room.
+    /// </summary>
+    public static readonly Color OutsideTint = Color.FromRgb(0xa5aad2);
+
+    /// <summary>
     /// How long the parts that block a refused part flash, in seconds.
     /// </summary>
     public const float HintSeconds = 0.6f;
@@ -678,7 +684,7 @@ public sealed class LudumDare60Game : IGame
             // Seen through the window: the frame goes under the room, the bubble over it in the other pass.
             if (outsidePass)
             {
-                batch.Draw(_customerSheets[sheet], CustomerSheet.Frame(shop.Pose), bottom, bust);
+                batch.Draw(_customerSheets[sheet], CustomerSheet.Frame(shop.Pose), bottom, bust with { Tint = OutsideTint });
                 return;
             }
         }

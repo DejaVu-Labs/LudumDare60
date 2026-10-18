@@ -66,13 +66,13 @@ busts from the chest up, 72x96 px each, side by side (216x96), standing on the b
 times larger, with the bottom middle on the far edge of the bench (y = 140):
 
 1. **Presenting:** bringing the revolver in, and waiting with a hand out to take it back.
-2. **Waiting:** while the repair goes on, on the phone. A customer whose waiting frame shows them elsewhere waits
-   there instead of the counter (`Customers/CustomerSeats`): `robe` sits on the bench under the revolver painting,
-   bottom middle at (156, 141), drawn 0.9 times larger since that bench stands at the back wall; `dog-walker` walks
-   the dog on the pavement right behind the window, bottom middle at (370, 150), 1.1 times larger, the feet and most
-   of the dog hidden below the sill. A customer outside is drawn between the street and the room, so the window
-   frame and the wall cover them. The symptom bubble moves and scales with them and stays over the room. They switch
-   places at once, without a walk.
+2. **Waiting:** while the repair goes on, on the phone. A customer whose waiting frame shows them elsewhere waits there
+   instead of the counter (`Customers/CustomerSeats`): `robe` sits on the bench under the revolver painting, bottom
+   middle at (156, 141), drawn 0.9 times larger since that bench stands at the back wall; `dog-walker` walks the dog on
+   the pavement right behind the window, bottom middle at (370, 150), 1.1 times larger, the feet and most of the dog
+   hidden below the sill. A customer outside is drawn between the street and the room, so the window frame and the wall
+   cover them, and tinted darker and cooler (`LudumDare60Game.OutsideTint`, `#a5aad2`). The symptom bubble moves and
+   scales with them and stays over the room. They switch places at once, without a walk.
 3. **Pleased:** with the revolver back, until they are out of the door.
 
 Sheets so far: `hoodie`, `robe` and `dog-walker`. Looks without a sheet are drawn as code placeholders. A sheet made
