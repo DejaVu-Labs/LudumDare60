@@ -1,0 +1,71 @@
+{
+  "orders": [
+    {
+      "id": "hoodie",
+      "customer": { "look": "hoodie", "description": "Young person in a hoodie" },
+      "symptom": "jammed-cylinder",
+      "parts": ["base-pin", "cylinder"],
+      "dirty": [{ "part": "cylinder", "kind": "rust" }],
+      "find": {
+        "id": "rolled-note",
+        "part": "cylinder",
+        "text": "If this finds you, I kept my word. - E."
+      },
+      "message": "hey, it's me from the shop. my great-grandma was called Eliza. weird, right?",
+      "targetSeconds": 90
+    },
+    {
+      "id": "cardigan",
+      "customer": { "look": "cardigan", "description": "Elderly woman in a cardigan" },
+      "symptom": "loose-grip",
+      "parts": ["grip-screw", "grip-panels"],
+      "dirty": [{ "part": "grip-panels", "kind": "grime" }],
+      "find": { "id": "photo", "part": "grip-panels" },
+      "message": "Thank you again, dear. I don't know the man in that photo. My mother never spoke of him.",
+      "targetSeconds": 120
+    },
+    {
+      "id": "work-jacket",
+      "customer": { "look": "work-jacket", "description": "Man in a work jacket" },
+      "symptom": "broken-spring",
+      "parts": ["grip-screw", "grip-panels", "mainspring"],
+      "broken": ["mainspring"],
+      "find": { "id": "carved-initials", "part": "mainspring", "text": "E. W." },
+      "message": "Those letters in the frame. Same ones are on my grandad's old toolbox.",
+      "targetSeconds": 120
+    },
+    {
+      "id": "headphones",
+      "customer": { "look": "headphones", "description": "Teenager with headphones" },
+      "symptom": "stiff-action",
+      "parts": ["base-pin", "cylinder", "hammer-screw", "hammer"],
+      "dirty": [
+        { "part": "cylinder", "kind": "rust" },
+        { "part": "hammer", "kind": "rust" }
+      ],
+      "oil": ["hammer"],
+      "find": { "id": "cartridge", "part": "cylinder" },
+      "message": "that bullet was still live?? my dad says someone brought you one from the same box",
+      "targetSeconds": 150
+    },
+    {
+      "id": "raincoat",
+      "customer": { "look": "raincoat", "description": "Woman in a raincoat" },
+      "symptom": "everything",
+      "parts": ["base-pin", "cylinder", "grip-screw", "grip-panels", "mainspring", "hammer-screw", "hammer"],
+      "dirty": [
+        { "part": "cylinder", "kind": "rust" },
+        { "part": "grip-panels", "kind": "grime" }
+      ],
+      "broken": ["mainspring"],
+      "oil": ["hammer"],
+      "find": {
+        "id": "letter",
+        "part": "grip-panels",
+        "text": "Six guns for six of us, so none of us forgets. - E. W., 1891"
+      },
+      "message": "You've met all of us now. Every one of those guns came from one house.",
+      "targetSeconds": 150
+    }
+  ]
+}

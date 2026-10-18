@@ -38,7 +38,8 @@ memory, so parsing happens in C#.
 - Aseprite animations: parse `.aseprite` directly (pixels are zlib-compressed, `ZLibStream` works in WASM). No export
   to PNG + JSON, because one asset is one file.
 - Fonts (TTF): glyph outlines or a baked atlas, depending on the text renderer.
-- JSON configs: `System.Text.Json` with `[JsonSerializable]` source generation, no reflection.
+- More JSON files: follow `Orders/OrderBookLoader` (source-generated `System.Text.Json`, strict options, a
+  validation pass that names every problem).
 
 ## Audio follow-ups
 
@@ -80,8 +81,10 @@ order their blocking graph allows (`Parts/PartAssembly`). Still to do:
 - A friction loop sound while a loose part moves, its pitch rising towards the snap, and a small screen shake on the
   snap.
 - Lift a free part off its path onto the mat, so the bench is not limited to one straight path per part.
-- Order data: which parts an order unlocks, their paths, feel and blocks, instead of the two parts built in
-  `LudumDare60Game`.
+- Bench layouts for the other five parts (`Bench/BenchLayout`), so orders 2 to 5 of `orders.json` can be played:
+  grip screw (unscrew: a circle path), grip panels (lift: an arc), mainspring, hammer screw, hammer. Orders 3 to 5
+  also need the parts drawer and oiling.
+- The shop loop: take the orders of `orders.json` one after the other instead of only the first.
 - Replace the code-generated frame, pin, cylinder and click with the real sprites and recordings.
 
 ## Cleaning follow-ups

@@ -97,9 +97,18 @@ The player controls the pace. Nothing in the loop has a timer, and nothing in it
 Ending: about 30 s. All five finds are laid out on the mat, one last phone message, credits, "Play again".
 Total: about 11 minutes (see [Session length](ftue.md#session-length)).
 
-The order data is a small table per order: customer parts and palette, symptom icon, list of movable parts with
-their blockers, dirt and broken flags, the find and its part, and the phone message. The order logic (blocking
-graph, part states, clean thresholds) lives in `LudumDare60.Game` and is tested without a browser.
+The orders are data: `src/game/LudumDare60.Game.Browser/wwwroot/assets/data/orders.json`, one entry per order in
+the order customers come in. An order names its customer's look, the symptom icon, the parts it unlocks (by id:
+`base-pin`, `cylinder`, `grip-screw`, `grip-panels`, `mainspring`, `hammer-screw`, `hammer`), its dirty parts (rust or
+grime, with an optional clean threshold), broken and oiled parts, the find (its id, the part it hides in, and its
+handwriting if it has any), the phone message and a target time. Which part blocks which is a fact of the revolver,
+not of an order, so it lives in code (`Orders/RevolverParts`); so do the parts' places on the bench until the real
+art exists (`Bench/BenchLayout`). Loading checks every rule at once and stops the game naming each problem: unknown
+properties or parts, a part whose blocker the order keeps fixed, dirty, broken, oiled or find parts the order does
+not unlock. The find texts and messages in the file are drafts.
+
+The order logic (blocking graph, part states, dirt, the brush) lives in `LudumDare60.Game` (`Bench/OrderBench`) and is
+tested without a browser.
 
 ## What feeds each loop
 
