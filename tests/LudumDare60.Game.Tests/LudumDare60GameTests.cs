@@ -1022,11 +1022,11 @@ public sealed class LudumDare60GameTests
         StartWithSound();
 
         var instances = LastFrame.Instances;
-        int IndexOf(IntRect sprite) => Array.FindIndex(instances, i => i.SourceX == sprite.X && i.SourceY == sprite.Y && i.SourceWidth == sprite.Width);
-        var body = IndexOf(PlaceholderParts.Body);
-        var spring = IndexOf(PlaceholderParts.Mainspring);
-        var panel = IndexOf(PlaceholderParts.GripPanel);
-        var screw = IndexOf(PlaceholderParts.Screw);
+        int drawnAt(IntRect sprite) => Array.FindIndex(instances, i => i.SourceX == sprite.X && i.SourceY == sprite.Y && i.SourceWidth == sprite.Width);
+        var body = drawnAt(PlaceholderParts.Body);
+        var spring = drawnAt(PlaceholderParts.Mainspring);
+        var panel = drawnAt(PlaceholderParts.GripPanel);
+        var screw = drawnAt(PlaceholderParts.Screw);
         Assert.True(body < spring && spring < panel && panel < screw, $"Body {body}, spring {spring}, panel {panel}, screw {screw}.");
     }
 
