@@ -1,7 +1,7 @@
 namespace LudumDare60.Game.Bench;
 
 /// <summary>
-/// What happened during one <see cref="ActionTest.Step"/>, for sounds.
+/// What happened to the hammer and the trigger during one <see cref="ActionTest.Step"/>, for sounds.
 /// </summary>
 [Flags]
 public enum TestEvents
@@ -9,7 +9,7 @@ public enum TestEvents
     None = 0,
 
     /// <summary>
-    /// The hammer passed half cock on its way back: the first click of the ratchet.
+    /// The hammer clicked into the half-cock notch: the revolver can be taken apart.
     /// </summary>
     HalfCock = 1,
 
@@ -19,7 +19,7 @@ public enum TestEvents
     Cocked = 2,
 
     /// <summary>
-    /// The player let go of the hammer before full cock, and its spring took it back down.
+    /// The player let go of the hammer before half cock, and its spring took it back down.
     /// </summary>
     HammerEased = 4,
 

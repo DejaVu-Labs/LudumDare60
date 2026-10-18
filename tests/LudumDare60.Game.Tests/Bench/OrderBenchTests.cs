@@ -276,6 +276,30 @@ public sealed class OrderBenchTests
     }
 
     [Fact]
+    public void Step_HammerDown_EveryPartStaysAndAPressSaysHammerFirst()
+    {
+        _bench.Step(Press(BenchLayout.PinSeated), Dt, hammerOpen: false);
+        Assert.Equal(BenchEvents.HammerFirst, _bench.Events);
+
+        for (var i = 0; i < 60; i++)
+        {
+            _bench.Step(Hold(BenchLayout.PinOut), Dt, hammerOpen: false);
+        }
+
+        Assert.Equal(PartStop.Start, _bench.Part(RevolverParts.BasePin).Stop);
+        Assert.False(_bench.Gun.CanMove(_bench.IndexOf(RevolverParts.BasePin)));
+    }
+
+    [Fact]
+    public void Step_HammerDown_BrushCanStillBeTaken()
+    {
+        _bench.Step(Press(BenchLayout.BrushRest), Dt, hammerOpen: false);
+
+        Assert.True(_bench.Brush.IsHeld);
+        Assert.Equal(BenchEvents.None, _bench.Events);
+    }
+
+    [Fact]
     public void Step_BrushInTheHand_PartsDoNotSeeThePointer()
     {
         _bench.Step(Press(BenchLayout.BrushRest), Dt);

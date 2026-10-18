@@ -64,11 +64,19 @@ public sealed class ShopTests
     }
 
     /// <summary>
-    /// Waits for the first customer, repairs order 1 the way a player would, and returns every event seen.
+    /// Takes the hammer's spur where it is and pulls it back past full cock.
+    /// </summary>
+    private static ShopEvents PullHammer(Shop shop)
+        => Drag(shop, shop.Test!.Spur, shop.Test.SpurCocked + (shop.Test.CockDirection * 10));
+
+    /// <summary>
+    /// Waits for the first customer, repairs order 1 the way a player would (half cock first), and returns every
+    /// event seen.
     /// </summary>
     private static ShopEvents Repair(Shop shop)
     {
         var seen = Wait(shop, Shop.WaitSeconds + Shop.WalkSeconds + Shop.DropSeconds + 0.1f);
+        seen |= PullHammer(shop);
         seen |= Drag(shop, BenchLayout.PinSeated, BenchLayout.PinOut - new Vector2(20, 0));
         seen |= Drag(shop, BenchLayout.CylinderSeated, BenchLayout.CylinderOut + new Vector2(0, 20));
 
@@ -95,8 +103,7 @@ public sealed class ShopTests
     /// </summary>
     private static ShopEvents FireTest(Shop shop)
     {
-        var hammer = shop.Test!.Hammer;
-        var seen = Drag(shop, hammer.Path.Start, hammer.Path.End + (hammer.Path.Direction * 10));
+        var seen = PullHammer(shop);
         shop.Step(Press(ActionTest.TriggerCenter), Dt);
         seen |= shop.Events;
         shop.Step(Release(ActionTest.TriggerCenter), Dt);
@@ -153,6 +160,32 @@ public sealed class ShopTests
         Assert.Equal(ShopEvents.GunLanded, events);
         Assert.Equal(Vector2.Zero, _shop.GetGunOffset(0));
         Assert.True(_shop.HasGun);
+    }
+
+    [Fact]
+    public void Step_HammerDown_PartsWaitForHalfCock()
+    {
+        Wait(_shop, Shop.WaitSeconds + Shop.WalkSeconds + 1);
+
+        Drag(_shop, BenchLayout.PinSeated, BenchLayout.PinOut - new Vector2(20, 0));
+        Assert.Equal(PartStop.Start, _shop.Bench!.Part(RevolverParts.BasePin).Stop);
+
+        PullHammer(_shop);
+        Drag(_shop, BenchLayout.PinSeated, BenchLayout.PinOut - new Vector2(20, 0));
+
+        Assert.Equal(HammerState.HalfCock, _shop.Test!.State);
+        Assert.Equal(PartStop.End, _shop.Bench.Part(RevolverParts.BasePin).Stop);
+    }
+
+    [Fact]
+    public void Step_PressAPartWithTheHammerDown_TheBenchSaysHammerFirst()
+    {
+        Wait(_shop, Shop.WaitSeconds + Shop.WalkSeconds + 1);
+
+        _shop.Step(Press(BenchLayout.PinSeated), Dt);
+
+        Assert.Equal(BenchEvents.HammerFirst, _shop.Bench!.Events);
+        Assert.Equal(_shop.Bench.IndexOf(RevolverParts.BasePin), _shop.Bench.EventPart);
     }
 
     [Fact]
@@ -231,7 +264,7 @@ public sealed class ShopTests
     [Fact]
     public void Step_Testing_RunsTheTestOnlyThen()
     {
-        Wait(_shop, Shop.WaitSeconds + Shop.WalkSeconds + 1);
+        Wait(_shop, Shop.WaitSeconds + (Shop.DropSeconds / 2));
         Assert.False(_shop.TestStepped);
 
         Repair(_shop);
@@ -239,6 +272,7 @@ public sealed class ShopTests
 
         Assert.True(_shop.TestStepped);
         Assert.False(_shop.BenchStepped);
+        Assert.Equal(HammerState.HalfCock, _shop.Test!.State);
     }
 
     [Fact]

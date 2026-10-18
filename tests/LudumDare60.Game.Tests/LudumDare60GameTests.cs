@@ -71,10 +71,20 @@ public sealed class LudumDare60GameTests
         => Sprite(frame, source) ?? throw new Xunit.Sdk.XunitException($"Nothing was drawn from {source}.");
 
     /// <summary>
-    /// Starts at one logical pixel per virtual pixel, with every sound decoded, and waits for the first customer's
-    /// revolver to land on the mat.
+    /// Starts at one logical pixel per virtual pixel, with every sound decoded, waits for the first customer's revolver
+    /// to land on the mat, and puts its hammer at half cock, the first step of every repair.
     /// </summary>
     private void StartWithSound()
+    {
+        ArriveWithSound();
+        PullHammer();
+        Assert.Equal(HammerState.HalfCock, Shop.Test!.State);
+    }
+
+    /// <summary>
+    /// <see cref="StartWithSound"/> without the half cock: the hammer is still down.
+    /// </summary>
+    private void ArriveWithSound()
     {
         _platform.Frame(0, Resize(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight, 1));
         _platform.AudioBackend.ReportReady(0, 1, 2);
@@ -184,11 +194,17 @@ public sealed class LudumDare60GameTests
         Assert.Equal(ShopPhase.Testing, Shop.Phase);
     }
 
-    private void CockHammer()
+    /// <summary>
+    /// Takes the hammer's spur where it is and pulls it back past full cock: half cock while repairing, full cock in
+    /// the test.
+    /// </summary>
+    private void PullHammer()
     {
-        var hammer = Shop.Test!.Hammer;
-        Drag(hammer.Path.Start, hammer.Path.End + (hammer.Path.Direction * 10));
+        var test = Shop.Test!;
+        Drag(test.Spur, test.SpurCocked + (test.CockDirection * 10));
     }
+
+    private void CockHammer() => PullHammer();
 
     private void PullTrigger()
     {
@@ -339,6 +355,79 @@ public sealed class LudumDare60GameTests
         Assert.NotNull(Sprite(LastFrame, PlaceholderCustomers.Icon(Symptom.JammedCylinder)));
         Assert.NotNull(Sprite(LastFrame, PlaceholderCustomers.Face(Expression.Neutral)));
         Assert.Equal(BenchLayout.PinSeated, Drawn(LastFrame, PlaceholderParts.Pin).Position);
+    }
+
+    [Fact]
+    public void HammerDown_OnlyTheHammerGlows()
+    {
+        ArriveWithSound();
+        Idle(1);
+
+        Assert.InRange(Drawn(LastFrame, PlaceholderParts.HammerGlow).Tint.A, 1, 255);
+        Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.PinGlow).Tint.A);
+        Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.CylinderGlow).Tint.A);
+        Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.Hammer).Rotation);
+    }
+
+    [Fact]
+    public void HammerDown_PressThePin_DullTickAndTheHammerFlashes()
+    {
+        ArriveWithSound();
+        var before = PlayCount();
+
+        _platform.Frame(Step, PointerDown(BenchLayout.PinSeated));
+        var flash = Drawn(LastFrame, PlaceholderParts.HammerGlow).Tint.A;
+        HoldAt(BenchLayout.PinOut - new Vector2(20, 0), 60);
+
+        Assert.Equal(255, flash);
+        Assert.Equal([0.4], PlayedPitches(before), (a, b) => Math.Abs(a - b) < 1e-6);
+        Assert.Equal(PartStop.Start, Bench.Part(RevolverParts.BasePin).Stop);
+    }
+
+    [Fact]
+    public void HalfCock_AtTwelveFramesPerSecond_StillOpensTheRevolver()
+    {
+        ArriveWithSound();
+        var test = Shop.Test!;
+        const double Frame = 1.0 / 12;
+        var to = test.SpurCocked + (test.CockDirection * 10);
+
+        // Like a slow browser frame: several pointer events per frame, spread over it.
+        _platform.Frame(Frame, PointerDownAt(test.Spur, 0.01f), PointerMoveAt(Vector2.Lerp(test.Spur, to, 0.3f), 0.05f));
+        for (var i = 1; i <= 6; i++)
+        {
+            _platform.Frame(Frame, PointerMoveAt(Vector2.Lerp(test.Spur, to, 0.3f + (i * 0.1f)), 0.02f), PointerMoveAt(to, 0.06f));
+        }
+
+        _platform.Frame(Frame, PointerUpAt(to, 0.03f));
+        Idle(5);
+
+        Assert.Equal(HammerState.HalfCock, test.State);
+    }
+
+    private static RawInputEvent PointerDownAt(Vector2 at, float time)
+        => new(RawInputEventKind.PointerDown, 0, (ushort)PointerType.Mouse, 1, time, at.X, at.Y, 0);
+
+    private static RawInputEvent PointerMoveAt(Vector2 at, float time)
+        => new(RawInputEventKind.PointerMove, 0, (ushort)PointerType.Mouse, 1, time, at.X, at.Y, 0);
+
+    private static RawInputEvent PointerUpAt(Vector2 at, float time)
+        => new(RawInputEventKind.PointerUp, 0, (ushort)PointerType.Mouse, 1, time, at.X, at.Y, 0);
+
+    [Fact]
+    public void HalfCock_ClicksStaysBackAndThePinStartsToGlow()
+    {
+        ArriveWithSound();
+        var before = PlayCount();
+
+        PullHammer();
+        Idle(1);
+
+        Assert.Contains(1.1, PlayedPitches(before).Select(p => Math.Round(p, 3)));
+        Assert.Equal(ActionTest.HalfCock * ActionTest.CockAngle, Drawn(LastFrame, PlaceholderParts.Hammer).Rotation, 1e-4);
+        Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.HammerGlow).Tint.A);
+        Assert.InRange(Drawn(LastFrame, PlaceholderParts.PinGlow).Tint.A, 1, 255);
+        Assert.Null(Sprite(LastFrame, PlaceholderParts.CylinderTurned));
     }
 
     [Fact]
@@ -582,7 +671,7 @@ public sealed class LudumDare60GameTests
         Assert.Null(Sprite(LastFrame, PlaceholderCustomers.Hand));
         Assert.Equal(new Vector2(Shop.CounterX, LudumDare60Game.CustomerBottom), Drawn(LastFrame, PlaceholderCustomers.Bust("hoodie")).Position);
         Assert.Equal(BenchLayout.HammerPivot, Drawn(LastFrame, PlaceholderParts.Hammer).Position);
-        Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.Hammer).Rotation);
+        Assert.Equal(ActionTest.HalfCock * ActionTest.CockAngle, Drawn(LastFrame, PlaceholderParts.Hammer).Rotation, 1e-4);
     }
 
     [Fact]
@@ -609,8 +698,9 @@ public sealed class LudumDare60GameTests
 
         CockHammer();
 
+        // From half cock, where the repair left it: no second half-cock click.
         var pitches = PlayedPitches(before).Select(p => Math.Round(p, 3)).ToList();
-        Assert.Contains(1.1, pitches);
+        Assert.DoesNotContain(1.1, pitches);
         Assert.Contains(0.9, pitches);
         Assert.Contains(1.3, pitches);
         Assert.Equal(ActionTest.CockAngle, Drawn(LastFrame, PlaceholderParts.Hammer).Rotation, 1e-4);

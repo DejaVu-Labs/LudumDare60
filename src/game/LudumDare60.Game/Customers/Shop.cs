@@ -7,8 +7,9 @@ namespace LudumDare60.Game.Customers;
 
 /// <summary>
 /// The shop loop of docs/gamedesign/core-loop.md, one customer at a time: the door opens and the customer walks to
-/// the counter, the revolver lands on the mat, the player repairs it on the <see cref="OrderBench"/> and tests it
-/// (<see cref="ActionTest"/>: cock the hammer, pull the trigger), the customer holds out a hand, the player drags the
+/// the counter, the revolver lands on the mat, the player puts the hammer at half cock and repairs the revolver on the
+/// <see cref="OrderBench"/>, then tests it (<see cref="ActionTest"/>: full cock, pull the trigger), the customer holds
+/// out a hand, the player drags the
 /// whole revolver up to them, they thank the player and leave, and the next customer comes in. The orders come in the order of the <see cref="OrderBook"/>; at the first one the bench cannot
 /// play yet, the shop closes. Advance it once per fixed step with <see cref="Step"/>.
 /// </summary>
@@ -58,6 +59,9 @@ public sealed class Shop
     /// The point of the revolver the player grabs to hand it back: the middle of the cylinder in its frame.
     /// </summary>
     public static readonly Vector2 GunGrip = BenchLayout.CylinderSeated;
+
+    // What the bench sees while the player holds the hammer: nowhere, no button.
+    private static readonly PointerSample s_noPointer = new(new Vector2(-10_000), IsDown: false, IsPressed: false);
 
     // The revolver goes up without breakaway: nothing holds it to the mat.
     private static readonly DragFeel s_handBackFeel = new() { BreakawayAtStart = 0 };
@@ -179,7 +183,7 @@ public sealed class Shop
                 Work(input, deltaTime);
                 break;
             case ShopPhase.Testing:
-                Test!.Step(input, deltaTime);
+                Test!.Step(input, deltaTime, canCock: true, canGrab: true);
                 TestStepped = true;
                 if (Test.IsFired)
                 {
@@ -250,9 +254,19 @@ public sealed class Shop
             return;
         }
 
-        Bench!.Step(input, deltaTime);
+        // The hammer first: half cock opens the revolver. While it is in the hand, the parts do not see the pointer.
+        var bench = Bench!;
+        var busy = bench.Brush.IsHeld;
+        for (var i = 0; i < bench.Count; i++)
+        {
+            busy |= bench.Gun[i].IsHeld;
+        }
+
+        Test!.Step(input, deltaTime, canCock: false, canGrab: !busy);
+        TestStepped = true;
+        bench.Step(Test.IsHammerHeld ? s_noPointer : input, deltaTime, Test.IsOpen);
         BenchStepped = true;
-        if (Bench.IsDone)
+        if (bench.IsDone)
         {
             Events |= ShopEvents.Assembled;
             Enter(ShopPhase.Testing);

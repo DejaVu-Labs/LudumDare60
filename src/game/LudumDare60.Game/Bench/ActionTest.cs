@@ -4,10 +4,13 @@ using LudumDare60.Game.Parts;
 namespace LudumDare60.Game.Bench;
 
 /// <summary>
-/// The test of a repaired revolver, the last step before handing it back: the player pulls the hammer back to full
-/// cock (a ratchet click at half cock, and the cylinder turns one chamber at full cock), then clicks the trigger, and
-/// the hammer falls with a dry-fire click. A single-action revolver: the trigger does nothing while the hammer is
-/// down, and a hammer let go before full cock springs back down. Advanced once per fixed step.
+/// The hammer and the trigger of a single-action revolver, as a repair uses them. The first step of every repair is
+/// half cock: the player pulls the hammer's spur back until the half-cock notch clicks, and it stays there, so the
+/// cylinder turns freely and the parts can come out. The last step is the test: from half cock the player pulls the
+/// hammer on to full cock (the cylinder turns one chamber), then clicks the trigger, and the hammer falls with a
+/// dry-fire click. The trigger does nothing unless the hammer is at full cock; a hammer let go before the half-cock
+/// notch falls back down; once it sits in the notch it cannot be pushed lower. The spur moves along the chord of its
+/// arc, and the hammer turns with it. Advanced once per fixed step.
 /// </summary>
 public sealed class ActionTest
 {
@@ -17,9 +20,14 @@ public sealed class ActionTest
     public const float CockAngle = MathF.PI / 4;
 
     /// <summary>
-    /// The share of the way back where the ratchet clicks at half cock.
+    /// Where the half-cock notch sits, as a share of the way from rest to full cock.
     /// </summary>
     public const float HalfCock = 0.45f;
+
+    /// <summary>
+    /// How close to the spur the pointer must be to take the hammer.
+    /// </summary>
+    public const float SpurRadius = 6;
 
     /// <summary>
     /// How close to the trigger the pointer must be to pull it.
@@ -31,34 +39,68 @@ public sealed class ActionTest
     /// </summary>
     public const float TriggerPullSeconds = 0.2f;
 
-    // The hammer's spur goes round on an arc; the drag follows its chord, and the angle follows the drag.
+    // How fast the hammer follows the thumb: the gap shrinks to 1/e in 1/HammerFollow seconds.
+    private const float HammerFollow = 20;
+
+    // How close to full cock the hammer must come for the sear to catch it.
+    private const float FullCockCatch = 0.97f;
+
     private static readonly Vector2 s_spurCocked = Vector2.Transform(PlaceholderParts.HammerSpur, Matrix3x2.CreateRotation(CockAngle));
 
-    // The mainspring holds the hammer down: it takes a firm pull to start.
-    private static readonly DragFeel s_hammerFeel = new() { BreakawayAtStart = 3, Strain = 0.3f, SnapDistance = 2, Follow = 20 };
-
-    private float _lastShare;
-
-    public ActionTest()
-    {
-        var spur = BenchLayout.HammerPivot + PlaceholderParts.HammerSpur;
-        Hammer = new PartDrag(new LinePath(spur, BenchLayout.HammerPivot + s_spurCocked), grabRadius: 6, s_hammerFeel);
-    }
+    private readonly LinePath _spurPath = new(BenchLayout.HammerPivot + PlaceholderParts.HammerSpur, BenchLayout.HammerPivot + s_spurCocked);
+    private float _grabOffset;
 
     /// <summary>
-    /// The hammer's spur, dragged from rest (<see cref="PartStop.Start"/>) to full cock (<see cref="PartStop.End"/>).
+    /// Where the hammer's spur is at rest, on the mat.
     /// </summary>
-    public PartDrag Hammer { get; }
+    public Vector2 SpurAtRest => _spurPath.Start;
+
+    /// <summary>
+    /// Where the hammer's spur is at full cock, on the mat.
+    /// </summary>
+    public Vector2 SpurCocked => _spurPath.End;
+
+    /// <summary>
+    /// The direction the spur moves when cocked.
+    /// </summary>
+    public Vector2 CockDirection => _spurPath.Direction;
+
+    /// <summary>
+    /// Where the spur is now.
+    /// </summary>
+    public Vector2 Spur => _spurPath.PointAt(Share * _spurPath.Length);
 
     /// <summary>
     /// The point of the trigger the player clicks, on the mat.
     /// </summary>
     public static Vector2 TriggerCenter => BenchLayout.TriggerPivot + new Vector2(1, 5);
 
-    public bool IsCocked => Hammer.Stop == PartStop.End;
+    public HammerState State { get; private set; }
 
     /// <summary>
-    /// Whether the trigger has released the cocked hammer: the test is done.
+    /// How far back the hammer is, from 0 (down) to 1 (full cock).
+    /// </summary>
+    public float Share { get; private set; }
+
+    /// <summary>
+    /// <see cref="Share"/> before the last step, for interpolated rendering.
+    /// </summary>
+    public float PreviousShare { get; private set; }
+
+    public bool IsHammerHeld { get; private set; }
+
+    /// <summary>
+    /// Whether the pointer is over the spur and could take the hammer.
+    /// </summary>
+    public bool IsHammerHovered { get; private set; }
+
+    /// <summary>
+    /// Whether the hammer is at least at half cock: the parts may come out.
+    /// </summary>
+    public bool IsOpen => State != HammerState.Down;
+
+    /// <summary>
+    /// Whether the trigger has dropped the hammer from full cock: the test is done.
     /// </summary>
     public bool IsFired { get; private set; }
 
@@ -82,71 +124,100 @@ public sealed class ActionTest
     /// <summary>
     /// The hammer's turn back from rest, in radians, <paramref name="alpha"/> of the way through the last step.
     /// </summary>
-    public float GetHammerAngle(float alpha)
-    {
-        if (IsCocked)
-        {
-            return CockAngle;
-        }
-
-        var distance = float.Lerp(Hammer.PreviousDistance, Hammer.Distance, alpha);
-        return distance / Hammer.Path.Length * CockAngle;
-    }
+    public float GetHammerAngle(float alpha) => float.Lerp(PreviousShare, Share, alpha) * CockAngle;
 
     /// <summary>
-    /// Advances the test by one fixed step.
+    /// Advances the hammer and the trigger by one fixed step.
     /// </summary>
     /// <param name="input">The pointer at the end of the step.</param>
     /// <param name="deltaTime">The step's length in seconds.</param>
-    public void Step(in PointerSample input, float deltaTime)
+    /// <param name="canCock">Whether the hammer may go on from half cock to full cock: only for the test, since a
+    /// cocked hammer locks the cylinder.</param>
+    /// <param name="canGrab">Whether the hammer and the trigger may be taken: false while the player holds a part or
+    /// the brush.</param>
+    public void Step(in PointerSample input, float deltaTime, bool canCock, bool canGrab)
     {
         Events = TestEvents.None;
+        PreviousShare = Share;
         TriggerPull = MathF.Max(0, TriggerPull - (deltaTime / TriggerPullSeconds));
-        if (!IsCocked)
-        {
-            CockHammer(input, deltaTime);
-        }
+        MoveHammer(input, deltaTime, canCock, canGrab);
 
-        IsTriggerHovered = !Hammer.IsHeld && Vector2.Distance(input.Position, TriggerCenter) <= TriggerRadius;
+        IsTriggerHovered = canGrab && !IsHammerHeld && Vector2.Distance(input.Position, TriggerCenter) <= TriggerRadius;
         if (!input.IsPressed || !IsTriggerHovered)
         {
             return;
         }
 
-        if (!IsCocked)
+        if (State != HammerState.FullCock)
         {
             Events |= TestEvents.TriggerRefused;
             return;
         }
 
         // The sear lets go: the hammer falls on an empty chamber.
-        Hammer.ReturnTo(PartStop.Start);
-        _lastShare = 0;
+        State = HammerState.Down;
+        Share = PreviousShare = 0;
         IsFired = true;
         TriggerPull = 1;
         Events |= TestEvents.DryFire;
     }
 
-    private void CockHammer(in PointerSample input, float deltaTime)
+    private void MoveHammer(in PointerSample input, float deltaTime, bool canCock, bool canGrab)
     {
-        var events = Hammer.Step(input, deltaTime);
-        var share = Hammer.Distance / Hammer.Path.Length;
-        if (_lastShare < HalfCock && share >= HalfCock)
+        if (!IsHammerHeld)
         {
+            IsHammerHovered = canGrab && State != HammerState.FullCock && Vector2.Distance(input.Position, Spur) <= SpurRadius;
+            if (!input.IsPressed || !IsHammerHovered)
+            {
+                return;
+            }
+
+            IsHammerHeld = true;
+            IsHammerHovered = false;
+            _grabOffset = _spurPath.Project(input.Position) - (Share * _spurPath.Length);
+        }
+
+        if (!input.IsDown)
+        {
+            // Let go: the half-cock notch holds the hammer; below it the mainspring takes it back down.
+            IsHammerHeld = false;
+            if (State == HammerState.HalfCock)
+            {
+                Share = HalfCock;
+            }
+            else
+            {
+                if (Share > 0.01f)
+                {
+                    Events |= TestEvents.HammerEased;
+                }
+
+                Share = 0;
+            }
+
+            return;
+        }
+
+        // Once in the notch the hammer cannot be pushed lower; without the test it goes no further than half cock.
+        var floor = State == HammerState.HalfCock ? HalfCock : 0;
+        var ceiling = canCock ? 1 : HalfCock;
+        var target = Math.Clamp((_spurPath.Project(input.Position) - _grabOffset) / _spurPath.Length, floor, ceiling);
+        Share += (target - Share) * (1 - MathF.Exp(-HammerFollow * deltaTime));
+        if (State == HammerState.Down && Share >= HalfCock - 0.01f)
+        {
+            State = HammerState.HalfCock;
+            Share = MathF.Max(Share, HalfCock);
             Events |= TestEvents.HalfCock;
         }
 
-        _lastShare = share;
-        if ((events & DragEvents.SnappedEnd) != DragEvents.None)
+        if (canCock && Share >= FullCockCatch)
         {
+            // The sear catches the full-cock notch: the hammer stays back and the cylinder turns one chamber.
+            State = HammerState.FullCock;
+            Share = 1;
+            IsHammerHeld = false;
             Chamber = (Chamber + 1) % 6;
             Events |= TestEvents.Cocked;
-        }
-        else if ((events & DragEvents.Dropped) != DragEvents.None && Hammer.Stop == PartStop.None)
-        {
-            Hammer.ReturnTo(PartStop.Start);
-            _lastShare = 0;
-            Events |= TestEvents.HammerEased;
         }
     }
 }

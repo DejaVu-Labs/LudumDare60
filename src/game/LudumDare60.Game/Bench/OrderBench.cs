@@ -10,7 +10,7 @@ namespace LudumDare60.Game.Bench;
 /// One order on the bench: the parts it unlocks with their blocks, the dirt on them, and the brush. It runs the rules
 /// of the order loop that do not depend on a browser: parts move as <see cref="PartAssembly"/> allows, a dirty part
 /// out on the mat is locked until the brush scrubs it clean, and bare hands do nothing to dirt. The game draws it and
-/// plays its sounds. Advance it once per fixed step with <see cref="Step"/>.
+/// plays its sounds. Advance it once per fixed step with <see cref="Step(in PointerSample, float, bool)"/>.
 /// </summary>
 public sealed class OrderBench
 {
@@ -197,18 +197,27 @@ public sealed class OrderBench
     public bool WasOut(int part) => _wasOut[part];
 
     /// <summary>
+    /// Advances the bench by one fixed step, with the hammer at half cock.
+    /// </summary>
+    /// <param name="input">The pointer at the end of the step.</param>
+    /// <param name="deltaTime">The step's length in seconds.</param>
+    public void Step(in PointerSample input, float deltaTime) => Step(input, deltaTime, hammerOpen: true);
+
+    /// <summary>
     /// Advances the bench by one fixed step.
     /// </summary>
     /// <param name="input">The pointer at the end of the step.</param>
     /// <param name="deltaTime">The step's length in seconds.</param>
-    public void Step(in PointerSample input, float deltaTime)
+    /// <param name="hammerOpen">Whether the hammer is at half cock or further. While it is down, every part stays put,
+    /// and a press on one reports <see cref="BenchEvents.HammerFirst"/>.</param>
+    public void Step(in PointerSample input, float deltaTime, bool hammerOpen)
     {
         Events = BenchEvents.None;
         EventPart = -1;
         var partHeld = false;
         for (var i = 0; i < Count; i++)
         {
-            Gun.SetLocked(i, NeedsScrubbing(i));
+            Gun.SetLocked(i, !hammerOpen || NeedsScrubbing(i));
             partHeld |= Gun[i].IsHeld;
         }
 
@@ -220,7 +229,18 @@ public sealed class OrderBench
         {
             for (var i = 0; i < Count; i++)
             {
-                if (NeedsScrubbing(i) && Gun[i].IsUnder(input.Position))
+                if (!Gun[i].IsUnder(input.Position))
+                {
+                    continue;
+                }
+
+                if (!hammerOpen)
+                {
+                    Report(BenchEvents.HammerFirst, i);
+                    break;
+                }
+
+                if (NeedsScrubbing(i))
                 {
                     Report(BenchEvents.BareHands, i);
                     break;

@@ -66,12 +66,13 @@ Order 1: young customer in a hoodie, jammed cylinder, a rolled note in one chamb
 | 0 s | Poster: the shop at night, rain on the window, title *Six Chambers*, small loading bar | Waits | Bar fills | - |
 | ~4 s | Live scene, same picture. The door sign reads CLOSED and pulses; label "Open shop" on hover | Clicks the sign | Sign flips to OPEN, rain ambience fades in, door bell | Clicking things on screen does things |
 | ~6 s | Customer walks in, puts the revolver on the mat | Watches | Thud, light screen shake, symptom bubble: cylinder with a lock | This is a request |
-| ~8 s | The **base pin** glows; nothing else does. Cursor over it: grab hand with an axis arrow | Drags the pin out | Friction, rising pitch, click; pin rolls onto the mat | **Pull** along a line |
+| ~8 s | The **hammer** glows; nothing else does | Pulls its spur back | Click into the half-cock notch; the hammer stays back | **Half cock** first, as a gunsmith would |
+| ~11 s | The **base pin** glows. Cursor over it: grab hand with an axis arrow | Drags the pin out | Friction, rising pitch, click; pin rolls onto the mat | **Pull** along a line |
 | ~15 s | The **cylinder** glows | Drags it out sideways | Slide, click; customer leans in | Removing a part unblocks the next one |
 | ~20 s | A rolled note sticks out of one chamber and glows | Clicks it | Paper unrolls over the bench: a few handwritten lines. Customer: surprised face | **Finds**: the hook of the game |
 | ~35 s | Note flies into the finds box. Cylinder shows rust; the wire brush beside it glows (a press on the cylinder flashes it) | Takes the brush, rubs | Rust erased pixel by pixel, a rasp that follows the strokes; at 90 % glint and chime | **Scrub** |
 | ~50 s | Faint outline of the cylinder in the frame | Drags it back | Snap. Then the pin outline; snap | **Reassemble** in reverse |
-| ~60 s | The hammer glows | Drags it back, clicks the trigger | Ratchet, cylinder turns one chamber, dry-fire click. Gun shines | **Test** |
+| ~60 s | The hammer glows again | Pulls it on to full cock, clicks the trigger | Cylinder turns one chamber, dry-fire click. Gun shines | **Test** |
 | ~70 s | Customer holds out a hand | Drags the gun up to the counter | Thankful face, phone photo of the note, door bell | **Hand back** |
 | ~80 s | Phone buzzes on the bench | Clicks it (optional) | A short message from the customer | Messages carry today's story |
 | ~90 s | Next customer comes in, or at once if the counter bell is rung | - | - | The loop repeats |

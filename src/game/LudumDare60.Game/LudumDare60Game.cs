@@ -284,16 +284,18 @@ public sealed class LudumDare60Game : IGame
             : handBack.IsHeld || handBack.IsHovered ? GlowActive
             : idleGlow;
 
-        // The test: first the hammer glows, once it is cocked the trigger.
+        // The hammer glows when it is the next step: half cock before anything else, full cock for the test. Once it
+        // is at full cock, the trigger glows.
         var test = shop.Test!;
         var testing = shop.Phase == ShopPhase.Testing;
+        var hammerNext = (working && test.State == HammerState.Down) || (testing && test.State != HammerState.FullCock);
         _hammerAngle = test.GetHammerAngle((float)alpha);
         _triggerAngle = test.TriggerPull * TriggerPullAngle;
-        _hammerGlow = !testing || test.IsCocked ? (byte)0
-            : _hammerHint > 0 ? Blink(_hammerHint)
-            : test.Hammer.IsHeld || test.Hammer.IsHovered ? GlowActive
+        _hammerGlow = _hammerHint > 0 ? Blink(_hammerHint)
+            : !hammerNext ? (byte)0
+            : test.IsHammerHeld || test.IsHammerHovered ? GlowActive
             : idleGlow;
-        _triggerGlow = !testing || !test.IsCocked ? (byte)0
+        _triggerGlow = !testing || test.State != HammerState.FullCock ? (byte)0
             : test.IsTriggerHovered ? GlowActive
             : idleGlow;
 
@@ -507,6 +509,13 @@ public sealed class LudumDare60Game : IGame
             PlayClick(bench.LayoutAt(i).ClickPitch, events[i]);
         }
 
+        if ((bench.Events & BenchEvents.HammerFirst) != BenchEvents.None)
+        {
+            // Nothing comes out with the hammer down: it flashes.
+            _hammerHint = HintSeconds;
+            PlaySound(s_refusedClick);
+        }
+
         if ((bench.Events & BenchEvents.BareHands) != BenchEvents.None)
         {
             // Bare hands do nothing to dirt: the brush flashes.
@@ -569,7 +578,7 @@ public sealed class LudumDare60Game : IGame
 
         if ((events & TestEvents.TriggerRefused) != TestEvents.None)
         {
-            // Single action: the hammer comes first, and it flashes.
+            // Single action, and only from full cock: the hammer comes first, and it flashes.
             _hammerHint = HintSeconds;
             PlaySound(s_refusedClick);
         }

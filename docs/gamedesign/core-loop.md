@@ -33,8 +33,10 @@ SHOP (session)         order 1 -> order 2 -> order 3 -> order 4 -> order 5 -> en
 1. **Arrive.** The door bell rings, the customer walks to the counter and puts the revolver on the mat with a
    thud. A speech bubble shows the symptom as an icon (a cylinder with a lock, a broken spring, a rust stain).
    No text.
-2. **Take apart.** Only the parts this order needs can move. Parts that can move right now glow; the rest are
-   blocked by something on top of them. Taking a part off unblocks the next one.
+2. **Take apart.** First the hammer goes to half cock, as on a real single-action revolver: until it clicks into
+   the notch nothing moves, and a press on a part flashes the hammer. Then only the parts this order needs can move.
+   Parts that can move right now glow; the rest are blocked by something on top of them. Taking a part off unblocks
+   the next one.
 3. **Find.** One part per order hides a find (a note in a chamber, a photo under a grip panel). It pops out when
    that part comes off; clicking it opens it full size over the bench. The customer reacts (surprised face). The
    find then goes into the **finds box** on the left of the bench, which stays on screen for the whole game.
@@ -59,12 +61,13 @@ The player controls the pace. Nothing in the loop has a timer, and nothing in it
 
 `Customers/Shop` runs the loop on the orders of `orders.json`, one customer at a time. After a moment the door bell
 rings and the customer walks from the door to the counter; the revolver drops onto the mat with a thud, and a
-bubble shows the symptom icon. Once every part of the order has been out, is back in its seat, and every dirty part
-is clean, the parts stay put and the test begins (`Bench/ActionTest`): the hammer glows, the player drags its spur
-back (it turns around its pivot; a ratchet click at half cock, and at full cock the cylinder turns one chamber), then
-the trigger glows and a click on it drops the hammer with a dry-fire click. A trigger pulled with the hammer down
-does nothing on a single-action revolver: a dull tick, and the hammer flashes; a hammer let go before full cock
-springs back down. Then the revolver shines, the customer holds out a hand, and the player drags the whole revolver
+bubble shows the symptom icon. The hammer glows first (`Bench/ActionTest`): the player drags its spur back (it turns
+around its pivot) until it clicks into the half-cock notch, where it stays; a hammer let go before the notch falls
+back down, and one in the notch cannot be pushed lower. Until then every part stays put, and a press on one gives a
+dull tick and flashes the hammer. Once every part of the order has been out, is back in its seat, and every dirty
+part is clean, the parts stay put and the test begins: the hammer glows again, the player pulls it on to full cock
+(the cylinder turns one chamber), then the trigger glows and a click on it drops the hammer with a dry-fire click.
+The trigger does nothing below full cock: a dull tick, and the hammer flashes. Then the revolver shines, the customer holds out a hand, and the player drags the whole revolver
 up to it. The customer smiles, takes it, walks out with the door bell, and the next order comes in. At the first
 order the bench cannot play yet the shop stays empty. Finds, the phone message and the counter bell are not built
 yet (see [backlog](../backlog.md#shop-loop-follow-ups)).
