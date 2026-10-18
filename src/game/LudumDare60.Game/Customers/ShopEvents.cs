@@ -37,4 +37,9 @@ public enum ShopEvents
     /// The door closed behind the customer.
     /// </summary>
     CustomerLeft = 32,
+
+    /// <summary>
+    /// The player clicked the customer, and the revolver left their hands for the mat.
+    /// </summary>
+    GunThrown = 64,
 }

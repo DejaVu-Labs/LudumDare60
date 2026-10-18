@@ -14,8 +14,9 @@ namespace LudumDare60.Game;
 
 /// <summary>
 /// The Ludum Dare 60 game. For now the bench background (the cutting mat color until it loads) and the
-/// <see cref="Customers.Shop"/> run on the orders of <c>orders.json</c>: a customer comes in through the door, puts the
-/// revolver on the mat and shows what is wrong with it; the player repairs it on the <see cref="OrderBench"/> (half cock
+/// <see cref="Customers.Shop"/> run on the orders of <c>orders.json</c>: a customer comes in through the door and waits at
+/// the counter, glowing, until the player clicks them; the revolver flies onto the mat and they show what is wrong
+/// with it; the player repairs it on the <see cref="OrderBench"/> (half cock
 /// first, then parts come off in the order their blocks allow and can be laid anywhere on the mat, a dirty part is
 /// rubbed clean with the brush, the parts go back in reverse order, sticking to their rails when brought close), tests
 /// it (full cock, pulls the trigger), drags the whole revolver up to the
@@ -54,11 +55,6 @@ public sealed class LudumDare60Game : IGame
     public const float BrushSpeedForFullVolume = 160;
 
     /// <summary>
-    /// Where a customer's bust stands, in virtual pixels: on the far edge of the bench.
-    /// </summary>
-    public const float CustomerBottom = 140;
-
-    /// <summary>
     /// How much larger than their sheet a customer is drawn, around the bottom middle of the bust.
     /// </summary>
     public const float CustomerScale = 1.4f;
@@ -75,6 +71,7 @@ public sealed class LudumDare60Game : IGame
     private static readonly SoundOptions s_cleanChime = new() { Pitch = 2f, Volume = 0.6f };
     private static readonly SoundOptions s_brushPickUp = new() { Pitch = 1.6f, Volume = 0.2f };
     private static readonly SoundOptions s_brushLand = new() { Pitch = 0.7f, Volume = 0.3f };
+    private static readonly SoundOptions s_gunThrown = new() { Pitch = 0.5f, Volume = 0.25f };
     private static readonly SoundOptions s_gunLanded = new() { Pitch = 0.35f, Volume = 0.9f };
     private static readonly SoundOptions s_repaired = new() { Pitch = 1.5f, Volume = 0.5f };
     private static readonly SoundOptions s_handedBack = new() { Pitch = 0.9f, Volume = 0.6f };
@@ -117,6 +114,7 @@ public sealed class LudumDare60Game : IGame
     private byte _bodyGlow;
     private byte _hammerGlow;
     private byte _triggerGlow;
+    private byte _customerGlow;
     private float _hammerAngle;
     private float _triggerAngle;
     private Vector2 _gunOffset;
@@ -125,6 +123,7 @@ public sealed class LudumDare60Game : IGame
     // The drawn customer sheets, as AssetPaths.CustomerSheets lists them.
     private readonly AssetHandle<Image>[] _customerImages = new AssetHandle<Image>[AssetPaths.CustomerSheets.Count];
     private readonly Texture[] _customerSheets = new Texture[AssetPaths.CustomerSheets.Count];
+    private readonly Texture[] _customerGlows = new Texture[AssetPaths.CustomerSheets.Count];
     private readonly bool[] _hasCustomerSheet = new bool[AssetPaths.CustomerSheets.Count];
 
     // The bench the arrays below belong to, and per part of its order.
@@ -256,6 +255,7 @@ public sealed class LudumDare60Game : IGame
             if (!_hasCustomerSheet[i] && _assets!.TryGet(_customerImages[i], out var sheet))
             {
                 _customerSheets[i] = _graphics!.CreateTexture(sheet);
+                _customerGlows[i] = _graphics.CreateTexture(CustomerSheet.CreateGlow(sheet));
                 _assets.Release(_customerImages[i]);
                 _hasCustomerSheet[i] = true;
             }
@@ -275,12 +275,21 @@ public sealed class LudumDare60Game : IGame
 
     public void PrepareRender(double alpha)
     {
-        if (Shop is not { HasGun: true } shop || _shownBench is not { } bench)
+        if (Shop is not { } shop)
         {
             return;
         }
 
+        // The customer glows while they wait for the player to take the revolver.
         var idleGlow = (byte)(GlowIdleBase + (GlowIdlePulse * MathF.Sin(_time * GlowPulseRate)));
+        _customerGlow = shop.Phase != ShopPhase.Offering ? (byte)0
+            : shop.IsCustomerHovered ? GlowActive
+            : idleGlow;
+        if (!shop.HasGun || _shownBench is not { } bench)
+        {
+            return;
+        }
+
         var working = shop.Phase == ShopPhase.Working;
         var gunOffset = shop.GetGunOffset((float)alpha);
         _gunOffset = new Vector2(MathF.Round(gunOffset.X), MathF.Round(gunOffset.Y));
@@ -487,16 +496,28 @@ public sealed class LudumDare60Game : IGame
     private void DrawCustomer(SpriteBatch batch, Shop shop, Order order)
     {
         var look = order.Customer.Look;
-        var bottom = new Vector2(MathF.Round(shop.CustomerX), CustomerBottom);
+        var bottom = new Vector2(MathF.Round(shop.CustomerX), Shop.CustomerBottom);
         var sheet = CustomerSheetIndex(look);
-        var bust = new SpriteOptions { Origin = PlaceholderCustomers.BustOrigin, Scale = new Vector2(CustomerScale) };
+        var scale = new Vector2(CustomerScale);
+        var bust = new SpriteOptions { Origin = PlaceholderCustomers.BustOrigin, Scale = scale };
+        var glow = new SpriteOptions { Origin = PlaceholderCustomers.BustOrigin + Vector2.One, Scale = scale, Tint = Color.White.WithAlpha(_customerGlow) };
         if (sheet >= 0 && _hasCustomerSheet[sheet])
         {
             // A drawn customer: the frame of their pose.
+            if (_customerGlow > 0)
+            {
+                batch.Draw(_customerGlows[sheet], CustomerSheet.Glow(shop.Pose), bottom, glow);
+            }
+
             batch.Draw(_customerSheets[sheet], CustomerSheet.Frame(shop.Pose), bottom, bust);
         }
         else
         {
+            if (_customerGlow > 0)
+            {
+                batch.Draw(_customers, PlaceholderCustomers.BustGlow(look), bottom, glow);
+            }
+
             // The face sits on the placeholder bust, scaled with it from the bust's bottom middle.
             batch.Draw(_customers, PlaceholderCustomers.Bust(look), bottom, bust);
             var face = bottom + ((PlaceholderCustomers.FaceOffset - PlaceholderCustomers.BustOrigin) * CustomerScale);
@@ -661,6 +682,11 @@ public sealed class LudumDare60Game : IGame
         if ((events & (ShopEvents.CustomerEntered | ShopEvents.CustomerLeft)) != ShopEvents.None)
         {
             _audio!.Play(_doorBell, AudioBus.Sfx, s_doorBell);
+        }
+
+        if ((events & ShopEvents.GunThrown) != ShopEvents.None)
+        {
+            PlaySound(s_gunThrown);
         }
 
         if ((events & ShopEvents.GunLanded) != ShopEvents.None)

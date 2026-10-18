@@ -11,13 +11,13 @@ namespace LudumDare60.Game;
 /// <summary>
 /// Customers generated in code until the real art exists, in one sheet: a bust per look from the chest up (one base
 /// figure, different hair, headwear, clothes and palette), three faces drawn over the head, a hand held out (white,
-/// tinted with the customer's skin), the speech bubble and a symptom icon per <see cref="Symptom"/>. Colors come from
-/// the palette (docs/gamedesign/art-direction.md).
+/// tinted with the customer's skin), the speech bubble, a symptom icon per <see cref="Symptom"/>, and a glow outline
+/// around each bust. Colors come from the palette (docs/gamedesign/art-direction.md).
 /// </summary>
 internal static class PlaceholderCustomers
 {
     public const int Width = 384;
-    public const int Height = 128;
+    public const int Height = GlowRow + BustHeight + 2;
 
     public const int BustWidth = 72;
     public const int BustHeight = 96;
@@ -56,6 +56,7 @@ internal static class PlaceholderCustomers
     private const int IconSize = 16;
     private const int IconsX = 112;
     private const int SheetRow = 96;
+    private const int GlowRow = 128;
 
     // The head: an ellipse around this point, in bust pixels.
     private const float HeadX = 36;
@@ -112,6 +113,11 @@ internal static class PlaceholderCustomers
     public static IntRect Bust(string look) => new(Math.Max(0, LookIndex(look)) * BustWidth, 0, BustWidth, BustHeight);
 
     /// <summary>
+    /// The outline of <see cref="Bust"/>, one pixel larger on every side, so it is drawn one pixel up and left of it.
+    /// </summary>
+    public static IntRect BustGlow(string look) => new(Math.Max(0, LookIndex(look)) * (BustWidth + 2), GlowRow, BustWidth + 2, BustHeight + 2);
+
+    /// <summary>
     /// The skin color of <paramref name="look"/>, to tint <see cref="Hand"/> with.
     /// </summary>
     public static Color Skin(string look) => Color.FromRgb(s_styles[Math.Max(0, LookIndex(look))].Skin);
@@ -126,6 +132,12 @@ internal static class PlaceholderCustomers
         for (var look = 0; look < s_styles.Length; look++)
         {
             DrawBust(pixels, look * BustWidth, s_styles[look]);
+        }
+
+        foreach (var look in Looks)
+        {
+            var glow = BustGlow(look);
+            SpriteOutline.Draw(pixels, Width, Bust(look), pixels, Width, glow.X, glow.Y, openBottom: true);
         }
 
         foreach (var expression in Enum.GetValues<Expression>())

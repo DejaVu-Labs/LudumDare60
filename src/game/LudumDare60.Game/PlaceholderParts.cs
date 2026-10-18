@@ -147,7 +147,7 @@ internal static class PlaceholderParts
     private static readonly Color s_steelLight = Color.FromRgb(0xb3a99b);
     private static readonly Color s_caseBlue = Color.FromRgb(0x2e4a70);
     private static readonly Color s_caseBrown = Color.FromRgb(0x622a14);
-    private static readonly Color s_glow = Color.FromRgb(0xfbe099);
+    private static readonly Color s_glow = SpriteOutline.Color;
     private static readonly Color s_brass = Color.FromRgb(0xe2ad5f);
     private static readonly Color s_brassDark = Color.FromRgb(0xd2834a);
     private static readonly Color s_walnutLight = Color.FromRgb(0xa1603b);

@@ -48,6 +48,29 @@ public sealed class ShopTests
         return seen;
     }
 
+    /// <summary>
+    /// The middle of a customer standing at the counter.
+    /// </summary>
+    private static Vector2 CustomerMiddle => new(Shop.CounterX, Shop.CustomerBottom - 60);
+
+    /// <summary>
+    /// Waits for the first customer to reach the counter, clicks them, and returns every event seen.
+    /// </summary>
+    private static ShopEvents TakeTheRevolver(Shop shop)
+    {
+        var seen = Wait(shop, Shop.WaitSeconds + Shop.WalkSeconds + Dt);
+        Assert.Equal(ShopPhase.Offering, shop.Phase);
+        shop.Step(Press(CustomerMiddle), Dt);
+        seen |= shop.Events;
+        shop.Step(Release(CustomerMiddle), Dt);
+        return seen | shop.Events;
+    }
+
+    /// <summary>
+    /// <see cref="TakeTheRevolver"/>, then waits for it to land on the mat.
+    /// </summary>
+    private static ShopEvents Arrive(Shop shop) => TakeTheRevolver(shop) | Wait(shop, Shop.ThrowSeconds + 0.1f);
+
     private static ShopEvents Drag(Shop shop, Vector2 from, Vector2 to)
     {
         var seen = ShopEvents.None;
@@ -74,7 +97,7 @@ public sealed class ShopTests
     /// event seen.
     /// </summary>
     private static ShopEvents Repair(Shop shop)
-        => Wait(shop, Shop.WaitSeconds + Shop.WalkSeconds + Shop.DropSeconds + 0.1f) | RepairWithoutWaiting(shop);
+        => Arrive(shop) | RepairWithoutWaiting(shop);
 
     /// <summary>
     /// Repairs the order on the bench, the customer already at the counter.
@@ -150,19 +173,76 @@ public sealed class ShopTests
         Wait(_shop, Shop.WalkSeconds / 2);
 
         Assert.InRange(halfway, Shop.CounterX + 10, Shop.DoorX - 10);
-        Assert.Equal(ShopPhase.Working, _shop.Phase);
+        Assert.Equal(ShopPhase.Offering, _shop.Phase);
         Assert.Equal(Shop.CounterX, _shop.CustomerX);
     }
 
     [Fact]
-    public void Step_AtTheCounter_TheRevolverDropsAndLandsOnce()
+    public void Step_AtTheCounter_KeepsTheRevolverUntilClicked()
+    {
+        var events = Wait(_shop, Shop.WaitSeconds + Shop.WalkSeconds + 5);
+
+        Assert.Equal(ShopEvents.CustomerEntered, events);
+        Assert.Equal(ShopPhase.Offering, _shop.Phase);
+        Assert.Equal(CustomerPose.Presenting, _shop.Pose);
+        Assert.False(_shop.HasGun);
+        Assert.False(_shop.TestStepped);
+    }
+
+    [Fact]
+    public void Step_PointerOverTheWaitingCustomer_HoversThem()
     {
         Wait(_shop, Shop.WaitSeconds + Shop.WalkSeconds + Dt);
-        var falling = _shop.GetGunOffset(0);
+
+        _shop.Step(Release(CustomerMiddle), Dt);
+        var over = _shop.IsCustomerHovered;
+        _shop.Step(Release(BenchLayout.CylinderSeated), Dt);
+
+        Assert.True(over);
+        Assert.False(_shop.IsCustomerHovered);
+        Assert.Equal(ShopPhase.Offering, _shop.Phase);
+    }
+
+    [Theory]
+    [InlineData(Shop.CounterX - Shop.CustomerHalfWidth - 2, Shop.CustomerBottom - 60)]
+    [InlineData(Shop.CounterX + Shop.CustomerHalfWidth + 2, Shop.CustomerBottom - 60)]
+    [InlineData(Shop.CounterX, Shop.CustomerBottom + 10)]
+    [InlineData(Shop.CounterX, Shop.CustomerBottom - Shop.CustomerHeight - 2)]
+    public void Step_PressBesideTheWaitingCustomer_KeepsTheRevolverWithThem(float x, float y)
+    {
+        Wait(_shop, Shop.WaitSeconds + Shop.WalkSeconds + Dt);
+
+        _shop.Step(Press(new Vector2(x, y)), Dt);
+
+        Assert.Equal(ShopEvents.None, _shop.Events);
+        Assert.Equal(ShopPhase.Offering, _shop.Phase);
+    }
+
+    [Fact]
+    public void Step_PressTheCustomerOnTheirWayIn_DoesNothing()
+    {
+        Wait(_shop, Shop.WaitSeconds + Dt);
+
+        _shop.Step(Press(new Vector2(_shop.CustomerX, Shop.CustomerBottom - 60)), Dt);
+
+        Assert.Equal(ShopPhase.Arriving, _shop.Phase);
+        Assert.False(_shop.IsCustomerHovered);
+    }
+
+    [Fact]
+    public void Step_ClickTheWaitingCustomer_TheRevolverFliesFromTheirHandsOntoTheMatAndLandsOnce()
+    {
+        var thrown = TakeTheRevolver(_shop);
+        var start = _shop.GetGunOffset(0);
+        Wait(_shop, (Shop.ThrowSeconds / 2) - (2 * Dt));
+        var halfway = _shop.GetGunOffset(0);
 
         var events = Wait(_shop, 1);
 
-        Assert.True(falling.Y < -Shop.DropHeight / 2);
+        Assert.Equal(ShopEvents.CustomerEntered | ShopEvents.GunThrown, thrown);
+        Assert.Equal(Shop.ThrowFrom.X, start.X, 3f);
+        Assert.Equal(Shop.ThrowFrom.Y, start.Y, 10f);
+        Assert.True(halfway.Y < (Shop.ThrowFrom.Y / 2) - (Shop.ThrowHeight / 2), $"Halfway at {halfway}.");
         Assert.Equal(ShopEvents.GunLanded, events);
         Assert.Equal(Vector2.Zero, _shop.GetGunOffset(0));
         Assert.True(_shop.HasGun);
@@ -171,7 +251,7 @@ public sealed class ShopTests
     [Fact]
     public void Step_HammerDown_PartsWaitForHalfCock()
     {
-        Wait(_shop, Shop.WaitSeconds + Shop.WalkSeconds + 1);
+        Arrive(_shop);
 
         Drag(_shop, BenchLayout.PinSeated, BenchLayout.PinOut);
         Assert.Equal(PartStop.Start, _shop.Bench!.Part(RevolverParts.BasePin).Stop);
@@ -186,7 +266,7 @@ public sealed class ShopTests
     [Fact]
     public void Step_PressAPartWithTheHammerDown_TheBenchSaysHammerFirst()
     {
-        Wait(_shop, Shop.WaitSeconds + Shop.WalkSeconds + 1);
+        Arrive(_shop);
 
         _shop.Step(Press(BenchLayout.PinSeated), Dt);
 
@@ -195,9 +275,9 @@ public sealed class ShopTests
     }
 
     [Fact]
-    public void Step_WhileTheRevolverFalls_PartsCannotBeTouched()
+    public void Step_WhileTheRevolverFlies_PartsCannotBeTouched()
     {
-        Wait(_shop, Shop.WaitSeconds + Shop.WalkSeconds + Dt);
+        TakeTheRevolver(_shop);
 
         _shop.Step(Press(BenchLayout.PinSeated), Dt);
 
@@ -270,7 +350,7 @@ public sealed class ShopTests
     [Fact]
     public void Step_Testing_RunsTheTestOnlyThen()
     {
-        Wait(_shop, Shop.WaitSeconds + (Shop.DropSeconds / 2));
+        Wait(_shop, Shop.WaitSeconds + Shop.WalkSeconds + 1);
         Assert.False(_shop.TestStepped);
 
         Repair(_shop);
@@ -353,7 +433,9 @@ public sealed class ShopTests
         Wait(_shop, Shop.WaitSeconds + Dt);
         var arriving = _shop.Pose;
         Wait(_shop, Shop.WalkSeconds + 0.5f);
-        var justArrived = _shop.Pose;
+        var waitingToHandOver = _shop.Pose;
+        _shop.Step(Press(CustomerMiddle), Dt);
+        var justHandedOver = _shop.Pose;
         Wait(_shop, Shop.PresentSeconds);
         var working = _shop.Pose;
         RepairWithoutWaiting(_shop);
@@ -363,7 +445,8 @@ public sealed class ShopTests
         HandBack(_shop);
 
         Assert.Equal(CustomerPose.Presenting, arriving);
-        Assert.Equal(CustomerPose.Presenting, justArrived);
+        Assert.Equal(CustomerPose.Presenting, waitingToHandOver);
+        Assert.Equal(CustomerPose.Presenting, justHandedOver);
         Assert.Equal(CustomerPose.Waiting, working);
         Assert.Equal(CustomerPose.Waiting, testing);
         Assert.Equal(CustomerPose.Presenting, ready);
@@ -373,7 +456,7 @@ public sealed class ShopTests
     [Fact]
     public void Expression_WhileWorking_IsNeutral()
     {
-        Wait(_shop, Shop.WaitSeconds + Shop.WalkSeconds + 1);
+        Arrive(_shop);
 
         Assert.Equal(Expression.Neutral, _shop.Expression);
         Assert.False(_shop.IsHandOut);

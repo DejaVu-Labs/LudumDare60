@@ -7,11 +7,12 @@ namespace LudumDare60.Game.Customers;
 
 /// <summary>
 /// The shop loop of docs/gamedesign/core-loop.md, one customer at a time: the door opens and the customer walks to
-/// the counter, the revolver lands on the mat, the player puts the hammer at half cock and repairs the revolver on the
-/// <see cref="OrderBench"/>, then tests it (<see cref="ActionTest"/>: full cock, pull the trigger), the customer holds
-/// out a hand, the player drags the
-/// whole revolver up to them, they thank the player and leave, and the next customer comes in. The orders come in the order of the <see cref="OrderBook"/>; at the first one the bench cannot
-/// play yet, the shop closes. Advance it once per fixed step with <see cref="Step"/>.
+/// the counter and waits with the revolver until the player clicks them, the revolver flies onto the mat, the player
+/// puts the hammer at half cock and repairs the revolver on the <see cref="OrderBench"/>, then tests it
+/// (<see cref="ActionTest"/>: full cock, pull the trigger), the customer holds out a hand, the player drags the whole
+/// revolver up to them, they thank the player and leave, and the next customer comes in. The orders come in the order
+/// of the <see cref="OrderBook"/>; at the first one the bench cannot play yet, the shop closes. Advance it once per
+/// fixed step with <see cref="Step"/>.
 /// </summary>
 public sealed class Shop
 {
@@ -26,14 +27,15 @@ public sealed class Shop
     public const float WalkSeconds = 1.6f;
 
     /// <summary>
-    /// How long the revolver takes to land on the mat, in seconds.
+    /// How long the revolver flies from the customer's hands to the mat, in seconds.
     /// </summary>
-    public const float DropSeconds = 0.25f;
+    public const float ThrowSeconds = 0.45f;
 
     /// <summary>
-    /// How high above the mat the revolver is let go, in virtual pixels.
+    /// How far above the straight line from the hands to the mat the revolver flies at the top of its arc, in virtual
+    /// pixels.
     /// </summary>
-    public const float DropHeight = 12;
+    public const float ThrowHeight = 28;
 
     /// <summary>
     /// How long the customer thanks the player before leaving, in seconds.
@@ -49,6 +51,27 @@ public sealed class Shop
     /// The middle of a customer standing at the counter, in virtual pixels.
     /// </summary>
     public const float CounterX = 290;
+
+    /// <summary>
+    /// Where a customer's bust stands, in virtual pixels: on the far edge of the bench.
+    /// </summary>
+    public const float CustomerBottom = 140;
+
+    /// <summary>
+    /// How far left and right of their middle the player can click a customer, in virtual pixels.
+    /// </summary>
+    public const float CustomerHalfWidth = 40;
+
+    /// <summary>
+    /// How far up from their bottom the player can click a customer, in virtual pixels.
+    /// </summary>
+    public const float CustomerHeight = 124;
+
+    /// <summary>
+    /// Where the revolver leaves the customer's hands, relative to where it lies on the mat: the middle of the
+    /// cylinder held at the customer's chest.
+    /// </summary>
+    public static readonly Vector2 ThrowFrom = new Vector2(CounterX, CustomerBottom - 24) - BenchLayout.CylinderSeated;
 
     /// <summary>
     /// Where the player drags the revolver to hand it back: up to the customer's hand, relative to where it lies.
@@ -118,6 +141,11 @@ public sealed class Shop
     public bool TestStepped { get; private set; }
 
     /// <summary>
+    /// Whether the pointer is over the customer while they wait to hand the revolver over.
+    /// </summary>
+    public bool IsCustomerHovered { get; private set; }
+
+    /// <summary>
     /// Whether a customer stands in the shop.
     /// </summary>
     public bool HasCustomer => Phase is not (ShopPhase.Waiting or ShopPhase.Closed);
@@ -162,16 +190,17 @@ public sealed class Shop
     };
 
     /// <summary>
-    /// How far the revolver is drawn from where it lies on the bench: falling onto the mat at first, then lifted
-    /// towards the customer while the player hands it back.
+    /// How far the revolver is drawn from where it lies on the bench: flying from the customer's hands onto the mat at
+    /// first, then lifted towards the customer while the player hands it back.
     /// </summary>
     /// <param name="alpha">How far the current time is between the last fixed step and the next one.</param>
     public Vector2 GetGunOffset(float alpha)
     {
-        if (Phase == ShopPhase.Working && PhaseTime < DropSeconds)
+        if (Phase == ShopPhase.Working && PhaseTime < ThrowSeconds)
         {
-            var left = 1 - (PhaseTime / DropSeconds);
-            return new Vector2(0, -DropHeight * left * left);
+            // Straight from the hands to the mat, lifted on an arc that peaks halfway.
+            var t = PhaseTime / ThrowSeconds;
+            return (ThrowFrom * (1 - t)) + new Vector2(0, -ThrowHeight * 4 * t * (1 - t));
         }
 
         return Phase == ShopPhase.Ready ? HandBack!.GetRenderPosition(alpha) - GunGrip : Vector2.Zero;
@@ -187,6 +216,7 @@ public sealed class Shop
         Events = ShopEvents.None;
         BenchStepped = false;
         TestStepped = false;
+        IsCustomerHovered = false;
         PhaseTime += deltaTime;
         switch (Phase)
         {
@@ -194,7 +224,16 @@ public sealed class Shop
                 LetNextCustomerIn();
                 break;
             case ShopPhase.Arriving when PhaseTime >= WalkSeconds:
-                Enter(ShopPhase.Working);
+                Enter(ShopPhase.Offering);
+                break;
+            case ShopPhase.Offering:
+                IsCustomerHovered = IsOverCustomer(input.Position);
+                if (IsCustomerHovered && input.IsPressed)
+                {
+                    Events |= ShopEvents.GunThrown;
+                    Enter(ShopPhase.Working);
+                }
+
                 break;
             case ShopPhase.Working:
                 Work(input, deltaTime);
@@ -234,6 +273,13 @@ public sealed class Shop
     }
 
     /// <summary>
+    /// Whether <paramref name="point"/>, in virtual pixels, is on the customer.
+    /// </summary>
+    public bool IsOverCustomer(Vector2 point)
+        => HasCustomer && MathF.Abs(point.X - CustomerX) <= CustomerHalfWidth
+            && point.Y <= CustomerBottom && point.Y >= CustomerBottom - CustomerHeight;
+
+    /// <summary>
     /// A smooth start and stop for walking: 0 at 0, 1 at 1 and later.
     /// </summary>
     private static float Ease(float t)
@@ -259,12 +305,12 @@ public sealed class Shop
 
     private void Work(in PointerSample input, float deltaTime)
     {
-        if (PhaseTime < DropSeconds)
+        if (PhaseTime < ThrowSeconds)
         {
             return;
         }
 
-        if (PhaseTime - deltaTime < DropSeconds)
+        if (PhaseTime - deltaTime < ThrowSeconds)
         {
             // The step the revolver lands in; the parts can be touched from the next one on.
             Events |= ShopEvents.GunLanded;

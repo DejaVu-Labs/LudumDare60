@@ -65,7 +65,7 @@ Order 1: young customer in a hoodie, jammed cylinder, a rolled note in one chamb
 | --- | --- | --- | --- | --- |
 | 0 s | Poster: the shop at night, rain on the window, title *Six Chambers*, small loading bar | Waits | Bar fills | - |
 | ~4 s | Live scene, same picture. The door sign reads CLOSED and pulses; label "Open shop" on hover | Clicks the sign | Sign flips to OPEN, rain ambience fades in, door bell | Clicking things on screen does things |
-| ~6 s | Customer walks in, puts the revolver on the mat | Watches | Thud, light screen shake, symptom bubble: cylinder with a lock | This is a request |
+| ~6 s | Customer walks in and holds the revolver out; the customer glows | Clicks the customer | The revolver flies onto the mat: thud, light screen shake, symptom bubble: cylinder with a lock | This is a request; what glows can be clicked |
 | ~8 s | The **hammer** glows; nothing else does | Pulls its spur back | Click into the half-cock notch; the hammer stays back | **Half cock** first, as a gunsmith would |
 | ~11 s | The **base pin** glows. Cursor over it: grab hand with an axis arrow | Drags the pin out | Friction, rising pitch, click; pin rolls onto the mat | **Pull** along a line |
 | ~15 s | The **cylinder** glows | Drags it out sideways | Slide, click; customer leans in | Removing a part unblocks the next one |

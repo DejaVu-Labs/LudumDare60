@@ -15,10 +15,12 @@ public sealed class LudumDare60GameTests
 {
     private const double Step = 1.0 / 60;
 
-    // Texture ids in creation order: the two placeholder sheets and the hoodie customer's sheet on the first frame,
-    // the rust when the first customer comes in.
+    // Texture ids in creation order: the two placeholder sheets, the hoodie customer's sheet and its glow on the first
+    // frame, the rust when the first customer comes in.
+    private const int CustomersTexture = 1;
     private const int CustomerTexture = 2;
-    private const int RustTexture = 3;
+    private const int CustomerGlowTexture = 3;
+    private const int RustTexture = 4;
 
     // Sound ids in creation order.
     private const int DoorBellSound = 2;
@@ -139,15 +141,39 @@ public sealed class LudumDare60GameTests
     /// </summary>
     private void ArriveWithSound()
     {
-        _platform.Frame(0, Resize(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight, 1));
-        _platform.AudioBackend.ReportReady(0, 1, 2);
-        _platform.Frame(Step);
-        for (var i = 0; i < 600 && !(Shop.Phase == ShopPhase.Working && Shop.PhaseTime > Shop.DropSeconds); i++)
+        ComeToTheCounterWithSound();
+        ClickTheCustomer();
+        for (var i = 0; i < 600 && !(Shop.Phase == ShopPhase.Working && Shop.PhaseTime > Shop.ThrowSeconds); i++)
         {
             Idle(1);
         }
 
         Assert.Equal(ShopPhase.Working, Shop.Phase);
+    }
+
+    /// <summary>
+    /// Starts at one logical pixel per virtual pixel, with every sound decoded, and waits for the first customer to
+    /// stand at the counter with the revolver.
+    /// </summary>
+    private void ComeToTheCounterWithSound()
+    {
+        _platform.Frame(0, Resize(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight, 1));
+        _platform.AudioBackend.ReportReady(0, 1, 2);
+        _platform.Frame(Step);
+        for (var i = 0; i < 600 && Shop.Phase != ShopPhase.Offering; i++)
+        {
+            Idle(1);
+        }
+
+        Assert.Equal(ShopPhase.Offering, Shop.Phase);
+    }
+
+    private static Vector2 CustomerMiddle => new(Shop.CounterX, Shop.CustomerBottom - 60);
+
+    private void ClickTheCustomer()
+    {
+        _platform.Frame(Step, PointerDown(CustomerMiddle));
+        _platform.Frame(Step, PointerUp(CustomerMiddle));
     }
 
     /// <summary>
@@ -331,7 +357,7 @@ public sealed class LudumDare60GameTests
         _platform.Frame(0);
         _platform.Frame(0.01);
 
-        Assert.Equal(3, _platform.Backend.Textures.Count);
+        Assert.Equal(4, _platform.Backend.Textures.Count);
         Assert.Equal(3, _platform.AudioBackend.Sounds.Count);
         Assert.Equal(2, _platform.Backend.Frames.Count);
     }
@@ -384,6 +410,74 @@ public sealed class LudumDare60GameTests
     }
 
     [Fact]
+    public void CustomersTexture_EveryBustHasAGlowAroundItOpenAtTheBottom()
+    {
+        _platform.Frame(0);
+
+        var pixels = _platform.Backend.Textures[CustomersTexture];
+        foreach (var look in PlaceholderCustomers.Looks)
+        {
+            var bust = PlaceholderCustomers.Bust(look);
+            var glow = PlaceholderCustomers.BustGlow(look);
+
+            // The bust's bottom middle is solid: its glow neither covers it nor runs under it.
+            var middle = bust.Width / 2;
+            Assert.Equal(0, AlphaAt(pixels, PlaceholderCustomers.Width, glow.X + 1 + middle, glow.Y + bust.Height));
+            Assert.Equal(0, AlphaAt(pixels, PlaceholderCustomers.Width, glow.X + 1 + middle, glow.Bottom - 1));
+
+            // At half height, the pixel just left of the bust glows and the bust's own first pixel does not.
+            var row = bust.Height / 2;
+            var first = Enumerable.Range(0, bust.Width).First(x => AlphaAt(pixels, PlaceholderCustomers.Width, bust.X + x, bust.Y + row) >= 128);
+            Assert.Equal(255, AlphaAt(pixels, PlaceholderCustomers.Width, glow.X + first, glow.Y + 1 + row));
+            Assert.Equal(0, AlphaAt(pixels, PlaceholderCustomers.Width, glow.X + 1 + first, glow.Y + 1 + row));
+        }
+    }
+
+    [Fact]
+    public void CustomerSheet_LoadedWithItsGlow()
+    {
+        _platform.Frame(0);
+
+        Assert.Equal($"create {CustomerGlowTexture} {3 * (CustomerSheet.FrameWidth + 2)}x{CustomerSheet.FrameHeight + 2}", _platform.Backend.Calls[CustomerGlowTexture]);
+    }
+
+    [Fact]
+    public void AtTheCounter_TheCustomerGlowsAndKeepsTheRevolverUntilClicked()
+    {
+        ComeToTheCounterWithSound();
+        Idle(120);
+        var glow = DrawnOn(LastFrame, CustomerGlowTexture, CustomerSheet.Glow(CustomerPose.Presenting));
+        var bust = DrawnOn(LastFrame, CustomerTexture, CustomerSheet.Frame(CustomerPose.Presenting));
+
+        HoldAt(CustomerMiddle, 1);
+        var hovered = DrawnOn(LastFrame, CustomerGlowTexture, CustomerSheet.Glow(CustomerPose.Presenting));
+
+        Assert.Equal(ShopPhase.Offering, Shop.Phase);
+        Assert.Null(Sprite(LastFrame, PlaceholderParts.Body));
+        Assert.Null(Sprite(LastFrame, PlaceholderCustomers.Bubble));
+        Assert.Equal(bust.Position, glow.Position);
+        Assert.InRange(glow.Tint.A, 1, 254);
+        Assert.Equal(255, hovered.Tint.A);
+    }
+
+    [Fact]
+    public void ClickTheCustomer_TheRevolverFliesFromTheirHandsAndLandsWithAThud()
+    {
+        ComeToTheCounterWithSound();
+        var played = PlayCount();
+
+        ClickTheCustomer();
+        var flying = Drawn(LastFrame, PlaceholderParts.Body).Position;
+        Idle((int)(Shop.ThrowSeconds * 60) + 2);
+
+        Assert.Equal(ShopPhase.Working, Shop.Phase);
+        Assert.Equal([0.5, 0.35], PlayedPitches(played).Select(p => Math.Round(p, 3)));
+        Assert.True(flying.Y < BenchLayout.GunPosition.Y - 50, $"Flying at {flying}.");
+        Assert.Equal(BenchLayout.GunPosition, Drawn(LastFrame, PlaceholderParts.Body).Position);
+        Assert.Null(Sprite(LastFrame, CustomerSheet.Glow(CustomerPose.Presenting)));
+    }
+
+    [Fact]
     public void FirstCustomer_ComesInWithTheDoorBellAndWalksToTheCounter()
     {
         _platform.Frame(0);
@@ -396,7 +490,7 @@ public sealed class LudumDare60GameTests
 
         Assert.Contains(_platform.AudioBackend.AllCommands(), c => c.Kind == AudioCommandKind.Play && (int)c.Arguments[0] == DoorBellSound);
         Assert.InRange(entering.Position.X, Shop.CounterX + 50, Shop.DoorX);
-        Assert.Equal(new Vector2(Shop.CounterX, LudumDare60Game.CustomerBottom), arrived.Position);
+        Assert.Equal(new Vector2(Shop.CounterX, Shop.CustomerBottom), arrived.Position);
         Assert.Contains($"create {RustTexture} {PlaceholderParts.Cylinder.Width}x{PlaceholderParts.Cylinder.Height}", _platform.Backend.Calls, StringComparer.Ordinal);
     }
 
@@ -794,7 +888,7 @@ public sealed class LudumDare60GameTests
         Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.PinGlow).Tint.A);
         Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.BodyGlow).Tint.A);
         Assert.Null(Sprite(LastFrame, PlaceholderCustomers.Hand));
-        Assert.Equal(new Vector2(Shop.CounterX, LudumDare60Game.CustomerBottom), DrawnOn(LastFrame, CustomerTexture, CustomerSheet.Frame(CustomerPose.Waiting)).Position);
+        Assert.Equal(new Vector2(Shop.CounterX, Shop.CustomerBottom), DrawnOn(LastFrame, CustomerTexture, CustomerSheet.Frame(CustomerPose.Waiting)).Position);
         Assert.Equal(BenchLayout.HammerPivot, Drawn(LastFrame, PlaceholderParts.Hammer).Position);
         Assert.Equal(ActionTest.HalfCock * ActionTest.CockAngle, Drawn(LastFrame, PlaceholderParts.Hammer).Rotation, 1e-4);
     }
@@ -911,7 +1005,7 @@ public sealed class LudumDare60GameTests
         _platform.Frame(0);
 
         Assert.False(_game.HasBackground);
-        Assert.Equal(3, _platform.Backend.Textures.Count);
+        Assert.Equal(4, _platform.Backend.Textures.Count);
     }
 
     [Fact]
@@ -948,7 +1042,7 @@ public sealed class LudumDare60GameTests
         platform.Frame(0);
         platform.Frame(0.01);
 
-        Assert.Equal(4, platform.Backend.Textures.Count);
+        Assert.Equal(5, platform.Backend.Textures.Count);
         Assert.Single(platform.Backend.Frames[1].Instances);
     }
 

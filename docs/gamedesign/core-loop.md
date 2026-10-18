@@ -30,8 +30,9 @@ SHOP (session)         order 1 -> order 2 -> order 3 -> order 4 -> order 5 -> en
 
 ## The order loop, step by step
 
-1. **Arrive.** The door bell rings, the customer walks to the counter and puts the revolver on the mat with a
-   thud. A speech bubble shows the symptom as an icon (a cylinder with a lock, a broken spring, a rust stain).
+1. **Arrive.** The door bell rings, the customer walks to the counter and holds the revolver out, glowing like a
+   part that can move. A click on the customer takes it: the revolver flies from their hands onto the mat and lands
+   with a thud. A speech bubble shows the symptom as an icon (a cylinder with a lock, a broken spring, a rust stain).
    No text.
 2. **Take apart.** First the hammer goes to half cock, as on a real single-action revolver: until it clicks into
    the notch nothing moves, and a press on a part flashes the hammer. Then only the parts this order needs can move.
