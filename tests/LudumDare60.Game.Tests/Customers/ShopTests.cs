@@ -478,4 +478,60 @@ public sealed class ShopTests
         Assert.Equal(Expression.Neutral, _shop.Expression);
         Assert.False(_shop.IsHandOut);
     }
+
+    [Fact]
+    public void Restart_WhileWorking_ThatOrdersCustomerComesInOnTheNextStep()
+    {
+        Arrive(_shop);
+        var oldBench = _shop.Bench;
+
+        _shop.Restart(2);
+        Assert.Null(_shop.Bench);
+        _shop.Step(s_idle, Dt);
+
+        Assert.Equal(ShopEvents.CustomerEntered, _shop.Events);
+        Assert.Equal(ShopPhase.Arriving, _shop.Phase);
+        Assert.Equal(2, _shop.OrderIndex);
+        Assert.Equal("dog-walker", _shop.Bench!.Order.Id);
+        Assert.NotSame(oldBench, _shop.Bench);
+        Assert.Equal(HammerState.Down, _shop.Test!.State);
+    }
+
+    [Fact]
+    public void Restart_SameOrder_StartsItsVisitOverWithAFreshBench()
+    {
+        Arrive(_shop);
+        var oldBench = _shop.Bench;
+
+        _shop.Restart(_shop.OrderIndex);
+        _shop.Step(s_idle, Dt);
+
+        Assert.Equal(0, _shop.OrderIndex);
+        Assert.Equal(ShopPhase.Arriving, _shop.Phase);
+        Assert.Equal(s_shipped.Orders[0].Id, _shop.Bench!.Order.Id);
+        Assert.NotSame(oldBench, _shop.Bench);
+    }
+
+    [Fact]
+    public void Restart_AfterClosing_OpensTheShopAgain()
+    {
+        var shop = new Shop(new OrderBook([s_shipped.Orders[0]]));
+        Repair(shop);
+        FireTest(shop);
+        HandBack(shop);
+        Wait(shop, Shop.ThankSeconds + Shop.WalkSeconds + Shop.WaitSeconds + 0.2f);
+        Assert.Equal(ShopPhase.Closed, shop.Phase);
+
+        shop.Restart(0);
+        shop.Step(s_idle, Dt);
+
+        Assert.Equal(ShopPhase.Arriving, shop.Phase);
+        Assert.True(shop.HasCustomer);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(5)]
+    public void Restart_OutsideTheBook_Throws(int orderIndex)
+        => Assert.Throws<ArgumentOutOfRangeException>(() => _shop.Restart(orderIndex));
 }

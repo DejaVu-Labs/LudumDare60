@@ -273,6 +273,25 @@ public sealed class Shop
     }
 
     /// <summary>
+    /// Sends the current customer away, with whatever is on the bench, and lets the customer of the order at
+    /// <paramref name="orderIndex"/> in on the next step, without the wait: a debug shortcut.
+    /// </summary>
+    /// <param name="orderIndex">The order's index in the book.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="orderIndex"/> is not in the book.</exception>
+    public void Restart(int orderIndex)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(orderIndex);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(orderIndex, _book.Orders.Count);
+        Bench = null;
+        HandBack = null;
+        Test = null;
+        IsCustomerHovered = false;
+        OrderIndex = orderIndex;
+        Enter(ShopPhase.Waiting);
+        PhaseTime = WaitSeconds;
+    }
+
+    /// <summary>
     /// Whether <paramref name="point"/>, in virtual pixels, is on the customer.
     /// </summary>
     public bool IsOverCustomer(Vector2 point)

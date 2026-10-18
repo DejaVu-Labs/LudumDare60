@@ -57,6 +57,14 @@ Reference point, measured on 2026-10-17 with SDK 10.0.402: an empty `wasmbrowser
 these settings produced **9 files and 6.7 MB uncompressed** (`dotnet.native.wasm` is about 5.5 MB). AOT took
 about 4 minutes. The build ran fine when served from a subdirectory and did not need cross-origin isolation.
 
+### Debug keys
+
+Add `?debug` to the page address (`index.html?debug`, or `?debug=1` next to other parameters) to turn on the debug
+keys, in every build: **1** to **9** (top row or numpad) send the current customer away and bring in the customer of
+that order at once, **0** brings the current one in again with a fresh bench. Keys beyond the number of orders do
+nothing. `Program.cs` reads the address with `PageAddress.HasQueryParameter` and sets
+`LudumDare60Game.HasDebugKeys`.
+
 ## itch.io HTML5 requirements
 
 Source: <https://itch.io/docs/creators/html5> (checked 2026-10-17).

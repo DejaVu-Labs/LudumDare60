@@ -1,6 +1,7 @@
 using System.Numerics;
 using LudumDare60.Engine;
 using LudumDare60.Engine.Assets;
+using LudumDare60.Engine.Input;
 using LudumDare60.Engine.Platform;
 using LudumDare60.Engine.Rendering;
 using LudumDare60.Engine.Sounds;
@@ -173,6 +174,12 @@ public sealed class LudumDare60Game : IGame
     public bool HasStreet { get; private set; }
 
     /// <summary>
+    /// Whether the debug keys work: 1 to 9 bring in the customer of that order at once, 0 brings the current one in
+    /// again. The page turns them on with <c>?debug</c> in its address.
+    /// </summary>
+    public bool HasDebugKeys { get; init; }
+
+    /// <summary>
     /// Every order, once <c>orders.json</c> is loaded.
     /// </summary>
     public OrderBook? Orders { get; private set; }
@@ -210,6 +217,11 @@ public sealed class LudumDare60Game : IGame
         if (Shop is not { } shop)
         {
             return;
+        }
+
+        if (HasDebugKeys && DebugOrder(context.Input, shop, Orders!.Orders.Count) is var order and >= 0)
+        {
+            shop.Restart(order);
         }
 
         var deltaTime = (float)context.DeltaTime;
@@ -488,6 +500,33 @@ public sealed class LudumDare60Game : IGame
         var brushGlow = new SpriteOptions { Origin = PlaceholderParts.BrushOrigin + Vector2.One, Tint = Color.White.WithAlpha(_brushGlow) };
         batch.Draw(_parts, PlaceholderParts.BrushGlow, _brushDrawPosition, brushGlow);
         batch.Draw(_parts, PlaceholderParts.Brush, _brushDrawPosition, new SpriteOptions { Origin = PlaceholderParts.BrushOrigin });
+    }
+
+    /// <summary>
+    /// The order a debug key pressed in this step asks for, or -1: 1 to 9 the order of that number, 0 the current one.
+    /// </summary>
+    private static int DebugOrder(InputState input, Shop shop, int orderCount)
+    {
+        if (orderCount == 0)
+        {
+            return -1;
+        }
+
+        if (input.IsPressed(Key.Digit0) || input.IsPressed(Key.Numpad0))
+        {
+            // Once the shop has closed, the last order.
+            return Math.Min(shop.OrderIndex, orderCount - 1);
+        }
+
+        for (var i = 0; i < 9 && i < orderCount; i++)
+        {
+            if (input.IsPressed(Key.Digit1 + i) || input.IsPressed(Key.Numpad1 + i))
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     private static byte Blink(float hint) => (int)(hint * HintBlinkRate) % 2 == 0 ? GlowActive : GlowHintLow;
