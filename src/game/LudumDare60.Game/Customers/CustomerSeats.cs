@@ -13,7 +13,7 @@ public static class CustomerSeats
     /// The bench under the revolver painting on the left wall of the background. It stands at the back of the shop,
     /// so the customer is drawn smaller than at the counter (<see cref="LudumDare60Game.CustomerScale"/>).
     /// </summary>
-    public static readonly CustomerSeat UnderThePainting = new(new Vector2(152, 136), 0.9f);
+    public static readonly CustomerSeat UnderThePainting = new(new Vector2(156, 141), 0.9f);
 
     /// <summary>
     /// The seat where <paramref name="look"/> waits, if that customer sits down to wait.
