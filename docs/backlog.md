@@ -89,8 +89,11 @@ order their blocking graph allows (`Parts/PartAssembly`). Still to do:
 Scrubbing works on order 1's cylinder (`Cleaning/DirtLayer`, see [concepts.md](gamedesign/concepts.md#rendering)).
 Still to do:
 
-- A brush cursor over a dirty part (needs the cursor visibility command from
-  [Platform commands](#platform-commands-game-to-platform)), and a brush loop sound instead of the scratch ticks.
+- Record a wire brush on rusty steel (and on clean steel) to replace the synthesized scrub loop
+  (`PlaceholderSounds.CreateScrubLoop`); keep it a seamless loop that sounds steady at any speed, since the game
+  drives its volume and pitch.
+- Hide the system cursor while the brush is in the hand (needs the cursor visibility command from
+  [Platform commands](#platform-commands-game-to-platform)).
 - A dirty part that is dragged back to its slot bounces back and its dirt flashes (core-loop step 4). Today a dirty
   part out on the mat cannot be dragged at all.
 - Several dirt layers per order, from the order data, and dirt drawn as real art (an Aseprite layer per part).

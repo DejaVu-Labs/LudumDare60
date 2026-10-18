@@ -69,7 +69,7 @@ Order 1: young customer in a hoodie, jammed cylinder, a rolled note in one chamb
 | ~8 s | The **base pin** glows; nothing else does. Cursor over it: grab hand with an axis arrow | Drags the pin out | Friction, rising pitch, click; pin rolls onto the mat | **Pull** along a line |
 | ~15 s | The **cylinder** glows | Drags it out sideways | Slide, click; customer leans in | Removing a part unblocks the next one |
 | ~20 s | A rolled note sticks out of one chamber and glows | Clicks it | Paper unrolls over the bench: a few handwritten lines. Customer: surprised face | **Finds**: the hook of the game |
-| ~35 s | Note flies into the finds box. Cylinder shows rust; cursor over it is a brush | Rubs | Rust erased pixel by pixel, brush sound; at 90 % glint and chime | **Scrub** |
+| ~35 s | Note flies into the finds box. Cylinder shows rust; the wire brush beside it glows (a press on the cylinder flashes it) | Takes the brush, rubs | Rust erased pixel by pixel, a rasp that follows the strokes; at 90 % glint and chime | **Scrub** |
 | ~50 s | Faint outline of the cylinder in the frame | Drags it back | Snap. Then the pin outline; snap | **Reassemble** in reverse |
 | ~60 s | The hammer glows | Drags it back, clicks the trigger | Ratchet, cylinder turns one chamber, dry-fire click. Gun shines | **Test** |
 | ~70 s | Customer holds out a hand | Drags the gun up to the counter | Thankful face, phone photo of the note, door bell | **Hand back** |
@@ -95,8 +95,8 @@ From order 3 on the delays double (12 s and 24 s): the player knows the controls
 
 - **Glow** marks what can move now. Nothing else on the bench animates, so the glow always means "you can touch
   this".
-- **Cursor per verb:** grab hand (pull, lift, hand back), circular arrows (unscrew), brush (scrub), oil can (oil),
-  pointing finger (click a find or the phone).
+- **Cursor per verb:** grab hand (pull, lift, hand back), circular arrows (unscrew), oil can (oil), pointing finger
+  (click a find or the phone). Scrubbing needs no cursor: the player holds the brush itself.
 - **Outline at the slot** marks where a removed part goes back.
 - **Sound pitch** rises as a part nears its snap point, so the player feels when to let go.
 - **Customer face** reacts to progress: leans in when parts come off, surprised at a find, thankful at the end.

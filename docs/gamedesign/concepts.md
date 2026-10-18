@@ -111,7 +111,7 @@ arc) with resistance, a snap point and a sound at the end. No physics engine.
 | Unscrew | circular mouse motion around the screw | squeak per turn, screw rises, pops out |
 | Pull out | drag along the part's axis | friction, then a click when free |
 | Swing / lift | drag along an arc | hinge creak, click at the stop |
-| Scrub | rub the mouse over a part | rust pixels erased, brush loop sound, clean metal glint |
+| Scrub | take the wire brush from the bench, rub it over a part | rust pixels erased, a rasp that follows the brush's speed, clean metal glint |
 | Oil | click a joint | drop sound, part moves smoother afterwards |
 | Replace | drag a new part from the drawer | metal clink, snap into the slot |
 | Test | drag the hammer back, click the trigger | ratchet per chamber, dry-fire click |

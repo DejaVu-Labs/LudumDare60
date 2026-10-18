@@ -14,7 +14,7 @@ namespace LudumDare60.Game;
 internal static class PlaceholderParts
 {
     public const int Width = 64;
-    public const int Height = 64;
+    public const int Height = 80;
 
     /// <summary>
     /// The frame block. The bore opens in its left edge, at row <see cref="BoreRow"/>; the cylinder window is
@@ -33,6 +33,19 @@ internal static class PlaceholderParts
 
     /// <inheritdoc cref="PinGlow"/>
     public static readonly IntRect CylinderGlow = Around(Cylinder, 24, 44);
+
+    /// <summary>
+    /// The scrubbing brush lying flat: wire bristles on the left, a brass ferrule, a walnut handle to the right.
+    /// </summary>
+    public static readonly IntRect Brush = new(0, 64, BrushWidth, 7);
+
+    /// <inheritdoc cref="PinGlow"/>
+    public static readonly IntRect BrushGlow = Around(Brush, 22, 64);
+
+    /// <summary>
+    /// The middle of the bristles, in brush pixels: the point that scrubs.
+    /// </summary>
+    public static readonly Vector2 BrushOrigin = new(3, 3);
 
     /// <summary>
     /// The pin's grab point, the middle of its head, in pin pixels.
@@ -57,6 +70,7 @@ internal static class PlaceholderParts
     private const int HeadWidth = 4;
     private const int CylinderWidth = 24;
     private const int CylinderHeight = 18;
+    private const int BrushWidth = 22;
 
     private static readonly Color s_ink = Color.FromRgb(0x0d0a0a);
     private static readonly Color s_steelDark = Color.FromRgb(0x2c201b);
@@ -64,6 +78,11 @@ internal static class PlaceholderParts
     private static readonly Color s_steelMid = Color.FromRgb(0x5f5247);
     private static readonly Color s_steelLight = Color.FromRgb(0xb3a99b);
     private static readonly Color s_glow = Color.FromRgb(0xfbe099);
+    private static readonly Color s_brass = Color.FromRgb(0xe2ad5f);
+    private static readonly Color s_brassDark = Color.FromRgb(0xd2834a);
+    private static readonly Color s_walnutLight = Color.FromRgb(0xa1603b);
+    private static readonly Color s_walnut = Color.FromRgb(0x823d1e);
+    private static readonly Color s_walnutDark = Color.FromRgb(0x622a14);
 
     // Rust, dark to light, from the walnut, rust and copper ramp.
     private static readonly Color[] s_rust =
@@ -82,8 +101,10 @@ internal static class PlaceholderParts
         Fill(pixels, Frame, FrameColor);
         Fill(pixels, Pin, PinColor);
         Fill(pixels, Cylinder, CylinderColor);
+        Fill(pixels, Brush, BrushColor);
         FillGlow(pixels, PinGlow, IsPin);
         FillGlow(pixels, CylinderGlow, IsCylinder);
+        FillGlow(pixels, BrushGlow, IsBrush);
         return new Image(Width, Height, pixels);
     }
 
@@ -214,6 +235,50 @@ internal static class PlaceholderParts
             <= 8 => s_steelMid,
             <= 13 => s_steel,
             _ => s_steelDark,
+        };
+    }
+
+    private static bool IsBrush(int x, int y)
+    {
+        if ((uint)x >= (uint)Brush.Width || (uint)y >= (uint)Brush.Height)
+        {
+            return false;
+        }
+
+        return x switch
+        {
+            // Ragged bristle tips at the left end.
+            0 => y is > 0 and < 6,
+            <= 5 => true,
+            <= 7 => y is > 0 and < 6,
+            BrushWidth - 1 => y == 3,
+            _ => y is > 1 and < 5,
+        };
+    }
+
+    private static Color BrushColor(int x, int y)
+    {
+        if (!IsBrush(x, y))
+        {
+            return Color.Transparent;
+        }
+
+        if (x <= 5)
+        {
+            // Wire bristles: light and dark strands.
+            return y % 2 == 0 ? s_steelLight : s_steelMid;
+        }
+
+        if (x <= 7)
+        {
+            return y <= 2 ? s_brass : s_brassDark;
+        }
+
+        return y switch
+        {
+            2 => s_walnutLight,
+            3 => s_walnut,
+            _ => s_walnutDark,
         };
     }
 
