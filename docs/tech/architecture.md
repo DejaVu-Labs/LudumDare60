@@ -59,7 +59,11 @@ reports (see [Audio](#audio)).
 1. `index.html` loads the app's `main.js`, which imports `boot.js` from
    `_content/LudumDare60.Engine.Platform.Browser/` and calls `boot('./_framework/')`.
 2. `boot(frameworkRoot)` resolves `dotnet.js` in `frameworkRoot` against the page URL (`document.baseURI`), imports
-   it with `import()`, calls `dotnet.create()` and then `runMain()`. The root is a parameter so an app can ship
+   it with `import()`, sets a resource loader (`dotnet.withResourceLoader`), calls `dotnet.create()` and then
+   `runMain()`. The loader downloads the runtime's `.wasm` files with `fetchWithRetry`: a network error or a 408,
+   429 or 5xx response is retried four times over about 15 s (`RETRY_DELAYS_MS`), where the runtime's own retry gives
+   up after about 100 ms. It also drops the runtime's `cache: 'no-cache'`, so a returning player loads the
+   content-hashed files from the HTTP cache without revalidating each one. The root is a parameter so an app can ship
    several runtime builds (for example single- and multi-threaded) and pick one at startup; today there is one.
    The root is resolved against the page, not against `boot.js`, so the resulting URL matches the import map key
    and loads the fingerprinted file.

@@ -139,6 +139,17 @@ Engine and host work for the first-time experience (see [ftue.md](gamedesign/ftu
   [Platform commands](#platform-commands-game-to-platform) to hide the system cursor over the canvas.
 - Idle timer and hint state (glow, wiggle, ghost hand) in the order logic, tested without a browser.
 
+## Download size and loading
+
+Deferred when `boot.js` got download retries (see [docs/tech/architecture.md](tech/architecture.md#browser-startup)).
+The download is about 3.2 MB gzipped, 2.6 MB of it `dotnet.native.wasm`; on a 130 KB/s link that is half a minute.
+
+- Brotli: ship only `*.br` copies of `_framework/*.wasm` (itch.io serves them with `content-encoding: br`) and point
+  `createResourceLoader` at them. Roughly 20-30 % less than gzip for the native module. Check that the integrity
+  hashes still match the decoded bytes.
+- Try `-Oz` for the native link (`EmccLinkOptimizationFlag`) and measure size against frame time.
+- Byte progress on the loading text ("Loading... 1.2 / 3.2 MB"), read from the response bodies in the loader.
+
 ## Browser E2E smoke tests
 
 A `tests/*.E2E` project with `Microsoft.Playwright`: the published build boots, reaches the first frame and logs

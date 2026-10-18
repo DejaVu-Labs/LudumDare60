@@ -29,9 +29,92 @@ export function getErrorText() {
 }
 
 /**
+ * The runtime's resource loader hook (`LoadBootResourceCallback` in `dotnet.d.ts`). It returns a URL string for the
+ * runtime to fetch, a promise of the response, or `undefined` for the default download.
+ * @typedef {(type: string, name: string, defaultUri: string, integrity: string) => string | Promise<Response> | undefined} LoadBootResource
+ */
+
+/**
  * @typedef {object} DotnetHostBuilder
+ * @property {(loader: LoadBootResource) => DotnetHostBuilder} withResourceLoader
  * @property {() => Promise<{ runMain: () => Promise<number> }>} create
  */
+
+/**
+ * @typedef {(url: string, init: RequestInit) => Promise<Response>} FetchLike
+ */
+
+/**
+ * Waits before each retry of a failed download, in milliseconds: four retries over about 15 s. The runtime's own retry
+ * gives up after about 100 ms, which a reset connection on a slow network outlasts (itch.io's CDN, seen 2026-10-19).
+ */
+export const RETRY_DELAYS_MS = Object.freeze([1000, 2000, 4000, 8000]);
+
+/**
+ * @param {number} status
+ * @returns {boolean} Whether a failed response may succeed when requested again.
+ */
+function isTransient(status) {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+/**
+ * Fetches `url`, and again after each delay in `delaysMs` while the request fails with a network error or a
+ * transient status (408, 429, 5xx). Other responses, including 404, are returned at once.
+ *
+ * @param {string} url
+ * @param {RequestInit} init
+ * @param {FetchLike} fetchLike Usually `fetch`.
+ * @param {(ms: number) => Promise<void>} sleep Usually `setTimeout`.
+ * @param {readonly number[]} [delaysMs] One entry per retry.
+ * @returns {Promise<Response>} The last response. Rejects with the last network error.
+ */
+export async function fetchWithRetry(url, init, fetchLike, sleep, delaysMs = RETRY_DELAYS_MS) {
+  for (let attempt = 0; ; attempt++) {
+    const last = attempt >= delaysMs.length;
+    try {
+      const response = await fetchLike(url, init);
+      if (response.ok || last || !isTransient(response.status)) {
+        return response;
+      }
+    } catch (error) {
+      if (last) {
+        throw error;
+      }
+    }
+    await sleep(delaysMs[attempt]);
+  }
+}
+
+/**
+ * Returns a resource loader that downloads the runtime's files with `fetchWithRetry`. JS modules (`dotnetjs`) and the
+ * boot manifest keep the default path: the runtime needs a URL for those, not a response.
+ *
+ * The runtime's default download sends `cache: 'no-cache'`, so every start revalidates every file. This loader uses
+ * the normal HTTP cache instead: every runtime file name carries a content hash (`WasmFingerprintAssets`).
+ *
+ * @param {FetchLike} fetchLike
+ * @param {(ms: number) => Promise<void>} sleep
+ * @returns {LoadBootResource}
+ */
+export function createResourceLoader(fetchLike, sleep) {
+  return (type, _name, defaultUri, integrity) => {
+    if (type === 'dotnetjs' || type === 'manifest') {
+      return undefined;
+    }
+    return fetchWithRetry(defaultUri, integrity ? { integrity } : {}, fetchLike, sleep);
+  };
+}
+
+/**
+ * @param {number} ms
+ * @returns {Promise<void>}
+ */
+function delay(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
 
 /**
  * @typedef {(url: string) => Promise<{ dotnet: DotnetHostBuilder }>} ImportRuntime
@@ -59,16 +142,17 @@ export function resolveRuntimeUrl(frameworkRoot, baseUrl) {
 }
 
 /**
- * Imports the runtime from `runtimeUrl`, creates it and runs `Main`.
+ * Imports the runtime from `runtimeUrl`, configures it, creates it and runs `Main`.
  *
  * @param {string} runtimeUrl Absolute URL of `dotnet.js`.
  * @param {ImportRuntime} importRuntime Usually `import()`.
  * @param {() => void} [onReady] Called once the runtime is downloaded and created, right before `Main` runs.
+ * @param {(dotnet: DotnetHostBuilder) => DotnetHostBuilder} [configure] Applied to the builder before `create()`.
  * @returns {Promise<number>} The exit code of `Main`.
  */
-export async function startRuntime(runtimeUrl, importRuntime, onReady = () => {}) {
+export async function startRuntime(runtimeUrl, importRuntime, onReady = () => {}, configure = (dotnet) => dotnet) {
   const { dotnet } = await importRuntime(runtimeUrl);
-  const { runMain } = await dotnet.create();
+  const { runMain } = await configure(dotnet).create();
   onReady();
   return runMain();
 }
@@ -101,7 +185,7 @@ export async function runWithStatus(start, status, errorTextOf = getErrorText) {
 
 /**
  * Starts the runtime from `frameworkRoot` (relative to the page) and runs `Main`, with loading and error text in the
- * element with id `statusId`, if the page has one.
+ * element with id `statusId`, if the page has one. Runtime files are downloaded with retries (`createResourceLoader`).
  *
  * @param {string} [frameworkRoot] Runtime folder. Defaults to the SDK's `./_framework/`.
  * @param {string} [statusId] Id of the status element.
@@ -109,7 +193,13 @@ export async function runWithStatus(start, status, errorTextOf = getErrorText) {
  */
 export function boot(frameworkRoot = './_framework/', statusId = 'status') {
   return runWithStatus(
-    (onReady) => startRuntime(resolveRuntimeUrl(frameworkRoot, document.baseURI), (url) => import(url), onReady),
+    (onReady) =>
+      startRuntime(
+        resolveRuntimeUrl(frameworkRoot, document.baseURI),
+        (url) => import(url),
+        onReady,
+        (dotnet) => dotnet.withResourceLoader(createResourceLoader((url, init) => fetch(url, init), delay)),
+      ),
     document.getElementById(statusId),
   );
 }

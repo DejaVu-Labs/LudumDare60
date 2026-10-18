@@ -84,9 +84,12 @@ Source: <https://itch.io/docs/creators/html5> (checked 2026-10-17).
 - HTML5 projects can only accept donations. They cannot be sold.
 - Project settings: Kind of project = **HTML**. After the first push, mark the upload as *This file will be
   played in the browser*.
-- Unverified: the MIME type itch.io uses for `.wasm`. If it is not `application/wasm`, the .NET loader falls
-  back from streaming instantiation to an ArrayBuffer. That still works but starts slower. Check the network
-  tab after the first upload.
+- `.wasm` is served as `application/wasm` with `content-encoding: gzip` (checked 2026-10-19), so the runtime
+  uses streaming instantiation. Gzipped, `dotnet.native.wasm` is about 2.6 MB of the roughly 3.2 MB download.
+- On a slow or throttled link to the CDN (about 130 KB/s and reset connections, seen 2026-10-19), the download takes
+  half a minute and some requests fail with `ERR_CONNECTION_RESET`. `boot.js` retries failed runtime downloads with
+  backoff (see [Browser startup](architecture.md#browser-startup)); the browser still logs each failed attempt
+  in the console.
 
 ## Asset caching
 
