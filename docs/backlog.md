@@ -151,6 +151,17 @@ The download is about 3.2 MB gzipped, 2.6 MB of it `dotnet.native.wasm`; on a 13
 - Try `-Oz` for the native link (`EmccLinkOptimizationFlag`) and measure size against frame time.
 - Byte progress on the loading text ("Loading... 1.2 / 3.2 MB"), read from the response bodies in the loader.
 
+## Reporting follow-ups
+
+Deferred when error and load reports shipped (see
+[build-and-deploy.md](tech/build-and-deploy.md#error-and-load-reports)):
+
+- A tunnel: post envelopes to a small endpoint on our own domain that forwards them to Sentry, so ad blockers stop
+  dropping reports. Needs a server, which an itch.io game does not have.
+- Readable .NET exceptions: Release maps messages to resource keys and has no stack traces (`StackTraceSupport`
+  false). Decide whether a few hundred KB of messages are worth it during the jam.
+- Report caught game errors (a failed asset decode, a lost GPU) from C# through one `[JSImport]` call.
+
 ## Browser E2E smoke tests
 
 A `tests/*.E2E` project with `Microsoft.Playwright`: the published build boots, reaches the first frame and logs

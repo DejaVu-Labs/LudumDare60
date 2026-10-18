@@ -1,6 +1,7 @@
 // @ts-check
 
 import { getLoadLog, STEP } from './load-log.js';
+import { startReporting } from './reporting.js';
 
 /**
  * Starts the .NET runtime and runs the app's `Main`. The host page's `main.js` calls `boot` with the folder that
@@ -203,14 +204,17 @@ export async function runWithStatus(start, status, errorTextOf = getErrorText) {
 /**
  * Starts the runtime from `frameworkRoot` (relative to the page) and runs `Main`, with loading and error text in the
  * element with id `statusId`, if the page has one. Runtime files are downloaded with retries (`createResourceLoader`).
- * Startup steps, retries and the runtime's downloads go to the load log (`load-log.js`).
+ * Startup steps, retries and the runtime's downloads go to the load log (`load-log.js`). Errors and load timing go to
+ * Sentry when `reportingConfig` holds a DSN (`reporting.js`).
  *
  * @param {string} [frameworkRoot] Runtime folder. Defaults to the SDK's `./_framework/`.
  * @param {string} [statusId] Id of the status element.
+ * @param {string} [reportingConfig] Reporting config file, relative to the page.
  * @returns {Promise<number>} The exit code of `Main`.
  */
-export function boot(frameworkRoot = './_framework/', statusId = 'status') {
+export function boot(frameworkRoot = './_framework/', statusId = 'status', reportingConfig = './reporting.json') {
   const log = getLoadLog();
+  const reporter = startReporting(new URL(reportingConfig, document.baseURI).href, log);
   log.step(STEP.BOOT);
   return runWithStatus(
     (onReady) =>
@@ -236,5 +240,8 @@ export function boot(frameworkRoot = './_framework/', statusId = 'status') {
           ),
       ),
     document.getElementById(statusId),
-  );
+  ).catch((error) => {
+    reporter.captureError(error, 'boot');
+    throw error;
+  });
 }

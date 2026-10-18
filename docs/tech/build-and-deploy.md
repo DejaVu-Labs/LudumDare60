@@ -174,9 +174,51 @@ run in parallel.
    add required reviewers to `itch` to approve each release by hand.
 4. After the first push to each project, open its *Edit game* page and mark the `html5` upload as *This file will
    be played in the browser*. Set the embed viewport to 1280x720.
+5. Optional, for [error and load reports](#error-and-load-reports): create a Sentry project (platform
+   *Browser JavaScript*), turn on *Settings > Security & Privacy > Prevent Storing of IP Addresses*, and add its DSN
+   as the `SENTRY_DSN` repository variable. One project serves both targets; events carry `environment` `dev` or
+   `release`.
 
 The `plan` job fails within seconds if a variable is missing, before the long AOT build. The push job fails if
 `BUTLER_API_KEY` is missing from the environment.
+
+### Error and load reports
+
+`reporting.js` (browser platform) sends uncaught errors and load timing to Sentry. It is off unless the page's
+`reporting.json` holds a DSN. The repository ships `src/game/LudumDare60.Game.Browser/wwwroot/reporting.json` as
+`{}`, so local and Debug builds report nothing. When the `SENTRY_DSN` variable is set, `deploy.yml` overwrites the
+published copy after `dotnet publish`:
+
+```json
+{ "dsn": "https://<key>@<org>.ingest.sentry.io/<project>", "release": "dev-42-abc1234", "environment": "dev" }
+```
+
+An optional `loadSampleRate` (0 to 1, default 1) limits load timing to that share of pages. `reporting.json` is read
+with `cache: 'no-cache'`, outside the import map, so overwriting it after publish breaks no integrity hash. A DSN is
+public by design: every client that sends events carries it. It is still kept out of the repository so forks and
+local builds never report into our project.
+
+What gets sent:
+
+- **Errors**: uncaught errors and unhandled rejections, including failed runtime downloads and .NET `ManagedError`s,
+  plus startup failures from `boot`. Each message is sent once, at most 10 per page, with the last 30 load log lines
+  as breadcrumbs. Exception messages in Release are resource keys (`UseSystemResourceKeys`), for example
+  `AggregateException_ctor_DefaultMessage`.
+- **Load timing**: one `load` transaction per page. Spans: page and `main.js`, `dotnet.js` import, runtime
+  download (plus one `resource.wasm` span per file, with transfer and decoded sizes), runtime compile and start,
+  `Main` to the first frame, the first asset batch. Measurements: `boot`, `runtime_downloaded`, `runtime_created`,
+  `first_frame`, `assets_loaded` (ms), `retries`, `runtime_transfer` (bytes). It is sent once the first frame ran and
+  the first asset batch finished. When the player leaves before that (`pagehide`), it is sent with status
+  `cancelled` and tag `load.completed: false`, which counts the players who gave up during loading.
+
+Envelopes are posted with `fetch` (`keepalive`, a `text/plain` body, no CORS preflight) to the project's envelope
+endpoint, with the public key in the query. itch.io sends no `Content-Security-Policy` for the game frame (checked
+2026-10-19), so requests to `*.ingest.sentry.io` go through. Failed posts are ignored. Ad blockers often block
+Sentry's domains, so expect reports from only part of the players.
+
+Privacy: the events carry the page URL, the user agent and the times above, and no cookies or player ids. Sentry
+sees the sender's IP address, so keep *Prevent Storing of IP Addresses* on. Say on the itch.io page that the game
+reports errors and load times.
 
 ### Updating butler
 
@@ -195,3 +237,4 @@ latest version from <https://broth.itch.zone/butler/linux-amd64/LATEST>, then se
 - [ ] Audio starts after the first click or keypress.
 - [ ] No console errors. File count is under 1000.
 - [ ] Asset requests in the network tab carry `?v=<commit hash>`.
+- [ ] With `SENTRY_DSN` set, the published `reporting.json` has the DSN, and a `load` transaction shows up in Sentry.

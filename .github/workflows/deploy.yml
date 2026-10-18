@@ -100,6 +100,19 @@ jobs:
       - name: Publish
         run: dotnet publish src/game/LudumDare60.Game.Browser -c Release
 
+      # Error and load reports to Sentry (reporting.js) stay off unless the SENTRY_DSN repository variable is set.
+      # The published reporting.json is "{}" otherwise.
+      - name: Write reporting config
+        if: vars.SENTRY_DSN != ''
+        env:
+          SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+          RELEASE: ${{ needs.plan.outputs.version }}
+          ENVIRONMENT: ${{ needs.plan.outputs.target }}
+        run: |
+          jq -n --arg dsn "$SENTRY_DSN" --arg release "$RELEASE" --arg environment "$ENVIRONMENT" \
+            '{dsn: $dsn, release: $release, environment: $environment}' > "$PUBLISH_DIR/reporting.json"
+          echo "Sentry reporting on: $ENVIRONMENT $RELEASE" >> "$GITHUB_STEP_SUMMARY"
+
       # itch.io HTML5 limits: index.html at the root, at most 1000 files.
       - name: Check output
         run: |
