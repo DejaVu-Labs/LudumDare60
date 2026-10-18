@@ -66,15 +66,19 @@ busts from the chest up, 72x96 px each, side by side (216x96), standing on the b
 times larger, with the bottom middle on the far edge of the bench (y = 140):
 
 1. **Presenting:** bringing the revolver in, and waiting with a hand out to take it back.
-2. **Waiting:** while the repair goes on, on the phone. A customer whose waiting frame sits down waits on a seat in
-   the background instead of the counter (`Customers/CustomerSeats`): `robe` sits on the bench under the revolver
-   painting, bottom middle at (152, 136), drawn 0.9 times larger since that bench stands at the back wall. The
-   symptom bubble moves and scales with them. They switch places at once, without a walk.
+2. **Waiting:** while the repair goes on, on the phone. A customer whose waiting frame shows them elsewhere waits
+   there instead of the counter (`Customers/CustomerSeats`): `robe` sits on the bench under the revolver painting,
+   bottom middle at (156, 141), drawn 0.9 times larger since that bench stands at the back wall; `dog-walker` walks
+   the dog on the pavement right behind the window, bottom middle at (370, 150), 1.1 times larger, the feet and most
+   of the dog hidden below the sill. A customer outside is drawn between the street and the room, so the window
+   frame and the wall cover them. The symptom bubble moves and scales with them and stays over the room. They switch
+   places at once, without a walk.
 3. **Pleased:** with the revolver back, until they are out of the door.
 
-Sheets so far: `hoodie` and `robe`. Looks without a sheet are drawn as code placeholders. A sheet made from a
-concept may leave out palette colors the character does not have (the `robe` sheet uses no cool or mat colors, so the
-concept's blue rim light turns gray instead of blue).
+Sheets so far: `hoodie`, `robe` and `dog-walker`. Looks without a sheet are drawn as code placeholders. A sheet made
+from a concept may leave out palette colors the character does not have (`robe` and `dog-walker` use no cool or mat
+colors, so the concept's blue rim light turns gray instead of blue). A frame may be drawn at another scale than its
+neighbors: the `dog-walker` waiting frame holds the whole figure and the dog, the other two frames a bust.
 
 ## Concept art prompts
 
@@ -105,5 +109,5 @@ Pixel art sprite sheet on a flat dark green background, top-down view, each item
 **Customer busts (modular check):**
 
 ```text
-Pixel art character sheet, front view, five modern customers from the chest up, about 96x128 pixels each, all built on the same base body shape with different hair, clothes and skin tones: a young person in a hoodie, an old man in a robe, a man in a work jacket, a teenager with headphones, a woman in a raincoat. Each customer in three expressions: neutral, surprised, thankful. Flat dark background, same strict pixel grid and limited palette.
+Pixel art character sheet, front view, five modern customers from the chest up, about 96x128 pixels each, all built on the same base body shape with different hair, clothes and skin tones: a young person in a hoodie, an old man in a robe, a woman walking a dog, a teenager with headphones, a woman in a raincoat. Each customer in three expressions: neutral, surprised, thankful. Flat dark background, same strict pixel grid and limited palette.
 ```

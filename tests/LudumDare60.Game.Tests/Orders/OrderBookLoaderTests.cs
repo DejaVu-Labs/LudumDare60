@@ -201,7 +201,7 @@ public sealed class OrderBookLoaderTests
     {
         var book = new OrderBookLoader().Load(AssetPaths.Orders, File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "assets", AssetPaths.Orders)));
 
-        Assert.Equal(["hoodie", "robe", "work-jacket", "headphones", "raincoat"], book.Orders.Select(order => order.Id), StringComparer.Ordinal);
+        Assert.Equal(["hoodie", "robe", "dog-walker", "headphones", "raincoat"], book.Orders.Select(order => order.Id), StringComparer.Ordinal);
     }
 
     [Fact]

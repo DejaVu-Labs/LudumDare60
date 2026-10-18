@@ -25,7 +25,7 @@ internal static class PlaceholderCustomers
     /// <summary>
     /// The looks the sheet draws, by the names <see cref="Customer.Look"/> uses, in sheet order.
     /// </summary>
-    public static readonly IReadOnlyList<string> Looks = ["hoodie", "robe", "work-jacket", "headphones", "raincoat"];
+    public static readonly IReadOnlyList<string> Looks = ["hoodie", "robe", "dog-walker", "headphones", "raincoat"];
 
     /// <summary>
     /// Where a bust is drawn from: the middle of its bottom edge, which stands on the far edge of the bench.

@@ -25,8 +25,8 @@
       "targetSeconds": 120
     },
     {
-      "id": "work-jacket",
-      "customer": { "look": "work-jacket", "description": "Man in a work jacket" },
+      "id": "dog-walker",
+      "customer": { "look": "dog-walker", "description": "Woman walking a dog" },
       "symptom": "broken-spring",
       "parts": ["grip-screw", "grip-panels", "mainspring"],
       "broken": ["mainspring"],

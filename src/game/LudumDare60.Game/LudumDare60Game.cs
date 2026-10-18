@@ -424,6 +424,12 @@ public sealed class LudumDare60Game : IGame
             batch.Draw(_street, StreetOffset);
         }
 
+        if (_hasSheets && Shop is { HasCustomer: true, Bench: { } outsider } outsideShop)
+        {
+            // A customer waiting out in the street is seen through the window: the room covers them.
+            DrawCustomer(batch, outsideShop, outsider.Order, outsidePass: true);
+        }
+
         if (HasBackground)
         {
             batch.Draw(_bench, Vector2.Zero);
@@ -436,7 +442,7 @@ public sealed class LudumDare60Game : IGame
 
         if (shop.HasCustomer && shop.Bench is { } visitor)
         {
-            DrawCustomer(batch, shop, visitor.Order);
+            DrawCustomer(batch, shop, visitor.Order, outsidePass: false);
         }
 
         if (!shop.HasGun || _shownBench is not { } bench)
@@ -599,24 +605,45 @@ public sealed class LudumDare60Game : IGame
         }
     }
 
-    private void DrawCustomer(SpriteBatch batch, Shop shop, Order order)
+    /// <summary>
+    /// Draws the customer: over the street and under the room when <paramref name="outsidePass"/> is set (only a
+    /// customer waiting outside is drawn then), over the room otherwise (everything else of the customer, and the
+    /// hand and the bubble of any customer).
+    /// </summary>
+    private void DrawCustomer(SpriteBatch batch, Shop shop, Order order, bool outsidePass)
     {
         var look = order.Customer.Look;
         var bottom = new Vector2(MathF.Round(shop.CustomerX), Shop.CustomerBottom);
         var sheet = CustomerSheetIndex(look);
         var hasSheet = sheet >= 0 && _hasCustomerSheet[sheet];
         var customerScale = CustomerScale;
+        var isOutside = false;
         if (hasSheet && shop.Pose == CustomerPose.Waiting && CustomerSeats.TryGetWaitingSeat(look, out var seat))
         {
-            // Their waiting frame sits: they wait on their seat, not at the counter.
+            // Their waiting frame sits down or stands in the street: they wait there, not at the counter.
             bottom = seat.Bottom;
             customerScale = seat.Scale;
+            isOutside = seat.IsOutside;
+        }
+
+        if (outsidePass && !isOutside)
+        {
+            return;
         }
 
         var scale = new Vector2(customerScale);
         var bust = new SpriteOptions { Origin = PlaceholderCustomers.BustOrigin, Scale = scale };
         var glow = new SpriteOptions { Origin = PlaceholderCustomers.BustOrigin + Vector2.One, Scale = scale, Tint = Color.White.WithAlpha(_customerGlow) };
-        if (hasSheet)
+        if (isOutside)
+        {
+            // Seen through the window: the frame goes under the room, the bubble over it in the other pass.
+            if (outsidePass)
+            {
+                batch.Draw(_customerSheets[sheet], CustomerSheet.Frame(shop.Pose), bottom, bust);
+                return;
+            }
+        }
+        else if (hasSheet)
         {
             // A drawn customer: the frame of their pose.
             if (_customerGlow > 0)

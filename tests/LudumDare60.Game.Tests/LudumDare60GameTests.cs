@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Text;
 using LudumDare60.Engine;
 using LudumDare60.Engine.Platform;
 using LudumDare60.Engine.Rendering;
@@ -15,13 +16,17 @@ public sealed class LudumDare60GameTests
 {
     private const double Step = 1.0 / 60;
 
-    // Texture ids in creation order: the two placeholder sheets, the hoodie and robe customers' sheets with their glows
-    // on the first frame, the rust when the first customer comes in.
+    // Texture ids in creation order: the two placeholder sheets, the hoodie, robe and dog-walker customers' sheets with
+    // their glows on the first frame, the rust when the first customer comes in. With the background, the room and the
+    // street come right after the placeholder sheets.
     private const int CustomersTexture = 1;
     private const int CustomerTexture = 2;
     private const int CustomerGlowTexture = 3;
     private const int RobeCustomerTexture = 4;
-    private const int RustTexture = 6;
+    private const int RustTexture = 8;
+    private const int RoomTexture = 2;
+    private const int StreetTexture = 3;
+    private const int DogWalkerTextureWithBackground = 8;
 
     // Textures the first frame creates without the background: the two placeholder sheets, and a sheet and its glow per
     // drawn customer.
@@ -1038,6 +1043,42 @@ public sealed class LudumDare60GameTests
     }
 
     [Fact]
+    public void DogWalker_WhileWaiting_StandsOutsideBetweenTheStreetAndTheRoom()
+    {
+        // The first order with the dog-walker coming in instead of hoodie, with the room and the street.
+        var platform = new ManualPlatform { Assets = new ShippedAssets(withBackground: true, firstLook: "dog-walker") };
+        var game = new LudumDare60Game();
+        _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(game, platform);
+        var away = PointerMove(new Vector2(600, 40));
+        platform.Frame(0, Resize(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight, 1));
+        platform.AudioBackend.ReportReady(0, 1, 2);
+        for (var i = 0; i < 600 && game.Shop?.Phase != ShopPhase.Offering; i++)
+        {
+            platform.Frame(Step, away);
+        }
+
+        platform.Frame(Step, PointerDown(CustomerMiddle));
+        platform.Frame(Step, PointerUp(CustomerMiddle));
+        for (var i = 0; i < 600 && game.Shop!.Pose != CustomerPose.Waiting; i++)
+        {
+            platform.Frame(Step, away);
+        }
+
+        Assert.Equal(CustomerPose.Waiting, game.Shop!.Pose);
+        var frame = platform.Backend.Frames[^1];
+        var spot = CustomerSeats.OutsideTheWindow;
+        var outside = DrawnOn(frame, DogWalkerTextureWithBackground, CustomerSheet.Frame(CustomerPose.Waiting));
+        Assert.Equal(spot.Bottom, outside.Position);
+        Assert.Equal(new Vector2(spot.Scale), outside.Scale);
+
+        // Street, then the customer, then the room over them; the bubble stays over the room.
+        var textures = frame.Decode().Where(c => c.Kind == RenderCommandKind.DrawSprites).Select(c => c.Arguments[0]).ToList();
+        Assert.Equal([StreetTexture, DogWalkerTextureWithBackground, RoomTexture], textures.Take(3));
+        Assert.Contains(CustomersTexture, textures.Skip(3));
+        Assert.NotNull(Sprite(frame, PlaceholderCustomers.Bubble));
+    }
+
+    [Fact]
     public void FirstOrder_PartsItKeepsFixed_AreDrawnInTheirSeatsWithoutGlow()
     {
         StartWithSound();
@@ -1174,13 +1215,24 @@ public sealed class LudumDare60GameTests
     /// <summary>
     /// Reads the files of <c>wwwroot/assets/</c>, copied next to the test assembly.
     /// </summary>
-    private sealed class ShippedAssets(bool withBackground) : IAssetSource
+    /// <param name="withBackground">Whether the room and the street are there.</param>
+    /// <param name="firstLook">When set, the first order's customer has this look instead of hoodie.</param>
+    private sealed class ShippedAssets(bool withBackground, string? firstLook = null) : IAssetSource
     {
         // Reads finish at once, so a file requested in Initialize is loaded in the first frame.
         public Task<byte[]> ReadAsync(string path)
             => !withBackground && (string.Equals(path, AssetPaths.Bench, StringComparison.Ordinal) || string.Equals(path, AssetPaths.Street, StringComparison.Ordinal))
                 ? Task.FromException<byte[]>(new FileNotFoundException(path))
-                : Task.FromResult(Read(path));
+                : Task.FromResult(firstLook is not null && string.Equals(path, AssetPaths.Orders, StringComparison.Ordinal) ? FirstLookAs(firstLook) : Read(path));
+
+        private static byte[] FirstLookAs(string look)
+        {
+            var json = Encoding.UTF8.GetString(Read(AssetPaths.Orders));
+            var hoodie = "\"look\": \"hoodie\"";
+            var at = json.IndexOf(hoodie, StringComparison.Ordinal);
+            Assert.True(at >= 0, "The first order's look is not hoodie any more.");
+            return Encoding.UTF8.GetBytes(string.Concat(json.AsSpan(0, at), $"\"look\": \"{look}\"", json.AsSpan(at + hoodie.Length)));
+        }
 
         private static byte[] Read(string path) => File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "assets", path));
     }
