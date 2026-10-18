@@ -65,6 +65,10 @@ function isTransient(status) {
  * Fetches `url`, and again after each delay in `delaysMs` while the request fails with a network error or a
  * transient status (408, 429, 5xx). Other responses, including 404, are returned at once.
  *
+ * Retries bypass the HTTP cache (`cache: 'reload'`). A failed integrity check is a network error, and the corrupt
+ * body that failed it stays in the cache: a retry that read the cache would fail the same way, on every later visit
+ * too (seen on itch.io from Chrome on Android, 2026-10-19).
+ *
  * @param {string} url
  * @param {RequestInit} init
  * @param {FetchLike} fetchLike Usually `fetch`.
@@ -79,7 +83,7 @@ export async function fetchWithRetry(url, init, fetchLike, sleep, delaysMs = RET
     const last = attempt >= delaysMs.length;
     let reason = '';
     try {
-      const response = await fetchLike(url, init);
+      const response = await fetchLike(url, attempt === 0 ? init : { ...init, cache: 'reload' });
       if (response.ok || last || !isTransient(response.status)) {
         return response;
       }
@@ -122,6 +126,109 @@ export function createResourceLoader(fetchLike, sleep, onRetry = () => {}) {
       (attempt, delayMs, reason) => onRetry(name, attempt, delayMs, reason),
     );
   };
+}
+
+/** Session storage key that marks a page reload done by `boot` to repair the runtime's cached modules. */
+export const REPAIR_KEY = 'ld60.boot.repaired';
+
+/**
+ * @param {unknown} error Why startup failed.
+ * @returns {boolean} Whether a JS module of the runtime failed to load: a failed integrity check (a corrupt cached
+ *   copy) or a network error. The runtime imports its modules itself, so `createResourceLoader` cannot retry them.
+ */
+export function isModuleLoadFailure(error) {
+  return error instanceof Error && error.message.includes('Failed to fetch dynamically imported module');
+}
+
+/**
+ * Lists the runtime's JS modules from the page's import map: every target under `frameworkUrl`.
+ *
+ * @param {string | null} importMapJson The text of `<script type="importmap">`.
+ * @param {string} frameworkUrl Absolute URL of the runtime folder, with a trailing `/`.
+ * @param {string} baseUrl The page URL that import map targets are relative to.
+ * @returns {string[]} Absolute URLs, each once.
+ */
+export function runtimeModuleUrls(importMapJson, frameworkUrl, baseUrl) {
+  /** @type {unknown} */
+  let map;
+  try {
+    map = JSON.parse(importMapJson ?? '');
+  } catch {
+    return [];
+  }
+  const imports = typeof map === 'object' && map !== null ? /** @type {{ imports?: unknown }} */ (map).imports : undefined;
+  if (typeof imports !== 'object' || imports === null) {
+    return [];
+  }
+  /** @type {Set<string>} */
+  const urls = new Set();
+  for (const target of Object.values(imports)) {
+    if (typeof target === 'string') {
+      const url = new URL(target, baseUrl).href;
+      if (url.startsWith(frameworkUrl)) {
+        urls.add(url);
+      }
+    }
+  }
+  return [...urls];
+}
+
+/**
+ * Downloads `urls` again past the HTTP cache (`cache: 'reload'`), which replaces any corrupt cached copy. Failures
+ * are ignored: the reload that follows reports them.
+ *
+ * @param {readonly string[]} urls
+ * @param {FetchLike} fetchLike
+ * @returns {Promise<void>}
+ */
+export async function refreshCache(urls, fetchLike) {
+  await Promise.all(
+    urls.map(async (url) => {
+      try {
+        const response = await fetchLike(url, { cache: 'reload' });
+        await response.arrayBuffer();
+      } catch {
+        // The reload shows whether it helped.
+      }
+    }),
+  );
+}
+
+/**
+ * The part of `sessionStorage` that `repairOnce` uses. Its methods may throw (storage turned off).
+ * @typedef {{ getItem(key: string): string | null, setItem(key: string, value: string): void }} RepairStore
+ */
+
+/**
+ * Decides whether to repair the cache and reload after a failed start: only for a module load failure, and once per
+ * browser tab, so a failure that a fresh download does not fix shows the error instead of reloading forever.
+ *
+ * @param {unknown} error
+ * @param {RepairStore | null} store Usually `sessionStorage`; without one, never.
+ * @returns {boolean} `true` after marking the repair in `store`.
+ */
+export function repairOnce(error, store) {
+  if (store === null || !isModuleLoadFailure(error)) {
+    return false;
+  }
+  try {
+    if (store.getItem(REPAIR_KEY) !== null) {
+      return false;
+    }
+    store.setItem(REPAIR_KEY, '1');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** @returns {RepairStore | null} */
+function sessionStore() {
+  try {
+    return globalThis.sessionStorage;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -205,7 +312,8 @@ export async function runWithStatus(start, status, errorTextOf = getErrorText) {
  * Starts the runtime from `frameworkRoot` (relative to the page) and runs `Main`, with loading and error text in the
  * element with id `statusId`, if the page has one. Runtime files are downloaded with retries (`createResourceLoader`).
  * Startup steps, retries and the runtime's downloads go to the load log (`load-log.js`). Errors and load timing go to
- * Sentry when `reportingConfig` holds a DSN (`reporting.js`).
+ * Sentry when `reportingConfig` holds a DSN (`reporting.js`). If a runtime JS module fails to load, `boot` downloads
+ * the runtime's modules again past the HTTP cache and reloads the page, once per tab (`repairOnce`).
  *
  * @param {string} [frameworkRoot] Runtime folder. Defaults to the SDK's `./_framework/`.
  * @param {string} [statusId] Id of the status element.
@@ -240,8 +348,23 @@ export function boot(frameworkRoot = './_framework/', statusId = 'status', repor
           ),
       ),
     document.getElementById(statusId),
-  ).catch((error) => {
+  ).catch(async (error) => {
     reporter.captureError(error, 'boot');
+    if (repairOnce(error, sessionStore())) {
+      const status = document.getElementById(statusId);
+      if (status !== null) {
+        status.textContent = 'Loading...';
+      }
+      log.step('repairing cached runtime modules, then reloading');
+      const frameworkUrl = new URL(frameworkRoot.endsWith('/') ? frameworkRoot : `${frameworkRoot}/`, document.baseURI).href;
+      const importMap = document.querySelector('script[type="importmap"]');
+      await refreshCache(
+        runtimeModuleUrls(importMap?.textContent ?? null, frameworkUrl, document.baseURI),
+        (url, init) => fetch(url, init),
+      );
+      await reporter.idle;
+      globalThis.location.reload();
+    }
     throw error;
   });
 }

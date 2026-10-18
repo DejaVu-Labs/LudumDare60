@@ -62,8 +62,10 @@ reports (see [Audio](#audio)).
    it with `import()`, sets a resource loader (`dotnet.withResourceLoader`), calls `dotnet.create()` and then
    `runMain()`. The loader downloads the runtime's `.wasm` files with `fetchWithRetry`: a network error or a 408,
    429 or 5xx response is retried four times over about 15 s (`RETRY_DELAYS_MS`), where the runtime's own retry gives
-   up after about 100 ms. It also drops the runtime's `cache: 'no-cache'`, so a returning player loads the
-   content-hashed files from the HTTP cache without revalidating each one. The root is a parameter so an app can ship
+   up after about 100 ms. Retries bypass the HTTP cache (`cache: 'reload'`): a body that failed its integrity check
+   stays cached, and reading it again would fail the same way. The first attempt drops the runtime's
+   `cache: 'no-cache'`, so a returning player loads the content-hashed files from the HTTP cache without
+   revalidating each one. The root is a parameter so an app can ship
    several runtime builds (for example single- and multi-threaded) and pick one at startup; today there is one.
    The root is resolved against the page, not against `boot.js`, so the resulting URL matches the import map key
    and loads the fingerprinted file.
@@ -74,6 +76,11 @@ reports (see [Audio](#audio)).
    exception (a frame that throws stops the frame loop and ends `Main`). The error itself goes to the console. A
    module that knows why the game stopped sets a better message with `setErrorText` before it throws: `webgl2.js`
    does so when the browser has no WebGL2 and when the GPU context is lost.
+5. The runtime imports its own JS modules (`dotnet.native.js`, `dotnet.runtime.js`), so the resource loader cannot
+   retry them. When one fails to load ("Failed to fetch dynamically imported module", for example a corrupt cached
+   copy that fails its import map integrity), `boot` downloads every `_framework/` target of the import map again
+   with `cache: 'reload'` and reloads the page. It does this once per tab (`repairOnce`, a `sessionStorage` flag);
+   a second failure shows the error text.
 
 ### Load log
 

@@ -7,8 +7,13 @@ import {
   ERROR_TEXT,
   fetchWithRetry,
   getErrorText,
+  isModuleLoadFailure,
+  refreshCache,
+  REPAIR_KEY,
+  repairOnce,
   resolveRuntimeUrl,
   RETRY_DELAYS_MS,
+  runtimeModuleUrls,
   runWithStatus,
   setErrorText,
   startRuntime,
@@ -254,7 +259,11 @@ test('fetchWithRetry_NetworkErrorsThenOk_RetriesWithDelays', async () => {
 
   assert.equal(response.status, 200);
   assert.deepEqual(waits, [10, 20]);
-  assert.deepEqual(requests.map((r) => r.init), [{ integrity: 'sha256-x' }, { integrity: 'sha256-x' }, { integrity: 'sha256-x' }]);
+  assert.deepEqual(requests.map((r) => r.init), [
+    { integrity: 'sha256-x' },
+    { integrity: 'sha256-x', cache: 'reload' },
+    { integrity: 'sha256-x', cache: 'reload' },
+  ]);
 });
 
 test('fetchWithRetry_TransientStatusThenOk_Retries', async () => {
@@ -363,4 +372,101 @@ test('createResourceLoader_OnRetry_ReportsFileName', async () => {
   await load('assembly', 'System.Linq.abc.wasm', './_framework/System.Linq.abc.wasm', '');
 
   assert.deepEqual(retries, [['System.Linq.abc.wasm', 1, RETRY_DELAYS_MS[0], 'TypeError: Failed to fetch']]);
+});
+
+const moduleFailure = new TypeError(
+  'Failed to fetch dynamically imported module: https://x/_framework/dotnet.runtime.abc.js',
+);
+
+test('isModuleLoadFailure_DynamicImportError_True', () => {
+  assert.equal(isModuleLoadFailure(moduleFailure), true);
+});
+
+test('isModuleLoadFailure_OtherErrors_False', () => {
+  assert.equal(isModuleLoadFailure(new Error('WebGL2 is not available.')), false);
+  assert.equal(isModuleLoadFailure('Failed to fetch dynamically imported module'), false);
+});
+
+test('runtimeModuleUrls_ImportMap_TargetsUnderFrameworkOnce', () => {
+  const importMap = JSON.stringify({
+    imports: {
+      './_framework/dotnet.js': './_framework/dotnet.a1.js',
+      './_framework/dotnet.native.js': './_framework/dotnet.native.b2.js',
+      './_framework/dotnet.runtime.js': './_framework/dotnet.runtime.c3.js',
+      './_framework/dotnet.runtime.c3.js': './_framework/dotnet.runtime.c3.js',
+      './main.js': './main.d4.js',
+      './_content/p/boot.js': './_content/p/boot.e5.js',
+    },
+  });
+
+  assert.deepEqual(runtimeModuleUrls(importMap, `${new URL('_framework/', page)}`, page), [
+    'https://html-classic.itch.zone/html/123/_framework/dotnet.a1.js',
+    'https://html-classic.itch.zone/html/123/_framework/dotnet.native.b2.js',
+    'https://html-classic.itch.zone/html/123/_framework/dotnet.runtime.c3.js',
+  ]);
+});
+
+test('runtimeModuleUrls_MissingOrInvalidMap_Empty', () => {
+  const framework = 'https://html-classic.itch.zone/html/123/_framework/';
+  assert.deepEqual(runtimeModuleUrls(null, framework, page), []);
+  assert.deepEqual(runtimeModuleUrls('{', framework, page), []);
+  assert.deepEqual(runtimeModuleUrls('{"scopes":{}}', framework, page), []);
+});
+
+test('refreshCache_FetchesEachUrlPastCacheAndIgnoresFailures', async () => {
+  /** @type {{ url: string, init: RequestInit }[]} */
+  const requests = [];
+  await refreshCache(['https://x/a.js', 'https://x/b.js'], async (url, init) => {
+    requests.push({ url, init });
+    if (url.endsWith('b.js')) {
+      throw new TypeError('Failed to fetch');
+    }
+    return new Response('code');
+  });
+
+  assert.deepEqual(requests, [
+    { url: 'https://x/a.js', init: { cache: 'reload' } },
+    { url: 'https://x/b.js', init: { cache: 'reload' } },
+  ]);
+});
+
+/** A sessionStorage stand-in. */
+function createStore() {
+  /** @type {Map<string, string>} */
+  const items = new Map();
+  return {
+    items,
+    /** @param {string} key */
+    getItem: (key) => items.get(key) ?? null,
+    /** @param {string} key @param {string} value */
+    setItem: (key, value) => {
+      items.set(key, value);
+    },
+  };
+}
+
+test('repairOnce_ModuleFailure_TrueOnceThenFalse', () => {
+  const store = createStore();
+
+  assert.equal(repairOnce(moduleFailure, store), true);
+  assert.equal(store.items.get(REPAIR_KEY), '1');
+  assert.equal(repairOnce(moduleFailure, store), false);
+});
+
+test('repairOnce_OtherError_FalseAndNotMarked', () => {
+  const store = createStore();
+
+  assert.equal(repairOnce(new Error('WebGL2 is not available.'), store), false);
+  assert.equal(store.items.size, 0);
+});
+
+test('repairOnce_NoStoreOrStoreThrows_False', () => {
+  assert.equal(repairOnce(moduleFailure, null), false);
+  const throwing = {
+    getItem() {
+      throw new Error('SecurityError');
+    },
+    setItem() {},
+  };
+  assert.equal(repairOnce(moduleFailure, throwing), false);
 });

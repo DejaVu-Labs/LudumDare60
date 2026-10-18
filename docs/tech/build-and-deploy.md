@@ -98,6 +98,11 @@ Source: <https://itch.io/docs/creators/html5> (checked 2026-10-17).
   half a minute and some requests fail with `ERR_CONNECTION_RESET`. `boot.js` retries failed runtime downloads with
   backoff (see [Browser startup](architecture.md#browser-startup)); the browser still logs each failed attempt
   in the console.
+- Chrome on Android once failed integrity checks for `dotnet.runtime.js`, `dotnet.native.js` and
+  `System.Private.CoreLib.wasm` (2026-10-19, build `dev-12`), although the CDN served the right bytes for every
+  `Accept-Encoding` and for range requests. The corrupt copies stayed in the browser cache, so every reload failed
+  the same way. `boot.js` now retries and repairs past the cache. If a device still fails, clear the site data of
+  `html-classic.itch.zone` there and check whether it loads.
 
 ## Asset caching
 
