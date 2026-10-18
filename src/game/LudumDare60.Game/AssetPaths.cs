@@ -22,5 +22,6 @@ public static class AssetPaths
     public static readonly IReadOnlyList<KeyValuePair<string, string>> CustomerSheets =
     [
         new("hoodie", "customers/hoodie.png"),
+        new("robe", "customers/robe.png"),
     ];
 }

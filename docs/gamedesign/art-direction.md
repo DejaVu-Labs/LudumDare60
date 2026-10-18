@@ -59,7 +59,9 @@ times larger, with the bottom middle on the far edge of the bench (y = 140):
 2. **Waiting:** while the repair goes on, on the phone.
 3. **Pleased:** with the revolver back, until they are out of the door.
 
-The first sheet is `hoodie`. Looks without a sheet are drawn as code placeholders.
+Sheets so far: `hoodie` and `robe`. Looks without a sheet are drawn as code placeholders. A sheet made from a
+concept may leave out palette colors the character does not have (the `robe` sheet uses no cool or mat colors, so the
+concept's blue rim light turns gray instead of blue).
 
 ## Concept art prompts
 
@@ -90,5 +92,5 @@ Pixel art sprite sheet on a flat dark green background, top-down view, each item
 **Customer busts (modular check):**
 
 ```text
-Pixel art character sheet, front view, five modern customers from the chest up, about 96x128 pixels each, all built on the same base body shape with different hair, clothes and skin tones: a young person in a hoodie, an elderly woman in a cardigan, a man in a work jacket, a teenager with headphones, a woman in a raincoat. Each customer in three expressions: neutral, surprised, thankful. Flat dark background, same strict pixel grid and limited palette.
+Pixel art character sheet, front view, five modern customers from the chest up, about 96x128 pixels each, all built on the same base body shape with different hair, clothes and skin tones: a young person in a hoodie, an old man in a robe, a man in a work jacket, a teenager with headphones, a woman in a raincoat. Each customer in three expressions: neutral, surprised, thankful. Flat dark background, same strict pixel grid and limited palette.
 ```

@@ -15,8 +15,8 @@
       "targetSeconds": 90
     },
     {
-      "id": "cardigan",
-      "customer": { "look": "cardigan", "description": "Elderly woman in a cardigan" },
+      "id": "robe",
+      "customer": { "look": "robe", "description": "Old man in a robe" },
       "symptom": "loose-grip",
       "parts": ["grip-screw", "grip-panels"],
       "dirty": [{ "part": "grip-panels", "kind": "grime" }],

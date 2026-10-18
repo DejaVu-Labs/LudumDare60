@@ -405,7 +405,7 @@ public sealed class ShopTests
         Assert.Equal(ShopEvents.CustomerLeft | ShopEvents.CustomerEntered, events);
         Assert.Equal(ShopPhase.Arriving, _shop.Phase);
         Assert.Equal(1, _shop.OrderIndex);
-        Assert.Equal("cardigan", _shop.Bench!.Order.Id);
+        Assert.Equal("robe", _shop.Bench!.Order.Id);
         Assert.Equal(0, _shop.Bench.IndexOf(RevolverParts.GripScrew));
     }
 

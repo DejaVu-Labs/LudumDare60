@@ -25,7 +25,7 @@ internal static class PlaceholderCustomers
     /// <summary>
     /// The looks the sheet draws, by the names <see cref="Customer.Look"/> uses, in sheet order.
     /// </summary>
-    public static readonly IReadOnlyList<string> Looks = ["hoodie", "cardigan", "work-jacket", "headphones", "raincoat"];
+    public static readonly IReadOnlyList<string> Looks = ["hoodie", "robe", "work-jacket", "headphones", "raincoat"];
 
     /// <summary>
     /// Where a bust is drawn from: the middle of its bottom edge, which stands on the far edge of the bench.
@@ -80,7 +80,7 @@ internal static class PlaceholderCustomers
         // A hood up, in night blue.
         new(Skin: 0xb37149, SkinShade: 0x944f2d, Hair: 0x2b120b, Cloth: 0x2e4a70, ClothShade: 0x243a5a, ClothLight: 0x3c608c, Headwear.Hood),
 
-        // Gray hair in a bun, a warm cardigan.
+        // Gray hair in a bun, a warm robe.
         new(Skin: 0xe2ad5f, SkinShade: 0xd2834a, Hair: 0xb3a99b, Cloth: 0xa1603b, ClothShade: 0x944f2d, ClothLight: 0xb37149, Headwear.Bun),
 
         // Short dark hair, a canvas work jacket.

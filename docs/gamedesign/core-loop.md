@@ -125,7 +125,7 @@ yet (see [backlog](../backlog.md#shop-loop-follow-ups)).
 | # | Customer (today) | Symptom | Parts that move | New verb | Find (1870s-1900s) | Target time |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Young person in a hoodie | Cylinder jammed (rust) | base pin, cylinder | pull, scrub, test, hand back | Rolled note in a chamber | 1.5 min |
-| 2 | Elderly woman in a cardigan | Grip loose and grimy | grip screw, grip panels | unscrew | Photo under a grip panel | 2 min |
+| 2 | Old man in a robe | Grip loose and grimy | grip screw, grip panels | unscrew | Photo under a grip panel | 2 min |
 | 3 | Man in a work jacket | Hammer will not stay cocked (broken spring) | grip screw, grip panels, mainspring | replace from the tray | Initials carved inside the frame | 2 min |
 | 4 | Teenager with headphones | Action stiff, heavy rust | base pin, cylinder, hammer screw, hammer | oil | One unspent cartridge in a chamber | 2.5 min |
 | 5 | Woman in a raincoat | "Make it work again" (everything) | all of the above | none | The find that joins both timelines | 2.5 min |

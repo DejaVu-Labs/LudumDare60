@@ -15,12 +15,13 @@ public sealed class LudumDare60GameTests
 {
     private const double Step = 1.0 / 60;
 
-    // Texture ids in creation order: the two placeholder sheets, the hoodie customer's sheet and its glow on the first
-    // frame, the rust when the first customer comes in.
+    // Texture ids in creation order: the two placeholder sheets, the hoodie and robe customers' sheets with their glows
+    // on the first frame, the rust when the first customer comes in.
     private const int CustomersTexture = 1;
     private const int CustomerTexture = 2;
     private const int CustomerGlowTexture = 3;
-    private const int RustTexture = 4;
+    private const int RobeCustomerTexture = 4;
+    private const int RustTexture = 6;
 
     // Sound ids in creation order.
     private const int DoorBellSound = 2;
@@ -995,11 +996,11 @@ public sealed class LudumDare60GameTests
         var bells = _platform.AudioBackend.AllCommands().Count(c => c.Kind == AudioCommandKind.Play && (int)c.Arguments[0] == DoorBellSound);
         Assert.Equal(3, bells);
         Assert.True(Shop.Phase is ShopPhase.Arriving or ShopPhase.Offering, $"The shop is {Shop.Phase}.");
-        Assert.Equal("cardigan", Bench.Order.Id);
+        Assert.Equal("robe", Bench.Order.Id);
         Assert.Contains($"destroy {RustTexture}", _platform.Backend.Calls, StringComparer.Ordinal);
 
-        // Nobody has drawn the cardigan customer yet: the placeholder bust comes in, without the revolver.
-        _ = DrawnOn(LastFrame, CustomersTexture, PlaceholderCustomers.Bust("cardigan"));
+        // The robe customer has a sheet of its own: it comes in presenting, without the revolver yet.
+        _ = DrawnOn(LastFrame, RobeCustomerTexture, CustomerSheet.Frame(CustomerPose.Presenting));
         Assert.Null(Sprite(LastFrame, PlaceholderParts.Body));
     }
 
