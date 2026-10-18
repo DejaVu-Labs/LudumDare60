@@ -12,7 +12,7 @@ public enum CustomerPose
     Presenting = 0,
 
     /// <summary>
-    /// Waiting while the player repairs it: on the phone.
+    /// Waiting while the player repairs it: on the phone, or sitting on a seat (see <see cref="CustomerSeats"/>).
     /// </summary>
     Waiting = 1,
 

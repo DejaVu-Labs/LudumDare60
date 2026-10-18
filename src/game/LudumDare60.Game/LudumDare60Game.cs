@@ -577,10 +577,19 @@ public sealed class LudumDare60Game : IGame
         var look = order.Customer.Look;
         var bottom = new Vector2(MathF.Round(shop.CustomerX), Shop.CustomerBottom);
         var sheet = CustomerSheetIndex(look);
-        var scale = new Vector2(CustomerScale);
+        var hasSheet = sheet >= 0 && _hasCustomerSheet[sheet];
+        var customerScale = CustomerScale;
+        if (hasSheet && shop.Pose == CustomerPose.Waiting && CustomerSeats.TryGetWaitingSeat(look, out var seat))
+        {
+            // Their waiting frame sits: they wait on their seat, not at the counter.
+            bottom = seat.Bottom;
+            customerScale = seat.Scale;
+        }
+
+        var scale = new Vector2(customerScale);
         var bust = new SpriteOptions { Origin = PlaceholderCustomers.BustOrigin, Scale = scale };
         var glow = new SpriteOptions { Origin = PlaceholderCustomers.BustOrigin + Vector2.One, Scale = scale, Tint = Color.White.WithAlpha(_customerGlow) };
-        if (sheet >= 0 && _hasCustomerSheet[sheet])
+        if (hasSheet)
         {
             // A drawn customer: the frame of their pose.
             if (_customerGlow > 0)
@@ -610,7 +619,8 @@ public sealed class LudumDare60Game : IGame
 
         if (shop.Phase == ShopPhase.Working)
         {
-            var bubble = bottom + s_bubbleOffset;
+            // Next to the head, wherever the customer waits and however large they are drawn there.
+            var bubble = bottom + (s_bubbleOffset * (customerScale / CustomerScale));
             batch.Draw(_customers, PlaceholderCustomers.Bubble, bubble);
             batch.Draw(_customers, PlaceholderCustomers.Icon(order.Symptom), bubble + PlaceholderCustomers.IconInBubble);
         }

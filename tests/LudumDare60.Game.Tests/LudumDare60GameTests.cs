@@ -1005,6 +1005,35 @@ public sealed class LudumDare60GameTests
     }
 
     [Fact]
+    public void RobeCustomer_WhileWaiting_SitsUnderThePaintingWithTheBubble()
+    {
+        StartWithSound();
+        RepairAndTest();
+        HandBack();
+        for (var i = 0; i < 1200 && !(Shop.Phase == ShopPhase.Offering && string.Equals(Shop.Bench?.Order.Id, "robe", StringComparison.Ordinal)); i++)
+        {
+            Idle(1);
+        }
+
+        ClickTheCustomer();
+        for (var i = 0; i < 600 && Shop.Pose != CustomerPose.Waiting; i++)
+        {
+            Idle(1);
+        }
+
+        Assert.Equal(CustomerPose.Waiting, Shop.Pose);
+        var seat = CustomerSeats.UnderThePainting;
+        var sitting = DrawnOn(LastFrame, RobeCustomerTexture, CustomerSheet.Frame(CustomerPose.Waiting));
+        Assert.Equal(seat.Bottom, sitting.Position);
+        Assert.Equal(new Vector2(seat.Scale), sitting.Scale);
+
+        // The bubble moves with the customer: up and to the right of the seated bust, not at the counter.
+        var bubble = Drawn(LastFrame, PlaceholderCustomers.Bubble).Position;
+        Assert.InRange(bubble.X, seat.Bottom.X, Shop.CounterX - Shop.CustomerHalfWidth);
+        Assert.InRange(bubble.Y, 0, seat.Bottom.Y - (seat.Scale * CustomerSheet.FrameHeight / 2));
+    }
+
+    [Fact]
     public void FirstOrder_PartsItKeepsFixed_AreDrawnInTheirSeatsWithoutGlow()
     {
         StartWithSound();

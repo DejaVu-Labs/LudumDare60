@@ -56,7 +56,10 @@ busts from the chest up, 72x96 px each, side by side (216x96), standing on the b
 times larger, with the bottom middle on the far edge of the bench (y = 140):
 
 1. **Presenting:** bringing the revolver in, and waiting with a hand out to take it back.
-2. **Waiting:** while the repair goes on, on the phone.
+2. **Waiting:** while the repair goes on, on the phone. A customer whose waiting frame sits down waits on a seat in
+   the background instead of the counter (`Customers/CustomerSeats`): `robe` sits on the bench under the revolver
+   painting, bottom middle at (152, 136), drawn 0.9 times larger since that bench stands at the back wall. The
+   symptom bubble moves and scales with them. They switch places at once, without a walk.
 3. **Pleased:** with the revolver back, until they are out of the door.
 
 Sheets so far: `hoodie` and `robe`. Looks without a sheet are drawn as code placeholders. A sheet made from a
