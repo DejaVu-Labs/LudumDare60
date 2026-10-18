@@ -15,8 +15,10 @@ public sealed class LudumDare60GameTests
 {
     private const double Step = 1.0 / 60;
 
-    // Texture ids in creation order: the two sheets on the first frame, the rust when the first customer comes in.
-    private const int RustTexture = 2;
+    // Texture ids in creation order: the two placeholder sheets and the hoodie customer's sheet on the first frame,
+    // the rust when the first customer comes in.
+    private const int CustomerTexture = 2;
+    private const int RustTexture = 3;
 
     // Sound ids in creation order.
     private const int DoorBellSound = 2;
@@ -65,6 +67,57 @@ public sealed class LudumDare60GameTests
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// The texture the first instance drawn from <paramref name="source"/> in <paramref name="frame"/> came from, or -1.
+    /// </summary>
+    private static int TextureOf(SubmittedFrame frame, IntRect source)
+    {
+        foreach (var command in frame.Decode())
+        {
+            if (command.Kind != RenderCommandKind.DrawSprites)
+            {
+                continue;
+            }
+
+            for (var i = command.Arguments[1]; i < command.Arguments[1] + command.Arguments[2]; i++)
+            {
+                var instance = frame.Instances[i];
+                if (instance.SourceX == source.X && instance.SourceY == source.Y && instance.SourceWidth == source.Width && instance.SourceHeight == source.Height)
+                {
+                    return command.Arguments[0];
+                }
+            }
+        }
+
+        return -1;
+    }
+
+    /// <summary>
+    /// The instance drawn from <paramref name="source"/> of texture <paramref name="texture"/>: several sheets share
+    /// rectangles.
+    /// </summary>
+    private static SpriteInstance DrawnOn(SubmittedFrame frame, int texture, IntRect source)
+    {
+        foreach (var command in frame.Decode())
+        {
+            if (command.Kind != RenderCommandKind.DrawSprites || command.Arguments[0] != texture)
+            {
+                continue;
+            }
+
+            for (var i = command.Arguments[1]; i < command.Arguments[1] + command.Arguments[2]; i++)
+            {
+                var instance = frame.Instances[i];
+                if (instance.SourceX == source.X && instance.SourceY == source.Y && instance.SourceWidth == source.Width && instance.SourceHeight == source.Height)
+                {
+                    return instance;
+                }
+            }
+        }
+
+        throw new Xunit.Sdk.XunitException($"Nothing was drawn from {source} of texture {texture}.");
     }
 
     private static SpriteInstance Drawn(SubmittedFrame frame, IntRect source)
@@ -278,7 +331,7 @@ public sealed class LudumDare60GameTests
         _platform.Frame(0);
         _platform.Frame(0.01);
 
-        Assert.Equal(2, _platform.Backend.Textures.Count);
+        Assert.Equal(3, _platform.Backend.Textures.Count);
         Assert.Equal(3, _platform.AudioBackend.Sounds.Count);
         Assert.Equal(2, _platform.Backend.Frames.Count);
     }
@@ -337,9 +390,9 @@ public sealed class LudumDare60GameTests
         _platform.AudioBackend.ReportReady(0, 1, 2);
 
         HoldAt(new Vector2(600, 40), (int)(Shop.WaitSeconds * 60) + 2);
-        var entering = Drawn(LastFrame, PlaceholderCustomers.Bust("hoodie"));
+        var entering = DrawnOn(LastFrame, CustomerTexture, CustomerSheet.Frame(CustomerPose.Presenting));
         HoldAt(new Vector2(600, 40), (int)(Shop.WalkSeconds * 60) + 2);
-        var arrived = Drawn(LastFrame, PlaceholderCustomers.Bust("hoodie"));
+        var arrived = DrawnOn(LastFrame, CustomerTexture, CustomerSheet.Frame(CustomerPose.Presenting));
 
         Assert.Contains(_platform.AudioBackend.AllCommands(), c => c.Kind == AudioCommandKind.Play && (int)c.Arguments[0] == DoorBellSound);
         Assert.InRange(entering.Position.X, Shop.CounterX + 50, Shop.DoorX);
@@ -355,7 +408,7 @@ public sealed class LudumDare60GameTests
         Assert.Contains(0.35, PlayedPitches().Select(p => Math.Round(p, 3)));
         Assert.NotNull(Sprite(LastFrame, PlaceholderCustomers.Bubble));
         Assert.NotNull(Sprite(LastFrame, PlaceholderCustomers.Icon(Symptom.JammedCylinder)));
-        Assert.NotNull(Sprite(LastFrame, PlaceholderCustomers.Face(Expression.Neutral)));
+        Assert.Null(Sprite(LastFrame, PlaceholderCustomers.Face(Expression.Neutral)));
         Assert.Equal(BenchLayout.PinSeated, Drawn(LastFrame, PlaceholderParts.Pin).Position);
     }
 
@@ -430,6 +483,29 @@ public sealed class LudumDare60GameTests
         Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.HammerGlow).Tint.A);
         Assert.InRange(Drawn(LastFrame, PlaceholderParts.PinGlow).Tint.A, 1, 255);
         Assert.Null(Sprite(LastFrame, PlaceholderParts.CylinderTurned));
+    }
+
+    [Fact]
+    public void AtTheCounter_PresentsTheRevolverThenWaitsOnThePhone()
+    {
+        ArriveWithSound();
+        var presenting = TextureOf(LastFrame, CustomerSheet.Frame(CustomerPose.Presenting));
+
+        Idle((int)(Shop.PresentSeconds * 60) + 5);
+
+        Assert.Equal(CustomerTexture, presenting);
+        Assert.Equal(CustomerTexture, TextureOf(LastFrame, CustomerSheet.Frame(CustomerPose.Waiting)));
+        Assert.NotNull(Sprite(LastFrame, PlaceholderCustomers.Bubble));
+    }
+
+    [Fact]
+    public void Repaired_TheCustomerPresentsAgainWithAHandOut()
+    {
+        StartWithSound();
+        RepairAndTest();
+        Idle(1);
+
+        Assert.Equal(CustomerTexture, TextureOf(LastFrame, CustomerSheet.Frame(CustomerPose.Presenting)));
     }
 
     [Fact]
@@ -718,7 +794,7 @@ public sealed class LudumDare60GameTests
         Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.PinGlow).Tint.A);
         Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.BodyGlow).Tint.A);
         Assert.Null(Sprite(LastFrame, PlaceholderCustomers.Hand));
-        Assert.Equal(new Vector2(Shop.CounterX, LudumDare60Game.CustomerBottom), Drawn(LastFrame, PlaceholderCustomers.Bust("hoodie")).Position);
+        Assert.Equal(new Vector2(Shop.CounterX, LudumDare60Game.CustomerBottom), DrawnOn(LastFrame, CustomerTexture, CustomerSheet.Frame(CustomerPose.Waiting)).Position);
         Assert.Equal(BenchLayout.HammerPivot, Drawn(LastFrame, PlaceholderParts.Hammer).Position);
         Assert.Equal(ActionTest.HalfCock * ActionTest.CockAngle, Drawn(LastFrame, PlaceholderParts.Hammer).Rotation, 1e-4);
     }
@@ -807,7 +883,7 @@ public sealed class LudumDare60GameTests
 
         Assert.Equal(ShopPhase.Thanking, Shop.Phase);
         Assert.Contains(0.9, PlayedPitches(before).Select(p => Math.Round(p, 3)));
-        Assert.NotNull(Sprite(LastFrame, PlaceholderCustomers.Face(Expression.Thankful)));
+        Assert.Equal(CustomerTexture, TextureOf(LastFrame, CustomerSheet.Frame(CustomerPose.Pleased)));
         Assert.Null(Sprite(LastFrame, PlaceholderParts.Body));
         Assert.Null(Sprite(LastFrame, PlaceholderParts.Hammer));
         Assert.Null(Sprite(LastFrame, PlaceholderParts.Brush));
@@ -835,7 +911,7 @@ public sealed class LudumDare60GameTests
         _platform.Frame(0);
 
         Assert.False(_game.HasBackground);
-        Assert.Equal(2, _platform.Backend.Textures.Count);
+        Assert.Equal(3, _platform.Backend.Textures.Count);
     }
 
     [Fact]
@@ -872,7 +948,7 @@ public sealed class LudumDare60GameTests
         platform.Frame(0);
         platform.Frame(0.01);
 
-        Assert.Equal(3, platform.Backend.Textures.Count);
+        Assert.Equal(4, platform.Backend.Textures.Count);
         Assert.Single(platform.Backend.Frames[1].Instances);
     }
 

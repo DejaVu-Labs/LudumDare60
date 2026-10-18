@@ -48,6 +48,19 @@ are and reduced to the palette (nearest color in OKLab, no dithering).
 - Keep 32 colors for now. Trim (towards 24) only after the first sprites, by merging steps that never appear next to
   each other.
 
+## Customer sheets
+
+One PNG per customer look in `src/game/LudumDare60.Game.Browser/wwwroot/assets/customers/<look>.png` (the look is
+`customer.look` in `orders.json`), listed in `AssetPaths.CustomerSheets`; the source goes in `art/sprites/`. Three
+busts from the chest up, 72x96 px each, side by side (216x96), standing on the bottom edge. The game draws them 1.4
+times larger, with the bottom middle on the far edge of the bench (y = 140):
+
+1. **Presenting:** bringing the revolver in, and waiting with a hand out to take it back.
+2. **Waiting:** while the repair goes on, on the phone.
+3. **Pleased:** with the revolver back, until they are out of the door.
+
+The first sheet is `hoodie`. Looks without a sheet are drawn as code placeholders.
+
 ## Concept art prompts
 
 For external image generators. These images are mood references only: in the Compo every asset is drawn by

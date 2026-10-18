@@ -74,9 +74,14 @@ public sealed class ShopTests
     /// event seen.
     /// </summary>
     private static ShopEvents Repair(Shop shop)
+        => Wait(shop, Shop.WaitSeconds + Shop.WalkSeconds + Shop.DropSeconds + 0.1f) | RepairWithoutWaiting(shop);
+
+    /// <summary>
+    /// Repairs the order on the bench, the customer already at the counter.
+    /// </summary>
+    private static ShopEvents RepairWithoutWaiting(Shop shop)
     {
-        var seen = Wait(shop, Shop.WaitSeconds + Shop.WalkSeconds + Shop.DropSeconds + 0.1f);
-        seen |= PullHammer(shop);
+        var seen = PullHammer(shop);
         seen |= Drag(shop, BenchLayout.PinSeated, BenchLayout.PinOut);
         seen |= Drag(shop, BenchLayout.CylinderSeated, BenchLayout.CylinderOut);
 
@@ -340,6 +345,29 @@ public sealed class ShopTests
         Assert.False(shop.Test!.IsFired);
         Assert.Equal(PartStop.Start, shop.Bench.Part(RevolverParts.Cylinder).Stop);
         Assert.False(shop.Bench.Dirt(RevolverParts.Cylinder)!.IsClean);
+    }
+
+    [Fact]
+    public void Pose_ThroughAVisit_PresentsWaitsPresentsAndIsPleased()
+    {
+        Wait(_shop, Shop.WaitSeconds + Dt);
+        var arriving = _shop.Pose;
+        Wait(_shop, Shop.WalkSeconds + 0.5f);
+        var justArrived = _shop.Pose;
+        Wait(_shop, Shop.PresentSeconds);
+        var working = _shop.Pose;
+        RepairWithoutWaiting(_shop);
+        var testing = _shop.Pose;
+        FireTest(_shop);
+        var ready = _shop.Pose;
+        HandBack(_shop);
+
+        Assert.Equal(CustomerPose.Presenting, arriving);
+        Assert.Equal(CustomerPose.Presenting, justArrived);
+        Assert.Equal(CustomerPose.Waiting, working);
+        Assert.Equal(CustomerPose.Waiting, testing);
+        Assert.Equal(CustomerPose.Presenting, ready);
+        Assert.Equal(CustomerPose.Pleased, _shop.Pose);
     }
 
     [Fact]

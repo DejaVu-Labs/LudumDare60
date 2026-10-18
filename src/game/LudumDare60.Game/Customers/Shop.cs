@@ -145,6 +145,23 @@ public sealed class Shop
     };
 
     /// <summary>
+    /// How long the customer keeps presenting the revolver at the counter before waiting on the phone, in seconds.
+    /// </summary>
+    public const float PresentSeconds = 2.5f;
+
+    /// <summary>
+    /// How the customer stands: presenting the revolver as they come in and for a moment after putting it down, on the
+    /// phone while the player works, presenting again with a hand out to take it back, and pleased once they have it.
+    /// </summary>
+    public CustomerPose Pose => Phase switch
+    {
+        ShopPhase.Working when PhaseTime < PresentSeconds => CustomerPose.Presenting,
+        ShopPhase.Working or ShopPhase.Testing => CustomerPose.Waiting,
+        ShopPhase.Thanking or ShopPhase.Leaving => CustomerPose.Pleased,
+        _ => CustomerPose.Presenting,
+    };
+
+    /// <summary>
     /// How far the revolver is drawn from where it lies on the bench: falling onto the mat at first, then lifted
     /// towards the customer while the player hands it back.
     /// </summary>

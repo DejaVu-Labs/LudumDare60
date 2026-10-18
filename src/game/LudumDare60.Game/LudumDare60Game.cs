@@ -56,7 +56,12 @@ public sealed class LudumDare60Game : IGame
     /// <summary>
     /// Where a customer's bust stands, in virtual pixels: on the far edge of the bench.
     /// </summary>
-    public const float CustomerBottom = 150;
+    public const float CustomerBottom = 140;
+
+    /// <summary>
+    /// How much larger than their sheet a customer is drawn, around the bottom middle of the bust.
+    /// </summary>
+    public const float CustomerScale = 1.4f;
 
     // Glow alpha of a part that can move, pulsing, and of the part under the pointer or in the hand.
     private const float GlowIdleBase = 70;
@@ -86,7 +91,7 @@ public sealed class LudumDare60Game : IGame
 
     // The hand held out, and the bubble with the symptom, relative to the customer's bottom middle.
     private static readonly Vector2 s_handOffset = new(-14, 12);
-    private static readonly Vector2 s_bubbleOffset = new(16, -104);
+    private static readonly Vector2 s_bubbleOffset = new(48, -120);
 
     private AssetManager? _assets;
     private Graphics? _graphics;
@@ -116,6 +121,11 @@ public sealed class LudumDare60Game : IGame
     private float _triggerAngle;
     private Vector2 _gunOffset;
     private float _time;
+
+    // The drawn customer sheets, as AssetPaths.CustomerSheets lists them.
+    private readonly AssetHandle<Image>[] _customerImages = new AssetHandle<Image>[AssetPaths.CustomerSheets.Count];
+    private readonly Texture[] _customerSheets = new Texture[AssetPaths.CustomerSheets.Count];
+    private readonly bool[] _hasCustomerSheet = new bool[AssetPaths.CustomerSheets.Count];
 
     // The bench the arrays below belong to, and per part of its order.
     private OrderBench? _shownBench;
@@ -155,6 +165,11 @@ public sealed class LudumDare60Game : IGame
         assets.Register(new ImageLoader());
         assets.Register(new OrderBookLoader());
         _benchImage = assets.Request<Image>(AssetPaths.Bench);
+        for (var i = 0; i < _customerImages.Length; i++)
+        {
+            _customerImages[i] = assets.Request<Image>(AssetPaths.CustomerSheets[i].Value);
+        }
+
         _ordersHandle = assets.Request<OrderBook>(AssetPaths.Orders);
     }
 
@@ -234,6 +249,16 @@ public sealed class LudumDare60Game : IGame
             _bench = _graphics!.CreateTexture(bench);
             _assets.Release(_benchImage);
             HasBackground = true;
+        }
+
+        for (var i = 0; i < _customerImages.Length; i++)
+        {
+            if (!_hasCustomerSheet[i] && _assets!.TryGet(_customerImages[i], out var sheet))
+            {
+                _customerSheets[i] = _graphics!.CreateTexture(sheet);
+                _assets.Release(_customerImages[i]);
+                _hasCustomerSheet[i] = true;
+            }
         }
 
         if (_hasScrubVoice && Bench is { } orderBench)
@@ -463,9 +488,21 @@ public sealed class LudumDare60Game : IGame
     {
         var look = order.Customer.Look;
         var bottom = new Vector2(MathF.Round(shop.CustomerX), CustomerBottom);
-        batch.Draw(_customers, PlaceholderCustomers.Bust(look), bottom, new SpriteOptions { Origin = PlaceholderCustomers.BustOrigin });
-        var bustTopLeft = bottom - PlaceholderCustomers.BustOrigin;
-        batch.Draw(_customers, PlaceholderCustomers.Face(shop.Expression), bustTopLeft + PlaceholderCustomers.FaceOffset);
+        var sheet = CustomerSheetIndex(look);
+        var bust = new SpriteOptions { Origin = PlaceholderCustomers.BustOrigin, Scale = new Vector2(CustomerScale) };
+        if (sheet >= 0 && _hasCustomerSheet[sheet])
+        {
+            // A drawn customer: the frame of their pose.
+            batch.Draw(_customerSheets[sheet], CustomerSheet.Frame(shop.Pose), bottom, bust);
+        }
+        else
+        {
+            // The face sits on the placeholder bust, scaled with it from the bust's bottom middle.
+            batch.Draw(_customers, PlaceholderCustomers.Bust(look), bottom, bust);
+            var face = bottom + ((PlaceholderCustomers.FaceOffset - PlaceholderCustomers.BustOrigin) * CustomerScale);
+            batch.Draw(_customers, PlaceholderCustomers.Face(shop.Expression), face, new SpriteOptions { Scale = new Vector2(CustomerScale) });
+        }
+
         if (shop.IsHandOut)
         {
             batch.Draw(_customers, PlaceholderCustomers.Hand, bottom + s_handOffset, new SpriteOptions { Tint = PlaceholderCustomers.Skin(look) });
@@ -477,6 +514,19 @@ public sealed class LudumDare60Game : IGame
             batch.Draw(_customers, PlaceholderCustomers.Bubble, bubble);
             batch.Draw(_customers, PlaceholderCustomers.Icon(order.Symptom), bubble + PlaceholderCustomers.IconInBubble);
         }
+    }
+
+    private static int CustomerSheetIndex(string look)
+    {
+        for (var i = 0; i < AssetPaths.CustomerSheets.Count; i++)
+        {
+            if (string.Equals(AssetPaths.CustomerSheets[i].Key, look, StringComparison.Ordinal))
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     private void DrawTurning(SpriteBatch batch, IntRect sprite, IntRect glow, Vector2 origin, Vector2 pivot, float angle, byte glowAlpha)

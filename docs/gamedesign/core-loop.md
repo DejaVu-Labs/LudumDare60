@@ -59,7 +59,8 @@ The player controls the pace. Nothing in the loop has a timer, and nothing in it
 
 ## What is built
 
-`Customers/Shop` runs the loop on the orders of `orders.json`, one customer at a time. After a moment the door bell
+`Customers/Shop` runs the loop on the orders of `orders.json`, one customer at a time; the customer's pose follows
+the visit (see [Customer sheets](art-direction.md#customer-sheets)). After a moment the door bell
 rings and the customer walks from the door to the counter; the revolver drops onto the mat with a thud, and a
 bubble shows the symptom icon. The hammer glows first (`Bench/ActionTest`): the player drags its spur back (it turns
 around its pivot) until it clicks into the half-cock notch, where it stays; a hammer let go before the notch falls
