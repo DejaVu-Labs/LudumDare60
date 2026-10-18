@@ -542,9 +542,11 @@ public sealed class LudumDare60GameTests
         TakeApart();
         var before = PlayCount();
 
+        // Carried across its seat: it does not drop in, and the brush flashes when it gets there.
+        var framesBefore = _platform.Backend.Frames.Count;
         _platform.Frame(Step, PointerDown(BenchLayout.CylinderOut));
-        var flash = Drawn(LastFrame, PlaceholderParts.BrushGlow).Tint.A;
         HoldAt(BenchLayout.CylinderSeated - new Vector2(0, 20), 90);
+        var flash = _platform.Backend.Frames.Skip(framesBefore).Max(frame => Drawn(frame, PlaceholderParts.BrushGlow).Tint.A);
 
         Assert.True(Bench.Part(RevolverParts.Cylinder).IsFree);
         Assert.Equal(Rust.InitialDirt, Rust.Dirt);
@@ -567,7 +569,7 @@ public sealed class LudumDare60GameTests
     }
 
     [Fact]
-    public void CleanCylinderBroughtBack_SticksWithAClick()
+    public void CleanCylinderBroughtNearItsSeat_DropsInWithAClick()
     {
         StartWithSound();
         TakeApart();
@@ -576,10 +578,25 @@ public sealed class LudumDare60GameTests
         var before = PlayCount();
 
         _platform.Frame(Step, PointerDown(new Vector2(150, 300)));
-        HoldAt(BenchLayout.CylinderOut + new Vector2(3, 4), 60);
+        HoldAt(BenchLayout.CylinderSeated + new Vector2(4, 3), 60);
 
         Assert.False(Bench.Part(RevolverParts.Cylinder).IsFree);
-        Assert.Contains(Math.Round(1.05 * 0.8, 3), PlayedPitches(before).Select(p => Math.Round(p, 3)));
+        Assert.Equal(PartStop.Start, Bench.Part(RevolverParts.Cylinder).Stop);
+        Assert.Equal(BenchLayout.CylinderSeated, Drawn(LastFrame, PlaceholderParts.Cylinder).Position);
+        Assert.Contains(Math.Round(0.75 * 0.8, 3), PlayedPitches(before).Select(p => Math.Round(p, 3)));
+    }
+
+    [Fact]
+    public void CleanCylinderAlongItsOldWayOut_DoesNotStick()
+    {
+        StartWithSound();
+        TakeApart();
+        ScrubCylinderClean();
+        Drag(BenchLayout.CylinderOut, new Vector2(150, 300));
+
+        Drag(new Vector2(150, 300), BenchLayout.CylinderSeated + new Vector2(0, 30));
+
+        Assert.True(Bench.Part(RevolverParts.Cylinder).IsFree);
     }
 
     [Fact]

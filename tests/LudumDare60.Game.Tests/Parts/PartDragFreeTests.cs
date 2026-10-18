@@ -196,6 +196,46 @@ public sealed class PartDragFreeTests
     }
 
     [Fact]
+    public void Step_SeatsOnDock_NoRailBackOnlyItsSeat()
+    {
+        // A cylinder: out after a short pull, back only by being brought to its seat.
+        var shortPath = new LinePath(new Vector2(100, 50), new Vector2(100, 60));
+        var cylinder = new PartDrag(shortPath, 8, DragFeel.Default, PartStop.Start, new FreeMove(s_min, s_max, DockRadius: 6, DockSpan: 0, SeatsOnDock: true));
+        cylinder.Step(Press(shortPath.Start), Dt);
+        var outEvents = HoldAt(cylinder, new Vector2(100, 120), 60);
+        Assert.True((outEvents & DragEvents.SnappedEnd) != DragEvents.None);
+        Assert.True(cylinder.IsFree);
+        Assert.Equal(120, cylinder.Position.Y, 0.5f);
+
+        // Along where the rail was: no sticking.
+        var near = HoldAt(cylinder, new Vector2(101, 64), 60);
+        Assert.Equal(DragEvents.None, near);
+        Assert.True(cylinder.IsFree);
+
+        var seat = HoldAt(cylinder, new Vector2(103, 53), 60);
+
+        Assert.True((seat & DragEvents.SnappedStart) != DragEvents.None);
+        Assert.False(cylinder.IsFree);
+        Assert.False(cylinder.IsHeld);
+        Assert.Equal(PartStop.Start, cylinder.Stop);
+        Assert.Equal(shortPath.Start, cylinder.Position);
+    }
+
+    [Fact]
+    public void Step_SeatsOnDockRefused_StaysLooseAtTheSeat()
+    {
+        var shortPath = new LinePath(new Vector2(100, 50), new Vector2(100, 60));
+        var cylinder = new PartDrag(shortPath, 8, DragFeel.Default, PartStop.Start, new FreeMove(s_min, s_max, DockRadius: 6, DockSpan: 0, SeatsOnDock: true));
+        cylinder.Step(Press(shortPath.Start), Dt);
+        HoldAt(cylinder, new Vector2(100, 120), 60);
+
+        var refused = HoldAt(cylinder, shortPath.Start, 60, canDock: false);
+
+        Assert.Equal(DragEvents.DockRefused, refused);
+        Assert.True(cylinder.IsFree);
+    }
+
+    [Fact]
     public void GetRenderPosition_Loose_InterpolatesTheLastStep()
     {
         PullOut();

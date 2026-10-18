@@ -88,12 +88,13 @@ yet (see [backlog](../backlog.md#shop-loop-follow-ups)).
 - **A part is in one of five states:** blocked, available (glows), held (being dragged), off (on the mat),
   back (in its slot).
 - **Parts out of the gun lie anywhere.** A part pulled to the end of its rail clicks out and stays in the hand; it can
-  be carried anywhere on the work surface and put down there. Brought back close to its rail it sticks to it
-  (`FreeMove` per part: the cylinder anywhere along its way out of the window, about 10 px off; the base pin only tip
-  first, at the mouth of the bore, within about 4 px), with a soft click, and can be pushed in from there; pulled
-  off to the side near the end of the rail it comes loose again. A part put down on the revolver lies on top of it.
+  be carried anywhere on the work surface and put down there. How it goes back depends on the part (`FreeMove`):
+  the base pin goes in tip first, so brought within about 4 px of the mouth of the bore it sticks to its rail with a
+  soft click and is pushed in from there (pulled off to the side it comes loose again); the cylinder has no rail at
+  all, it comes free after a short pull out of its window and drops back into it with a click when brought within
+  about 8 px of its place. A part put down on the revolver lies on top of it.
 - **Dirty parts:** each has a dirt layer and a clean threshold (about 90 % of its pixels). A dirty part can be moved
-  like any other, but it does not fit: brought to its rail it does not stick, a dull tick plays and the part and the
+  like any other, but it does not fit: brought back to its rail or its place it does not go in, a dull tick plays and the part and the
   wire brush flash. A press on the brush picks it up; while the button stays down its bristles follow the pointer
   and erase dirt wherever they pass over a part out of the gun. The scrub sound rasps louder and a little higher the
   faster the brush moves over the metal, and falls silent when it stops or leaves the part; bare steel sounds softer

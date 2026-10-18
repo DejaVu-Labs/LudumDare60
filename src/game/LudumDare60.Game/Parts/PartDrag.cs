@@ -312,12 +312,13 @@ public sealed class PartDrag
     }
 
     /// <summary>
-    /// Whether the loose part lies close enough to its rail to stick to it, and where on the rail.
+    /// Whether the loose part lies close enough to its rail to stick to it, and where on the rail: near its seat for a
+    /// part that seats on docking.
     /// </summary>
     private bool InDockZone(out float distance)
     {
         var free = _free!.Value;
-        distance = Math.Clamp(Path.Project(_freePosition), Path.Length - free.DockSpan, Path.Length);
+        distance = free.SeatsOnDock ? 0 : Math.Clamp(Path.Project(_freePosition), Path.Length - free.DockSpan, Path.Length);
         return Vector2.Distance(_freePosition, Path.PointAt(distance)) <= free.DockRadius;
     }
 
@@ -350,6 +351,14 @@ public sealed class PartDrag
         if (!canDock)
         {
             return entered ? DragEvents.DockRefused : DragEvents.None;
+        }
+
+        if (free.SeatsOnDock)
+        {
+            // It drops into its seat with a click and out of the hand.
+            IsFree = false;
+            _leftStop = PartStop.None;
+            return SnapTo(PartStop.Start);
         }
 
         // It sticks to its rail and can be pushed in from here.

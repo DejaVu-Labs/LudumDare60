@@ -42,7 +42,13 @@ public static class BenchLayout
     public static readonly Vector2 CylinderSeated = GunPosition + PlaceholderParts.CylinderInBody;
 
     /// <summary>
-    /// The cylinder's middle when it is out: below the revolver, on the mat, clear of the trigger guard.
+    /// How far the cylinder moves out of its window before it comes free in the hand.
+    /// </summary>
+    public const float CylinderPull = 10;
+
+    /// <summary>
+    /// A good place for the cylinder once it is out: below the revolver, on the mat, clear of the trigger guard. The
+    /// cylinder can lie anywhere; this is where the tests and the brush's first place expect it.
     /// </summary>
     public static readonly Vector2 CylinderOut = CylinderSeated + new Vector2(0, 64);
 
@@ -81,7 +87,7 @@ public static class BenchLayout
         Free: new FreeMove(MatMin, MatMax, DockRadius: 4, DockSpan: 4));
 
     private static readonly PartLayout s_cylinder = new(
-        new LinePath(CylinderSeated, CylinderOut),
+        new LinePath(CylinderSeated, CylinderSeated + new Vector2(0, CylinderPull)),
         GrabRadius: 11,
         new DragFeel { BreakawayAtStart = 4 },
         PlaceholderParts.Cylinder,
@@ -90,7 +96,7 @@ public static class BenchLayout
         UnderFrame: false,
         ClickPitch: 0.8f,
         PlaceholderParts.CylinderTurned,
-        new FreeMove(MatMin, MatMax, DockRadius: 10, DockSpan: CylinderOut.Y - CylinderSeated.Y));
+        new FreeMove(MatMin, MatMax, DockRadius: 8, DockSpan: 0, SeatsOnDock: true));
 
     /// <summary>
     /// The layout of part <paramref name="id"/>, if it has one yet.
