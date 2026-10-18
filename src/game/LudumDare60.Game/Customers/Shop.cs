@@ -317,9 +317,10 @@ public sealed class Shop
             return;
         }
 
-        // The hammer first: half cock opens the revolver. While it is in the hand, the parts do not see the pointer.
+        // The hammer first: half cock opens the revolver. While it is in the hand, the parts do not see the pointer;
+        // while it is off its pivot, it cannot be cocked.
         var bench = Bench!;
-        var busy = bench.Brush.IsHeld;
+        var busy = bench.Brush.IsHeld || bench.OilCan.IsHeld || bench.IsHammerOut;
         for (var i = 0; i < bench.Count; i++)
         {
             busy |= bench.Gun[i].IsHeld;

@@ -17,8 +17,9 @@ namespace LudumDare60.Game;
 /// <see cref="Customers.Shop"/> run on the orders of <c>orders.json</c>: a customer comes in through the door and waits at
 /// the counter, glowing, until the player clicks them; the revolver flies onto the mat and they show what is wrong
 /// with it; the player repairs it on the <see cref="OrderBench"/> (half cock
-/// first, then parts come off in the order their blocks allow and can be laid anywhere on the mat, a dirty part is
-/// rubbed clean with the brush, the parts go back in reverse order, sticking to their rails when brought close), tests
+/// first, then parts come off in the order their blocks allow and can be laid anywhere on the mat, screws by turning
+/// them, a dirty part is rubbed clean with the brush, a dry one oiled with the oil can, a broken one swapped in the
+/// tray of spares, the parts go back in reverse order, sticking to their rails when brought close), tests
 /// it (full cock, pulls the trigger), drags the whole revolver up to the
 /// customer's hand, and the customer thanks the player and leaves. Parts that can move glow, a press on a blocked part flashes what blocks it, every snap clicks, and the
 /// brush rasps louder the faster it rubs. Customers, parts, the brush, the dirt and the sounds are placeholders until
@@ -81,6 +82,13 @@ public sealed class LudumDare60Game : IGame
     private static readonly SoundOptions s_cylinderTurn = new() { Pitch = 1.3f, Volume = 0.45f };
     private static readonly SoundOptions s_dryFire = new() { Pitch = 1.7f, Volume = 1f };
     private static readonly SoundOptions s_hammerEased = new() { Pitch = 0.6f, Volume = 0.4f };
+    private static readonly SoundOptions s_oilCanPickUp = new() { Pitch = 1.2f, Volume = 0.2f };
+    private static readonly SoundOptions s_oilCanLand = new() { Pitch = 0.6f, Volume = 0.3f };
+    private static readonly SoundOptions s_oilDrop = new() { Pitch = 2.4f, Volume = 0.35f };
+    private static readonly SoundOptions s_spareSwapped = new() { Pitch = 0.6f, Volume = 0.6f };
+
+    // A screw ticks every quarter turn, softly.
+    private const float ScrewTickVolume = 0.2f;
 
     // How far back the trigger turns when pulled, in radians (counterclockwise: its tip goes towards the grip).
     private const float TriggerPullAngle = -0.35f;
@@ -107,10 +115,15 @@ public sealed class LudumDare60Game : IGame
     private Voice _scrubVoice;
     private bool _hasScrubVoice;
     private float _brushHint;
+    private float _oilCanHint;
+    private float _trayHint;
     private float _bodyHint;
     private float _hammerHint;
     private Vector2 _brushDrawPosition;
+    private Vector2 _oilCanDrawPosition;
     private byte _brushGlow;
+    private byte _oilCanGlow;
+    private byte _trayGlow;
     private byte _bodyGlow;
     private byte _hammerGlow;
     private byte _triggerGlow;
@@ -129,11 +142,17 @@ public sealed class LudumDare60Game : IGame
     // The bench the arrays below belong to, and per part of its order.
     private OrderBench? _shownBench;
     private Vector2[] _drawPositions = [];
+    private float[] _rotations = [];
     private byte[] _glowAlphas = [];
     private float[] _hints = [];
     private float[] _dirtFades = [];
     private Texture[] _dirtTextures = [];
     private bool[] _hasDirtTexture = [];
+
+    // Every part of the revolver that has a place on the bench, back to front as the gun draws them: its layout, and
+    // its index in the bench, or -1 for a part the order keeps fixed.
+    private PartLayout[] _drawLayouts = [];
+    private int[] _drawParts = [];
 
     /// <summary>
     /// Whether the bench background is loaded and drawn.
@@ -211,6 +230,8 @@ public sealed class LudumDare60Game : IGame
         }
 
         _brushHint = MathF.Max(0, _brushHint - deltaTime);
+        _oilCanHint = MathF.Max(0, _oilCanHint - deltaTime);
+        _trayHint = MathF.Max(0, _trayHint - deltaTime);
         if (shop.BenchStepped)
         {
             HandleBenchEvents(bench);
@@ -293,22 +314,40 @@ public sealed class LudumDare60Game : IGame
         var working = shop.Phase == ShopPhase.Working;
         var gunOffset = shop.GetGunOffset((float)alpha);
         _gunOffset = new Vector2(MathF.Round(gunOffset.X), MathF.Round(gunOffset.Y));
+        var test = shop.Test!;
+        _hammerAngle = test.GetHammerAngle((float)alpha);
         var brushNeeded = false;
+        var oilNeeded = false;
+        var spareNeeded = false;
         for (var i = 0; i < bench.Count; i++)
         {
             var part = bench.Gun[i];
+            var layout = bench.LayoutAt(i);
 
             // Only a bench that is still being stepped moves between steps; afterwards the last step's motion is stale.
             var position = working ? part.GetRenderPosition((float)alpha) : part.Position;
+            var distance = working ? float.Lerp(part.PreviousDistance, part.Distance, (float)alpha) : part.Distance;
 
-            // Whole pixels, so a part never shimmers between two columns.
-            _drawPositions[i] = new Vector2(MathF.Round(position.X), MathF.Round(position.Y));
+            // Whole pixels for the sprite's corner, so a part never shimmers between two columns.
+            var corner = position - layout.Origin;
+            _drawPositions[i] = new Vector2(MathF.Round(corner.X), MathF.Round(corner.Y)) + layout.Origin;
+
+            // A screw turns as it goes in and out. The hammer keeps its cock on its pivot, and straightens as it lifts
+            // off, so it lies flat on the mat.
+            _rotations[i] = layout.Layer != PartLayer.Hammer ? layout.Path.AngleAt(distance)
+                : part.IsFree ? 0
+                : _hammerAngle * (1 - (distance / layout.Path.Length));
             var needsScrubbing = bench.NeedsScrubbing(i);
+            var needsOiling = bench.NeedsOiling(i);
+            var needsSpare = bench.NeedsSpare(i);
             brushNeeded |= needsScrubbing;
+            oilNeeded |= needsOiling;
+            spareNeeded |= needsSpare;
             _glowAlphas[i] = !working ? (byte)0
                 : _hints[i] > 0 ? Blink(_hints[i])
                 : part.IsHeld || part.IsHovered ? GlowActive
                 : needsScrubbing ? bench.ScrubbedPart == i ? GlowActive : idleGlow
+                : needsOiling || needsSpare ? idleGlow
                 : bench.Gun.CanMove(i) ? idleGlow
                 : (byte)0;
         }
@@ -321,10 +360,8 @@ public sealed class LudumDare60Game : IGame
 
         // The hammer glows when it is the next step: half cock before anything else, full cock for the test. Once it
         // is at full cock, the trigger glows.
-        var test = shop.Test!;
         var testing = shop.Phase == ShopPhase.Testing;
         var hammerNext = (working && test.State == HammerState.Down) || (testing && test.State != HammerState.FullCock);
-        _hammerAngle = test.GetHammerAngle((float)alpha);
         _triggerAngle = test.TriggerPull * TriggerPullAngle;
         _hammerGlow = _hammerHint > 0 ? Blink(_hammerHint)
             : !hammerNext ? (byte)0
@@ -341,6 +378,18 @@ public sealed class LudumDare60Game : IGame
             : _brushHint > 0 ? Blink(_brushHint)
             : brush.IsHovered ? GlowActive
             : brushNeeded ? idleGlow
+            : (byte)0;
+
+        var oilCan = bench.OilCan;
+        var oilCanPosition = oilCan.GetRenderPosition((float)alpha);
+        _oilCanDrawPosition = new Vector2(MathF.Round(oilCanPosition.X), MathF.Round(oilCanPosition.Y));
+        _oilCanGlow = oilCan.IsHeld ? (byte)0
+            : _oilCanHint > 0 ? Blink(_oilCanHint)
+            : oilCan.IsHovered ? GlowActive
+            : oilNeeded ? idleGlow
+            : (byte)0;
+        _trayGlow = _trayHint > 0 ? Blink(_trayHint)
+            : spareNeeded ? idleGlow
             : (byte)0;
     }
 
@@ -368,30 +417,27 @@ public sealed class LudumDare60Game : IGame
             return;
         }
 
-        // Parts on their rails under the frame first, so what of them is still inside is hidden; the rest over it.
+        // The tray of spares lies on the mat with the spare in it, or, once swapped, the broken part.
+        var trayGlow = new SpriteOptions { Origin = Vector2.One, Tint = Color.White.WithAlpha(_trayGlow) };
+        batch.Draw(_parts, PlaceholderParts.TrayGlow, BenchLayout.TrayMin, trayGlow);
+        batch.Draw(_parts, PlaceholderParts.Tray, BenchLayout.TrayMin);
+        if (bench.SparePart >= 0)
+        {
+            var spare = bench.LayoutAt(bench.SparePart);
+            var inTray = bench.IsBroken(bench.SparePart) ? spare.Sprite : spare.BrokenSprite ?? spare.Sprite;
+            batch.Draw(_parts, inTray, BenchLayout.TraySpare, new SpriteOptions { Origin = spare.Origin });
+        }
+
+        // Parts in the gun back to front: under the frame first, so what of them is still inside is hidden, then over
+        // it, the hammer and the trigger turning around their pivots, and what sits on the hammer.
         var gun = BenchLayout.GunPosition + _gunOffset;
         var bodyGlow = new SpriteOptions { Origin = Vector2.One, Tint = Color.White.WithAlpha(_bodyGlow) };
         batch.Draw(_parts, PlaceholderParts.BodyGlow, gun, bodyGlow);
-        for (var i = 0; i < bench.Count; i++)
-        {
-            if (bench.LayoutAt(i).UnderFrame && !bench.Gun[i].IsFree)
-            {
-                DrawPart(batch, bench, i);
-            }
-        }
-
+        DrawLayers(batch, bench, PartLayer.UnderFrame, PartLayer.UnderFrame);
         batch.Draw(_parts, PlaceholderParts.Body, gun);
-        for (var i = 0; i < bench.Count; i++)
-        {
-            if (!bench.LayoutAt(i).UnderFrame && !bench.Gun[i].IsFree)
-            {
-                DrawPart(batch, bench, i);
-            }
-        }
-
-        // The hammer and the trigger turn around their pivots.
-        DrawTurning(batch, PlaceholderParts.Hammer, PlaceholderParts.HammerGlow, PlaceholderParts.HammerOrigin, BenchLayout.HammerPivot, _hammerAngle, _hammerGlow);
-        DrawTurning(batch, PlaceholderParts.Trigger, PlaceholderParts.TriggerGlow, PlaceholderParts.TriggerOrigin, BenchLayout.TriggerPivot, _triggerAngle, _triggerGlow);
+        DrawLayers(batch, bench, PartLayer.OverFrame, PartLayer.Hammer);
+        DrawTurning(batch, PlaceholderParts.Trigger, PlaceholderParts.TriggerGlow, PlaceholderParts.TriggerOrigin, BenchLayout.TriggerPivot + _gunOffset, _triggerAngle, _triggerGlow);
+        DrawLayers(batch, bench, PartLayer.OverHammer, PartLayer.OverHammer);
 
         // Parts loose on the mat lie on top of everything, even when put down on the revolver.
         for (var i = 0; i < bench.Count; i++)
@@ -402,7 +448,10 @@ public sealed class LudumDare60Game : IGame
             }
         }
 
-        // The brush lies on top of everything, and in the hand it is above the parts it scrubs.
+        // The tools lie on top of everything, and in the hand they are above the parts they work on.
+        var oilCanGlow = new SpriteOptions { Origin = PlaceholderParts.OilCanOrigin + Vector2.One, Tint = Color.White.WithAlpha(_oilCanGlow) };
+        batch.Draw(_parts, PlaceholderParts.OilCanGlow, _oilCanDrawPosition, oilCanGlow);
+        batch.Draw(_parts, PlaceholderParts.OilCan, _oilCanDrawPosition, new SpriteOptions { Origin = PlaceholderParts.OilCanOrigin });
         var brushGlow = new SpriteOptions { Origin = PlaceholderParts.BrushOrigin + Vector2.One, Tint = Color.White.WithAlpha(_brushGlow) };
         batch.Draw(_parts, PlaceholderParts.BrushGlow, _brushDrawPosition, brushGlow);
         batch.Draw(_parts, PlaceholderParts.Brush, _brushDrawPosition, new SpriteOptions { Origin = PlaceholderParts.BrushOrigin });
@@ -451,12 +500,15 @@ public sealed class LudumDare60Game : IGame
         _shownBench = bench;
         var count = bench?.Count ?? 0;
         _drawPositions = new Vector2[count];
+        _rotations = new float[count];
         _glowAlphas = new byte[count];
         _hints = new float[count];
         _dirtFades = new float[count];
         _dirtTextures = new Texture[count];
         _hasDirtTexture = new bool[count];
         _brushHint = 0;
+        _oilCanHint = 0;
+        _trayHint = 0;
         for (var i = 0; i < count; i++)
         {
             _drawPositions[i] = bench!.Gun[i].Position;
@@ -471,7 +523,34 @@ public sealed class LudumDare60Game : IGame
         if (bench is not null)
         {
             _brushDrawPosition = bench.Brush.Position;
+            _oilCanDrawPosition = bench.OilCan.Position;
         }
+
+        SortParts(bench);
+    }
+
+    /// <summary>
+    /// Lists every part of the revolver that has a place on the bench, back to front, with its index in
+    /// <paramref name="bench"/> or -1 when the order keeps it fixed.
+    /// </summary>
+    private void SortParts(OrderBench? bench)
+    {
+        var layouts = new List<PartLayout>(RevolverParts.All.Count);
+        var parts = new List<int>(RevolverParts.All.Count);
+        foreach (var layer in Enum.GetValues<PartLayer>())
+        {
+            foreach (var id in RevolverParts.All)
+            {
+                if (BenchLayout.TryGetPart(id, out var layout) && layout.Layer == layer)
+                {
+                    layouts.Add(layout);
+                    parts.Add(bench?.IndexOf(id) ?? -1);
+                }
+            }
+        }
+
+        _drawLayouts = [.. layouts];
+        _drawParts = [.. parts];
     }
 
     /// <summary>
@@ -550,29 +629,95 @@ public sealed class LudumDare60Game : IGame
         return -1;
     }
 
-    private void DrawTurning(SpriteBatch batch, IntRect sprite, IntRect glow, Vector2 origin, Vector2 pivot, float angle, byte glowAlpha)
+    private void DrawTurning(SpriteBatch batch, IntRect sprite, IntRect glow, Vector2 origin, Vector2 position, float angle, byte glowAlpha)
     {
-        var position = pivot + _gunOffset;
         var glowOptions = new SpriteOptions { Origin = origin + Vector2.One, Rotation = angle, Tint = Color.White.WithAlpha(glowAlpha) };
         batch.Draw(_parts, glow, position, glowOptions);
         batch.Draw(_parts, sprite, position, new SpriteOptions { Origin = origin, Rotation = angle });
     }
 
+    /// <summary>
+    /// Draws the parts in the gun whose layer lies from <paramref name="first"/> to <paramref name="last"/>: the
+    /// order's parts where they are, the fixed ones in their seats. Parts loose on the mat are drawn later, on top.
+    /// </summary>
+    private void DrawLayers(SpriteBatch batch, OrderBench bench, PartLayer first, PartLayer last)
+    {
+        for (var k = 0; k < _drawLayouts.Length; k++)
+        {
+            var layout = _drawLayouts[k];
+            var part = _drawParts[k];
+            if (layout.Layer < first || layout.Layer > last || (part >= 0 && bench.Gun[part].IsFree))
+            {
+                continue;
+            }
+
+            if (layout.Layer == PartLayer.Hammer)
+            {
+                DrawHammer(batch, bench, part);
+            }
+            else if (part >= 0)
+            {
+                DrawPart(batch, bench, part);
+            }
+            else
+            {
+                batch.Draw(_parts, SpriteOf(layout, broken: false), layout.Seat + _gunOffset, new SpriteOptions { Origin = layout.Origin });
+            }
+        }
+    }
+
+    /// <summary>
+    /// Draws the hammer on its pivot or lifting off it, cocked as the test has it: the fixed one, or the order's
+    /// <paramref name="part"/> while it is not loose on the mat.
+    /// </summary>
+    private void DrawHammer(SpriteBatch batch, OrderBench bench, int part)
+    {
+        if (part < 0)
+        {
+            DrawTurning(batch, PlaceholderParts.Hammer, PlaceholderParts.HammerGlow, PlaceholderParts.HammerOrigin, BenchLayout.HammerPivot + _gunOffset, _hammerAngle, _hammerGlow);
+            return;
+        }
+
+        // It glows for the test or as a part that can come out, whichever is brighter.
+        var position = _drawPositions[part] + (bench.Gun[part].Stop == PartStop.Start ? _gunOffset : Vector2.Zero);
+        var glow = Math.Max(_hammerGlow, _glowAlphas[part]);
+        DrawTurning(batch, PlaceholderParts.Hammer, PlaceholderParts.HammerGlow, PlaceholderParts.HammerOrigin, position, _rotations[part], glow);
+        DrawDirt(batch, part, position, PlaceholderParts.HammerOrigin, _rotations[part]);
+    }
+
     private void DrawPart(SpriteBatch batch, OrderBench bench, int part)
     {
         var layout = bench.LayoutAt(part);
-
-        // The cylinder shows which chamber the last cock turned it to.
-        var sprite = layout.TurnedSprite is { } turned && Shop!.Test is { Chamber: var chamber } && chamber % 2 == 1 ? turned : layout.Sprite;
+        var sprite = SpriteOf(layout, bench.IsBroken(part));
 
         // A part in the gun moves with it; one out on the mat stays where it lies.
         var position = _drawPositions[part] + (bench.Gun[part].Stop == PartStop.Start ? _gunOffset : Vector2.Zero);
-        var glow = new SpriteOptions { Origin = layout.Origin + Vector2.One, Tint = Color.White.WithAlpha(_glowAlphas[part]) };
+        var rotation = _rotations[part];
+        var glow = new SpriteOptions { Origin = layout.Origin + Vector2.One, Rotation = rotation, Tint = Color.White.WithAlpha(_glowAlphas[part]) };
         batch.Draw(_parts, layout.Glow, position, glow);
-        batch.Draw(_parts, sprite, position, new SpriteOptions { Origin = layout.Origin });
+        batch.Draw(_parts, sprite, position, new SpriteOptions { Origin = layout.Origin, Rotation = rotation });
+        DrawDirt(batch, part, position, layout.Origin, rotation);
+    }
+
+    /// <summary>
+    /// The sprite <paramref name="layout"/>'s part is drawn with now: the cylinder shows which chamber the last cock
+    /// turned it to, a broken part shows the break.
+    /// </summary>
+    private IntRect SpriteOf(PartLayout layout, bool broken)
+    {
+        if (layout.TurnedSprite is { } turned && Shop!.Test is { Chamber: var chamber } && chamber % 2 == 1)
+        {
+            return turned;
+        }
+
+        return broken && layout.BrokenSprite is { } brokenSprite ? brokenSprite : layout.Sprite;
+    }
+
+    private void DrawDirt(SpriteBatch batch, int part, Vector2 position, Vector2 origin, float rotation)
+    {
         if (_hasDirtTexture[part] && _dirtFades[part] > 0)
         {
-            var dirt = new SpriteOptions { Origin = layout.Origin, Tint = Color.White.WithAlpha((byte)(255 * _dirtFades[part])) };
+            var dirt = new SpriteOptions { Origin = origin, Rotation = rotation, Tint = Color.White.WithAlpha((byte)(255 * _dirtFades[part])) };
             batch.Draw(_dirtTextures[part], position, dirt);
         }
     }
@@ -589,11 +734,22 @@ public sealed class LudumDare60Game : IGame
 
             if ((events[i] & DragEvents.DockRefused) != DragEvents.None)
             {
-                // It does not fit yet: a dirty part flashes with the brush, a held-back one flashes what holds it.
+                // It does not fit yet: a dirty part flashes with the brush, a dry one with the oil can, a broken one
+                // with the tray, and a held-back one flashes what holds it.
                 if (bench.DirtAt(i) is { IsClean: false })
                 {
                     _hints[i] = HintSeconds;
                     _brushHint = HintSeconds;
+                }
+                else if (bench.NeedsOil(i))
+                {
+                    _hints[i] = HintSeconds;
+                    _oilCanHint = HintSeconds;
+                }
+                else if (bench.IsBroken(i))
+                {
+                    _hints[i] = HintSeconds;
+                    _trayHint = HintSeconds;
                 }
                 else
                 {
@@ -601,7 +757,12 @@ public sealed class LudumDare60Game : IGame
                 }
             }
 
-            PlayClick(bench.LayoutAt(i).ClickPitch, events[i]);
+            var layout = bench.LayoutAt(i);
+            PlayClick(layout.ClickPitch, events[i]);
+            if (layout.Path.IsTurn)
+            {
+                TickScrew(bench.Gun[i], layout.ClickPitch);
+            }
         }
 
         if ((bench.Events & BenchEvents.HammerFirst) != BenchEvents.None)
@@ -618,7 +779,48 @@ public sealed class LudumDare60Game : IGame
             PlaySound(s_cleanChime);
         }
 
+        if ((bench.Events & BenchEvents.Oiled) != BenchEvents.None)
+        {
+            // A drop from the spout, and the part glints.
+            _hints[bench.EventPart] = HintSeconds;
+            PlaySound(s_oilDrop);
+        }
+
+        if ((bench.Events & BenchEvents.Replaced) != BenchEvents.None)
+        {
+            // The broken part goes into the tray, the spare comes out.
+            _hints[bench.EventPart] = HintSeconds;
+            _trayHint = HintSeconds;
+            PlaySound(s_spareSwapped);
+        }
+
         UseBrush(bench.BrushEvents);
+        if ((bench.OilCanEvents & BrushEvents.PickedUp) != BrushEvents.None)
+        {
+            PlaySound(s_oilCanPickUp);
+        }
+
+        if ((bench.OilCanEvents & BrushEvents.PutDown) != BrushEvents.None)
+        {
+            PlaySound(s_oilCanLand);
+        }
+    }
+
+    /// <summary>
+    /// A soft tick for every quarter turn a screw made in the last step, in or out.
+    /// </summary>
+    private void TickScrew(PartDrag screw, float pitch)
+    {
+        if (screw.IsFree)
+        {
+            return;
+        }
+
+        var quarter = MathF.PI / 2 * screw.Path.TurnRadius;
+        if (MathF.Floor(screw.Distance / quarter) != MathF.Floor(screw.PreviousDistance / quarter))
+        {
+            PlaySound(new SoundOptions { Pitch = 1.4f * pitch, Volume = ScrewTickVolume });
+        }
     }
 
     /// <summary>

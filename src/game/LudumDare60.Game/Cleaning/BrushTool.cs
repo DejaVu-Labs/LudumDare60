@@ -4,8 +4,9 @@ using LudumDare60.Game.Parts;
 namespace LudumDare60.Game.Cleaning;
 
 /// <summary>
-/// The scrubbing brush on the bench. A press on it picks it up; while the button stays down its bristles follow the
-/// pointer over the work surface, and let go it lies where it was put down. Advanced once per fixed step.
+/// A tool on the bench carried in the hand: the scrubbing brush, and the oil can. A press on it picks it up; while the
+/// button stays down its working point (the bristles, the tip of the spout) follows the pointer over the work surface,
+/// and let go it lies where it was put down. Advanced once per fixed step.
 /// </summary>
 public sealed class BrushTool
 {

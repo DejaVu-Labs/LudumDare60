@@ -11,12 +11,12 @@ public enum PartStop
     None = 0,
 
     /// <summary>
-    /// At <see cref="LinePath.Start"/>: seated in the gun.
+    /// At <see cref="PartPath.Start"/>: seated in the gun.
     /// </summary>
     Start = 1,
 
     /// <summary>
-    /// At <see cref="LinePath.End"/>: pulled all the way out.
+    /// At <see cref="PartPath.End"/>: pulled all the way out.
     /// </summary>
     End = 2,
 }

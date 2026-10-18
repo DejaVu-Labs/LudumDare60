@@ -7,11 +7,13 @@ using LudumDare60.Game.Parts;
 namespace LudumDare60.Game.Bench;
 
 /// <summary>
-/// One order on the bench: the parts it unlocks with their blocks, the dirt on them, and the brush. It runs the rules
-/// of the order loop that do not depend on a browser: nothing moves before the hammer is at half cock, parts move as
-/// <see cref="PartAssembly"/> allows and lie anywhere on the work surface once out, the brush scrubs whatever part
-/// out of the gun it rubs, and a dirty part does not go back onto its rail until it is clean. The game draws it and
-/// plays its sounds. Advance it once per fixed step with <see cref="Step(in PointerSample, float, bool)"/>.
+/// One order on the bench: the parts it unlocks with their blocks, the dirt on them, which are broken and which need
+/// oil, and the tools: the brush, the oil can and the tray of spare parts. It runs the rules of the order loop that do
+/// not depend on a browser: nothing moves before the hammer is at half cock, parts move as <see cref="PartAssembly"/>
+/// allows and lie anywhere on the work surface once out, the brush scrubs whatever part out of the gun it rubs, the
+/// oil can's spout oils whatever part out of the gun it touches, a broken part put down in the tray is swapped for a
+/// spare, and a part does not go back onto its rail while it is dirty, dry or broken. The game draws it and plays its
+/// sounds. Advance it once per fixed step with <see cref="Step(in PointerSample, float, bool)"/>.
 /// </summary>
 public sealed class OrderBench
 {
@@ -19,6 +21,11 @@ public sealed class OrderBench
     /// Radius of the brush's bristles in virtual pixels.
     /// </summary>
     public const float BrushRadius = 2.5f;
+
+    /// <summary>
+    /// How close to a part the tip of the oil can's spout must come to oil it, in virtual pixels.
+    /// </summary>
+    public const float OilRadius = 2;
 
     // How fast the brush speed that drives the scrub sound follows the real one, per second.
     private const float BrushSpeedSmoothing = 20;
@@ -29,7 +36,10 @@ public sealed class OrderBench
     private readonly string[] _ids;
     private readonly PartLayout[] _layouts;
     private readonly DirtLayer?[] _dirt;
+    private readonly bool[] _broken;
+    private readonly bool[] _needsOil;
     private readonly bool[] _wasOut;
+    private readonly int _hammer;
     private Vector2 _lastBrush;
 
     /// <exception cref="NotSupportedException">The bench cannot play the order yet (see <see cref="CanSetUp"/>).</exception>
@@ -46,6 +56,8 @@ public sealed class OrderBench
         _ids = [.. order.Parts];
         _layouts = new PartLayout[count];
         _dirt = new DirtLayer?[count];
+        _broken = new bool[count];
+        _needsOil = new bool[count];
         _wasOut = new bool[count];
         var parts = new PartDrag[count];
         for (var i = 0; i < count; i++)
@@ -71,7 +83,20 @@ public sealed class OrderBench
             _dirt[IndexOf(dirt.Part)] = new DirtLayer(BenchLayout.CreateDirt(dirt.Part, dirt.Kind), dirt.Threshold);
         }
 
+        foreach (var part in order.Broken)
+        {
+            _broken[IndexOf(part)] = true;
+        }
+
+        foreach (var part in order.Oil)
+        {
+            _needsOil[IndexOf(part)] = true;
+        }
+
+        _hammer = IndexOf(RevolverParts.Hammer);
+        SparePart = Array.IndexOf(_broken, true);
         Brush = new BrushTool(BenchLayout.BrushRest, BenchLayout.BrushGrabMin, BenchLayout.BrushGrabMax, BenchLayout.MatMin, BenchLayout.MatMax);
+        OilCan = new BrushTool(BenchLayout.OilCanRest, BenchLayout.OilCanGrabMin, BenchLayout.OilCanGrabMax, BenchLayout.MatMin, BenchLayout.MatMax);
     }
 
     public Order Order { get; }
@@ -82,6 +107,16 @@ public sealed class OrderBench
     public PartAssembly Gun { get; }
 
     public BrushTool Brush { get; }
+
+    /// <summary>
+    /// The oil can, carried like the brush: its position is the tip of the spout.
+    /// </summary>
+    public BrushTool OilCan { get; }
+
+    /// <summary>
+    /// The broken part the tray holds a spare of, or -1 when nothing in this order is broken.
+    /// </summary>
+    public int SparePart { get; }
 
     public int Count => _ids.Length;
 
@@ -102,6 +137,17 @@ public sealed class OrderBench
     public BrushEvents BrushEvents { get; private set; }
 
     /// <summary>
+    /// What happened to the oil can in the last step.
+    /// </summary>
+    public BrushEvents OilCanEvents { get; private set; }
+
+    /// <summary>
+    /// Whether the hammer is off its pivot or in the hand: an order that takes it out, from the moment it moves until
+    /// it is back. The hammer cannot be cocked meanwhile.
+    /// </summary>
+    public bool IsHammerOut => _hammer >= 0 && (Gun[_hammer].Stop != PartStop.Start || Gun[_hammer].IsHeld);
+
+    /// <summary>
     /// What happened on the bench in the last step.
     /// </summary>
     public BenchEvents Events { get; private set; }
@@ -112,8 +158,8 @@ public sealed class OrderBench
     public int EventPart { get; private set; } = -1;
 
     /// <summary>
-    /// Whether the bench can play <paramref name="order"/>: every part has a layout and every dirt a drawing, and it
-    /// asks for no repair or oil, which the bench cannot do yet.
+    /// Whether the bench can play <paramref name="order"/>: every part has a layout, every dirt a drawing, and every
+    /// broken part a spare in the tray.
     /// </summary>
     public static bool CanSetUp(Order order, [NotNullWhen(false)] out string? reason)
     {
@@ -136,10 +182,13 @@ public sealed class OrderBench
             }
         }
 
-        if (order.Broken.Count > 0 || order.Oil.Count > 0)
+        foreach (var part in order.Broken)
         {
-            reason = $"Order '{order.Id}': the parts drawer and oiling do not exist yet.";
-            return false;
+            if (!BenchLayout.HasSpare(part))
+            {
+                reason = $"Order '{order.Id}': the tray has no spare '{part}' yet.";
+                return false;
+            }
         }
 
         reason = null;
@@ -171,11 +220,38 @@ public sealed class OrderBench
     /// Whether <paramref name="part"/> lies out of the gun with dirt still on it: it does not go back before it is
     /// clean.
     /// </summary>
-    public bool NeedsScrubbing(int part) => _dirt[part] is { IsClean: false } && Gun[part].Stop == PartStop.End && !Gun[part].IsHeld;
+    public bool NeedsScrubbing(int part) => _dirt[part] is { IsClean: false } && IsOutOnTheMat(part);
 
     /// <summary>
-    /// Whether the repair is done: every part of the order has been out, is back in its seat, and every dirty part
-    /// is clean. The test with the hammer is not part of it yet.
+    /// Whether <paramref name="part"/> is broken: it does not go back until it is swapped for the spare in the tray.
+    /// </summary>
+    public bool IsBroken(int part) => _broken[part];
+
+    /// <summary>
+    /// Whether <paramref name="part"/> still needs a drop of oil before it goes back.
+    /// </summary>
+    public bool NeedsOil(int part) => _needsOil[part];
+
+    /// <summary>
+    /// Whether <paramref name="part"/> lies out of the gun, still dry: the oil can's spout oils it.
+    /// </summary>
+    public bool NeedsOiling(int part) => _needsOil[part] && IsOutOnTheMat(part);
+
+    /// <summary>
+    /// Whether <paramref name="part"/> lies out of the gun, still broken: put down in the tray, it is swapped for the
+    /// spare.
+    /// </summary>
+    public bool NeedsSpare(int part) => _broken[part] && IsOutOnTheMat(part);
+
+    /// <summary>
+    /// Whether <paramref name="part"/> may go back now as far as it is concerned: clean, oiled and whole. Its blocks
+    /// may still hold it.
+    /// </summary>
+    public bool IsReady(int part) => _dirt[part] is not { IsClean: false } && !_needsOil[part] && !_broken[part];
+
+    /// <summary>
+    /// Whether the repair is done: every part of the order has been out, is back in its seat, and is clean, oiled and
+    /// whole. The test with the hammer is not part of it.
     /// </summary>
     public bool IsDone
     {
@@ -183,7 +259,7 @@ public sealed class OrderBench
         {
             for (var i = 0; i < Count; i++)
             {
-                if (!_wasOut[i] || Gun[i].Stop != PartStop.Start || Gun[i].IsHeld || _dirt[i] is { IsClean: false })
+                if (!_wasOut[i] || Gun[i].Stop != PartStop.Start || Gun[i].IsHeld || !IsReady(i))
                 {
                     return false;
                 }
@@ -211,8 +287,8 @@ public sealed class OrderBench
     /// <param name="input">The pointer at the end of the step.</param>
     /// <param name="deltaTime">The step's length in seconds.</param>
     /// <param name="hammerOpen">Whether the hammer is at half cock or further. While it is down, every part stays put,
-    /// and a press on one reports <see cref="BenchEvents.HammerFirst"/>. A dirty part does not stick to its rail: it
-    /// reports <see cref="DragEvents.DockRefused"/> in <see cref="PartAssembly.Events"/>.</param>
+    /// and a press on one reports <see cref="BenchEvents.HammerFirst"/>. A part that is dirty, dry or broken does not
+    /// stick to its rail: it reports <see cref="DragEvents.DockRefused"/> in <see cref="PartAssembly.Events"/>.</param>
     public void Step(in PointerSample input, float deltaTime, bool hammerOpen)
     {
         Events = BenchEvents.None;
@@ -221,15 +297,18 @@ public sealed class OrderBench
         for (var i = 0; i < Count; i++)
         {
             Gun.SetLocked(i, !hammerOpen);
-            Gun.SetDockable(i, _dirt[i] is not { IsClean: false });
+            Gun.SetDockable(i, IsReady(i));
             partHeld |= Gun[i].IsHeld;
         }
 
-        // The brush first: a press on it takes it, and while it is in the hand no part sees the pointer.
-        BrushEvents = Brush.Step(input, canGrab: !partHeld);
+        // The tools first: a press on one takes it, and while a tool is in the hand no part sees the pointer.
+        BrushEvents = Brush.Step(input, canGrab: !partHeld && !OilCan.IsHeld);
         var brushTaken = Brush.IsHeld || (BrushEvents & BrushEvents.PickedUp) != BrushEvents.None;
-        Gun.Step(brushTaken ? s_noPointer : input, deltaTime);
-        if (!brushTaken && input.IsPressed)
+        OilCanEvents = OilCan.Step(input, canGrab: !partHeld && !brushTaken);
+        var toolTaken = brushTaken || OilCan.IsHeld || (OilCanEvents & BrushEvents.PickedUp) != BrushEvents.None;
+        Gun.Step(toolTaken ? s_noPointer : input, deltaTime);
+        SwapPutDownBrokenParts();
+        if (!toolTaken && input.IsPressed)
         {
             for (var i = 0; i < Count; i++)
             {
@@ -252,6 +331,43 @@ public sealed class OrderBench
         }
 
         Scrub(deltaTime);
+        Oil();
+    }
+
+    private bool IsOutOnTheMat(int part) => Gun[part].Stop == PartStop.End && !Gun[part].IsHeld;
+
+    /// <summary>
+    /// Swaps a broken part just put down in the tray for the spare: the new part lies where the broken one was put.
+    /// </summary>
+    private void SwapPutDownBrokenParts()
+    {
+        var events = Gun.Events;
+        for (var i = 0; i < Count; i++)
+        {
+            if (_broken[i] && Gun[i].IsFree && (events[i] & DragEvents.Dropped) != DragEvents.None && BenchLayout.IsInTray(Gun[i].Position))
+            {
+                _broken[i] = false;
+                Report(BenchEvents.Replaced, i);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Oils the dry part out of the gun under the tip of the oil can's spout, while the can is in the hand.
+    /// </summary>
+    private void Oil()
+    {
+        if (!OilCan.IsHeld)
+        {
+            return;
+        }
+
+        var part = PartUnder(OilCan.Position, OilRadius);
+        if (part >= 0 && _needsOil[part])
+        {
+            _needsOil[part] = false;
+            Report(BenchEvents.Oiled, part);
+        }
     }
 
     /// <summary>
@@ -260,7 +376,7 @@ public sealed class OrderBench
     /// </summary>
     private void Scrub(float deltaTime)
     {
-        var part = Brush.IsHeld ? PartUnderBristles() : -1;
+        var part = Brush.IsHeld ? PartUnder(Brush.Position, BrushRadius) : -1;
         var speed = part >= 0 ? Vector2.Distance(Brush.Position, Brush.PreviousPosition) / deltaTime : 0;
         BrushSpeed += (speed - BrushSpeed) * (1 - MathF.Exp(-BrushSpeedSmoothing * deltaTime));
         var local = part >= 0 ? LocalPoint(part, Brush.Position) : default;
@@ -279,21 +395,21 @@ public sealed class OrderBench
     }
 
     /// <summary>
-    /// The first part out of the gun whose sprite, widened by the bristles' radius, lies under the bristles; -1 when
-    /// there is none.
+    /// The first part out of the gun whose sprite, widened by <paramref name="radius"/>, lies under
+    /// <paramref name="point"/>; -1 when there is none.
     /// </summary>
-    private int PartUnderBristles()
+    private int PartUnder(Vector2 point, float radius)
     {
         for (var i = 0; i < Count; i++)
         {
-            if (Gun[i].Stop != PartStop.End || Gun[i].IsHeld)
+            if (!IsOutOnTheMat(i))
             {
                 continue;
             }
 
-            var local = LocalPoint(i, Brush.Position);
+            var local = LocalPoint(i, point);
             var sprite = _layouts[i].Sprite;
-            if (local.X >= -BrushRadius && local.Y >= -BrushRadius && local.X <= sprite.Width + BrushRadius && local.Y <= sprite.Height + BrushRadius)
+            if (local.X >= -radius && local.Y >= -radius && local.X <= sprite.Width + radius && local.Y <= sprite.Height + radius)
             {
                 return i;
             }

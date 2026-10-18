@@ -3,7 +3,7 @@ using System.Numerics;
 namespace LudumDare60.Game.Parts;
 
 /// <summary>
-/// A part the player drags along a <see cref="LinePath"/>: a constrained drag, the touch loop of
+/// A part the player drags along a <see cref="PartPath"/> (a line, or a screw turned in circles): a constrained drag, the touch loop of
 /// docs/gamedesign/core-loop.md. Snapped into an end, the part sticks until it is pulled
 /// <see cref="DragFeel.BreakawayAtStart"/> pixels and only strains towards the pointer; loose, it follows the pointer
 /// with friction; moving into an end, it snaps there and the player lets go of it. A part let go between the ends
@@ -20,6 +20,9 @@ public sealed class PartDrag
 
     private readonly FreeMove? _free;
     private float _grabOffset;
+
+    // Where the hand is along the path, wound up over a screw's turns so that circling on keeps counting.
+    private float _along;
     private Vector2 _freePosition;
     private Vector2 _freeGrab;
 
@@ -39,7 +42,7 @@ public sealed class PartDrag
     /// <param name="free">How the part moves once it is out, or null to keep it on its rail.</param>
     /// <exception cref="ArgumentOutOfRangeException">A distance, rate or speed is negative or not a number, the strain
     /// is outside [0, 1], the snap zones of the two ends touch, or <paramref name="stop"/> is not an end.</exception>
-    public PartDrag(LinePath path, float grabRadius, in DragFeel feel, PartStop stop = PartStop.Start, FreeMove? free = null)
+    public PartDrag(PartPath path, float grabRadius, in DragFeel feel, PartStop stop = PartStop.Start, FreeMove? free = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(grabRadius);
         ArgumentOutOfRangeException.ThrowIfNegative(feel.BreakawayAtStart, nameof(feel));
@@ -71,14 +74,14 @@ public sealed class PartDrag
         PreviousPosition = Position;
     }
 
-    public LinePath Path { get; }
+    public PartPath Path { get; }
 
     public float GrabRadius { get; }
 
     public DragFeel Feel { get; }
 
     /// <summary>
-    /// How far along <see cref="Path"/> the part is, from 0 to <see cref="LinePath.Length"/>.
+    /// How far along <see cref="Path"/> the part is, from 0 to <see cref="PartPath.Length"/>.
     /// </summary>
     public float Distance { get; private set; }
 
@@ -165,7 +168,8 @@ public sealed class PartDrag
 
             IsHeld = true;
             IsHovered = false;
-            _grabOffset = Path.Project(input.Position) - Distance;
+            _along = Path.Project(input.Position, Distance);
+            _grabOffset = _along - Distance;
             _freeGrab = input.Position - Position;
             // Taken up by its rail, a part that may not go back says so at once.
             _dockBlocked = false;
@@ -198,8 +202,10 @@ public sealed class PartDrag
             return Distance >= Path.Length - Feel.SnapDistance ? events | SnapTo(PartStop.End) : events;
         }
 
-        var target = Math.Clamp(Path.Project(input.Position) - _grabOffset, 0, Path.Length);
-        if (_free is { } free && Stop != PartStop.Start && Distance >= Path.Length - free.DockSpan && IsPulledOff(input, free))
+        var along = Path.Project(input.Position, _along);
+        _along = Math.Clamp(along, _grabOffset - Path.Slack, _grabOffset + Path.Length + Path.Slack);
+        var target = Math.Clamp(along - _grabOffset, 0, Path.Length);
+        if (_free is { } free && Stop != PartStop.Start && Distance >= Path.Length - free.DockSpan && IsPulledOff(along, input, free))
         {
             return events | Leave();
         }
@@ -284,13 +290,13 @@ public sealed class PartDrag
 
     /// <summary>
     /// Whether the hand pulls a part off its rail: off to the side by more than the dock tolerance plus the grab, or,
-    /// from the end of the rail, on out past it. A part moving out along the rail clicks out at the end instead.
+    /// from the end of the rail, on out past it (a screw turned on out of its hole). A part moving out along the rail
+    /// clicks out at the end instead. <paramref name="along"/> is where the hand is along the path.
     /// </summary>
-    private bool IsPulledOff(in PointerSample input, FreeMove free)
+    private bool IsPulledOff(float along, in PointerSample input, FreeMove free)
     {
-        var fromStart = input.Position - Path.Start;
-        var side = MathF.Abs((fromStart.X * Path.Direction.Y) - (fromStart.Y * Path.Direction.X));
-        var beyond = Path.Project(input.Position) - _grabOffset - Path.Length;
+        var side = Path.SideDistance(input.Position);
+        var beyond = along - _grabOffset - Path.Length;
         return side > free.DockRadius + GrabRadius || (Stop == PartStop.End && beyond > free.DockRadius);
     }
 
@@ -304,7 +310,7 @@ public sealed class PartDrag
         Stop = PartStop.End;
 
         // The hand keeps holding the part where it took it, along the rail: a part pulled off sideways catches up with
-        // the hand instead of keeping the gap.
+        // the hand instead of keeping the gap. A screw has no rail and comes to the hand.
         _freeGrab = Path.Direction * _grabOffset;
         _dockBlocked = true;
         _wasInDockZone = true;
@@ -318,7 +324,7 @@ public sealed class PartDrag
     private bool InDockZone(out float distance)
     {
         var free = _free!.Value;
-        distance = free.SeatsOnDock ? 0 : Math.Clamp(Path.Project(_freePosition), Path.Length - free.DockSpan, Path.Length);
+        distance = free.SeatsOnDock ? 0 : Math.Clamp(Path.Project(_freePosition, Path.Length), Path.Length - free.DockSpan, Path.Length);
         return Vector2.Distance(_freePosition, Path.PointAt(distance)) <= free.DockRadius;
     }
 
@@ -366,7 +372,8 @@ public sealed class PartDrag
         Distance = dockAt;
         Stop = dockAt >= Path.Length ? PartStop.End : PartStop.None;
         _leftStop = PartStop.None;
-        _grabOffset = Path.Project(input.Position) - Distance;
+        _along = Path.Project(input.Position, Distance);
+        _grabOffset = _along - Distance;
         return DragEvents.Docked;
     }
 }

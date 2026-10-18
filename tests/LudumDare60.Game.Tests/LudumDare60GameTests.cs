@@ -984,7 +984,7 @@ public sealed class LudumDare60GameTests
     }
 
     [Fact]
-    public void AfterHandBack_TheCustomerLeavesWithTheBellAndTheShopCloses()
+    public void AfterHandBack_TheCustomerLeavesWithTheBellAndTheNextOneComesIn()
     {
         StartWithSound();
         RepairAndTest();
@@ -993,10 +993,71 @@ public sealed class LudumDare60GameTests
         Idle((int)((Shop.ThankSeconds + Shop.WalkSeconds + Shop.WaitSeconds) * 60) + 10);
 
         var bells = _platform.AudioBackend.AllCommands().Count(c => c.Kind == AudioCommandKind.Play && (int)c.Arguments[0] == DoorBellSound);
-        Assert.Equal(2, bells);
-        Assert.Equal(ShopPhase.Closed, Shop.Phase);
+        Assert.Equal(3, bells);
+        Assert.True(Shop.Phase is ShopPhase.Arriving or ShopPhase.Offering, $"The shop is {Shop.Phase}.");
+        Assert.Equal("cardigan", Bench.Order.Id);
         Assert.Contains($"destroy {RustTexture}", _platform.Backend.Calls, StringComparer.Ordinal);
-        Assert.Empty(LastFrame.Instances);
+
+        // Nobody has drawn the cardigan customer yet: the placeholder bust comes in, without the revolver.
+        _ = DrawnOn(LastFrame, CustomersTexture, PlaceholderCustomers.Bust("cardigan"));
+        Assert.Null(Sprite(LastFrame, PlaceholderParts.Body));
+    }
+
+    [Fact]
+    public void FirstOrder_PartsItKeepsFixed_AreDrawnInTheirSeatsWithoutGlow()
+    {
+        StartWithSound();
+
+        Assert.Equal(BenchLayout.GripPanelSeated, Drawn(LastFrame, PlaceholderParts.GripPanel).Position);
+        Assert.Equal(BenchLayout.MainspringSeated, Drawn(LastFrame, PlaceholderParts.Mainspring).Position);
+        Assert.Equal(BenchLayout.GripScrewSeated, Drawn(LastFrame, PlaceholderParts.Screw).Position);
+        Assert.Null(Sprite(LastFrame, PlaceholderParts.GripPanelGlow));
+        Assert.Null(Sprite(LastFrame, PlaceholderParts.ScrewGlow));
+        Assert.Null(Sprite(LastFrame, PlaceholderParts.MainspringBroken));
+    }
+
+    [Fact]
+    public void FirstOrder_TheGripPanelIsDrawnOverTheMainspringAndTheScrewOverThePanel()
+    {
+        StartWithSound();
+
+        var instances = LastFrame.Instances;
+        int IndexOf(IntRect sprite) => Array.FindIndex(instances, i => i.SourceX == sprite.X && i.SourceY == sprite.Y && i.SourceWidth == sprite.Width);
+        var body = IndexOf(PlaceholderParts.Body);
+        var spring = IndexOf(PlaceholderParts.Mainspring);
+        var panel = IndexOf(PlaceholderParts.GripPanel);
+        var screw = IndexOf(PlaceholderParts.Screw);
+        Assert.True(body < spring && spring < panel && panel < screw, $"Body {body}, spring {spring}, panel {panel}, screw {screw}.");
+    }
+
+    [Fact]
+    public void FirstOrder_TheTrayAndTheOilCanLieOnTheMatUnlit()
+    {
+        StartWithSound();
+
+        Assert.Equal(BenchLayout.TrayMin, Drawn(LastFrame, PlaceholderParts.Tray).Position);
+        Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.TrayGlow).Tint.A);
+        Assert.Equal(BenchLayout.OilCanRest, Drawn(LastFrame, PlaceholderParts.OilCan).Position);
+        Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.OilCanGlow).Tint.A);
+    }
+
+    [Fact]
+    public void PartsTexture_GripPanelScrewAndMainspringAreOpaqueWhereTheyGrab()
+    {
+        _platform.Frame(0);
+
+        var pixels = _platform.Backend.Textures[0];
+        var panel = PlaceholderParts.GripPanel;
+        var spring = PlaceholderParts.Mainspring;
+        var screw = PlaceholderParts.Screw;
+        Assert.Equal(255, AlphaAt(pixels, PlaceholderParts.Width, panel.X + (int)PlaceholderParts.GripPanelOrigin.X, panel.Y + (int)PlaceholderParts.GripPanelOrigin.Y));
+        Assert.Equal(255, AlphaAt(pixels, PlaceholderParts.Width, spring.X + (int)PlaceholderParts.MainspringOrigin.X, spring.Y + (int)PlaceholderParts.MainspringOrigin.Y));
+        Assert.Equal(255, AlphaAt(pixels, PlaceholderParts.Width, screw.X + 3, screw.Y + 3));
+        Assert.Equal(0, AlphaAt(pixels, PlaceholderParts.Width, screw.X, screw.Y));
+
+        // Under the panel the body shows the grip's channel, not a hole.
+        var underPanel = PlaceholderParts.GripPanelInBody;
+        Assert.Equal(255, AlphaAt(pixels, PlaceholderParts.Width, (int)underPanel.X, (int)underPanel.Y));
     }
 
     [Fact]

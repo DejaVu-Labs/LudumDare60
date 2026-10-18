@@ -72,18 +72,21 @@ Deferred when the asset manager shipped (see [docs/tech/architecture.md](tech/ar
 
 ## Touch loop follow-ups
 
-Order 1's base pin and cylinder drag along lines with breakaway, friction and a snap (`Parts/PartDrag`), in the
+Every part of the five orders drags along a line or turns as a screw, with breakaway, friction and a snap (`Parts/PartDrag`), in the
 order their blocking graph allows (`Parts/PartAssembly`). Still to do:
 
 - Tune `DragFeel` by hand with a mouse and a touchpad. A quick flick released early leaves the part short of the end,
   because it trails the pointer at most 160 px/s; check whether that reads as weight or as a missed drag.
-- Arc and circle paths for swing (loading gate, grip panel) and unscrew (circular motion around a screw).
+- Arc paths for swing (loading gate; the grip panel lifts on a short line today).
 - A friction loop sound while a loose part moves, its pitch rising towards the snap, and a small screen shake on the
   snap.
 - Parts out on the mat could turn as they are carried, and lie at an angle; today they keep the angle of their rail.
-- Bench layouts for the other five parts (`Bench/BenchLayout`), so orders 2 to 5 of `orders.json` can be played:
-  grip screw (unscrew: a circle path), grip panels (lift: an arc), mainspring, hammer screw, hammer. Orders 3 to 5
-  also need the parts drawer and oiling.
+- A screw turns around its middle, but the shader snaps the pivot of a turned sprite to a whole pixel and the
+  corner of an unturned one, so a screw shifts half a pixel when it starts to turn. Draw screws with whole-pixel
+  middles, or snap both the same way.
+- Show the hand how to unscrew: a faint circular arrow around a screw while it is held, for players who drag
+  straight.
+- An oiled part could show a wet sheen for a moment; today it only glints.
 - Replace the code-generated frame, pin, cylinder and click with the real sprites and recordings.
 
 ## Shop loop follow-ups

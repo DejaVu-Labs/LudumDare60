@@ -14,20 +14,29 @@ namespace LudumDare60.Game.Bench;
 /// <param name="Sprite">The part in the parts sheet.</param>
 /// <param name="Glow">Its glow outline in the parts sheet, one pixel larger on every side.</param>
 /// <param name="Origin">The grab point in sprite pixels: the sprite is drawn with it at the part's position.</param>
-/// <param name="UnderFrame">Whether the frame is drawn over the part, hiding what of it is still inside.</param>
+/// <param name="Layer">What the part is drawn over and under while it is in the gun.</param>
 /// <param name="ClickPitch">Pitch of the part's clicks: heavier parts click lower.</param>
 /// <param name="TurnedSprite">How the part looks one chamber further round, for the cylinder; null for parts that do
 /// not turn.</param>
 /// <param name="Free">How the part moves on the work surface once it is out, and how close to its rail it must be put
 /// to stick to it again; null for a part that stays on its rail.</param>
+/// <param name="BrokenSprite">How the part looks broken, for an order that has it swapped for a spare; null for a part
+/// the bench has no spare of.</param>
 public sealed record PartLayout(
-    LinePath Path,
+    PartPath Path,
     float GrabRadius,
     DragFeel Feel,
     IntRect Sprite,
     IntRect Glow,
     Vector2 Origin,
-    bool UnderFrame,
+    PartLayer Layer,
     float ClickPitch,
     IntRect? TurnedSprite = null,
-    FreeMove? Free = null);
+    FreeMove? Free = null,
+    IntRect? BrokenSprite = null)
+{
+    /// <summary>
+    /// Where the part sits in the gun as the customer brings it.
+    /// </summary>
+    public Vector2 Seat => Path.Start;
+}

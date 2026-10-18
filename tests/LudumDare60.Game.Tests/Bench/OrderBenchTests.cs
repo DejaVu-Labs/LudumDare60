@@ -1,4 +1,5 @@
 using System.Numerics;
+using LudumDare60.Engine.Rendering;
 using LudumDare60.Game.Bench;
 using LudumDare60.Game.Cleaning;
 using LudumDare60.Game.Orders;
@@ -91,24 +92,27 @@ public sealed class OrderBenchTests
     }
 
     [Theory]
-    [InlineData(1, "grip-screw")]
-    [InlineData(2, "grip-screw")]
-    [InlineData(3, "hammer-screw")]
-    [InlineData(4, "grip-screw")]
-    public void CanSetUp_LaterShippedOrders_NotYetNamingTheMissingPart(int index, string part)
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void CanSetUp_EveryShippedOrder_IsPlayable(int index)
     {
-        Assert.False(OrderBench.CanSetUp(s_shipped.Orders[index], out var reason));
-        Assert.Contains(part, reason, StringComparison.Ordinal);
-        Assert.Throws<NotSupportedException>(() => new OrderBench(s_shipped.Orders[index]));
+        Assert.True(OrderBench.CanSetUp(s_shipped.Orders[index], out var reason), reason);
+
+        var bench = new OrderBench(s_shipped.Orders[index]);
+
+        Assert.Equal(s_shipped.Orders[index].Parts.Count, bench.Count);
     }
 
     [Fact]
-    public void CanSetUp_BrokenPart_NotYet()
+    public void CanSetUp_BrokenPartWithoutASpare_NotYet()
     {
         var order = MakeOrder([RevolverParts.BasePin, RevolverParts.Cylinder], broken: [RevolverParts.Cylinder]);
 
         Assert.False(OrderBench.CanSetUp(order, out var reason));
-        Assert.Contains("drawer", reason, StringComparison.Ordinal);
+        Assert.Contains("spare", reason, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -345,5 +349,255 @@ public sealed class OrderBenchTests
         _bench.Step(Press(BenchLayout.BrushRest), Dt);
 
         Assert.False(_bench.Brush.IsHeld);
+    }
+    [Fact]
+    public void Constructor_SecondShippedOrder_TheGripScrewHoldsTheGrimyPanel()
+    {
+        var bench = new OrderBench(s_shipped.Orders[1]);
+        var screw = bench.IndexOf(RevolverParts.GripScrew);
+        var panel = bench.IndexOf(RevolverParts.GripPanels);
+
+        Assert.True(bench.Part(RevolverParts.GripScrew).Path.IsTurn);
+        Assert.Equal(BenchLayout.GripScrewSeated, bench.Part(RevolverParts.GripScrew).Position);
+        Assert.Equal(BenchLayout.GripPanelSeated, bench.Part(RevolverParts.GripPanels).Position);
+        Assert.True(bench.Gun.Holds(screw, panel));
+        Assert.NotNull(bench.Dirt(RevolverParts.GripPanels));
+        Assert.Equal(-1, bench.SparePart);
+        Assert.False(bench.IsHammerOut);
+    }
+
+    [Fact]
+    public void IsDone_SecondShippedOrder_UnscrewedScrubbedAndScrewedBack_IsTrue()
+    {
+        var bench = new OrderBench(s_shipped.Orders[1]);
+        var screwRest = new Vector2(120, 300);
+        Unscrew(bench, BenchLayout.GripScrewSeated, screwRest);
+        Assert.True(bench.Part(RevolverParts.GripScrew).IsFree);
+
+        Drag(bench, BenchLayout.GripPanelSeated, BenchLayout.GripPanelOut);
+        Assert.True(bench.Part(RevolverParts.GripPanels).IsFree);
+        Assert.True(bench.NeedsScrubbing(bench.IndexOf(RevolverParts.GripPanels)));
+
+        var grime = bench.Dirt(RevolverParts.GripPanels)!;
+        ScrubAround(bench, bench.Part(RevolverParts.GripPanels).Position, PlaceholderParts.GripPanel, PlaceholderParts.GripPanelOrigin, grime);
+        Assert.True(grime.IsClean);
+
+        Drag(bench, bench.Part(RevolverParts.GripPanels).Position, BenchLayout.GripPanelSeated);
+        Assert.Equal(PartStop.Start, bench.Part(RevolverParts.GripPanels).Stop);
+        Assert.False(bench.IsDone);
+
+        ScrewIn(bench, screwRest, BenchLayout.GripScrewSeated);
+
+        Assert.Equal(PartStop.Start, bench.Part(RevolverParts.GripScrew).Stop);
+        Assert.True(bench.IsDone);
+    }
+
+    [Fact]
+    public void Step_ThirdShippedOrder_TheBrokenMainspringIsSwappedInTheTray()
+    {
+        var bench = new OrderBench(s_shipped.Orders[2]);
+        var spring = bench.IndexOf(RevolverParts.Mainspring);
+        Assert.Equal(spring, bench.SparePart);
+        Unscrew(bench, BenchLayout.GripScrewSeated, new Vector2(120, 300));
+        Drag(bench, BenchLayout.GripPanelSeated, BenchLayout.GripPanelOut);
+
+        var outside = BenchLayout.MainspringSeated + (BenchLayout.MainspringPullDirection * 40);
+        Drag(bench, BenchLayout.MainspringSeated, outside);
+        Assert.True(bench.NeedsSpare(spring));
+
+        // Whole parts only: brought back to its place, the broken spring does not go in.
+        var refused = DragWatching(bench, outside, BenchLayout.MainspringSeated, spring);
+        Assert.True((refused & DragEvents.DockRefused) != DragEvents.None);
+        Assert.True(bench.Part(RevolverParts.Mainspring).IsFree);
+
+        var events = Drag(bench, bench.Part(RevolverParts.Mainspring).Position, BenchLayout.TraySpare);
+        Assert.True((events & BenchEvents.Replaced) != BenchEvents.None);
+        Assert.False(bench.IsBroken(spring));
+        Assert.True(bench.IsReady(spring));
+
+        Drag(bench, bench.Part(RevolverParts.Mainspring).Position, BenchLayout.MainspringSeated);
+        Assert.Equal(PartStop.Start, bench.Part(RevolverParts.Mainspring).Stop);
+    }
+
+    [Fact]
+    public void Step_BrokenPartPutDownBesideTheTray_StaysBroken()
+    {
+        var bench = new OrderBench(s_shipped.Orders[2]);
+        Unscrew(bench, BenchLayout.GripScrewSeated, new Vector2(120, 300));
+        Drag(bench, BenchLayout.GripPanelSeated, BenchLayout.GripPanelOut);
+
+        var events = Drag(bench, BenchLayout.MainspringSeated, BenchLayout.TrayMin - new Vector2(20, 0));
+
+        Assert.Equal(BenchEvents.None, events & BenchEvents.Replaced);
+        Assert.True(bench.IsBroken(bench.IndexOf(RevolverParts.Mainspring)));
+    }
+
+    [Fact]
+    public void Step_FourthShippedOrder_TheHammerComesOffAfterItsScrew()
+    {
+        var bench = new OrderBench(s_shipped.Orders[3]);
+        var hammer = bench.IndexOf(RevolverParts.Hammer);
+        Assert.True(bench.Gun.Holds(bench.IndexOf(RevolverParts.HammerScrew), hammer));
+
+        Unscrew(bench, BenchLayout.HammerScrewSeated, new Vector2(120, 300));
+        Assert.False(bench.IsHammerOut);
+        Drag(bench, BenchLayout.HammerPivot, BenchLayout.HammerOut);
+
+        Assert.True(bench.IsHammerOut);
+        Assert.True(bench.Part(RevolverParts.Hammer).IsFree);
+        Assert.True(bench.NeedsScrubbing(hammer));
+        Assert.True(bench.NeedsOiling(hammer));
+        Assert.False(bench.IsReady(hammer));
+    }
+
+    [Fact]
+    public void Step_OilCanSpoutOnTheDryHammer_OilsItOnce()
+    {
+        var bench = new OrderBench(s_shipped.Orders[3]);
+        var hammer = bench.IndexOf(RevolverParts.Hammer);
+        Unscrew(bench, BenchLayout.HammerScrewSeated, new Vector2(120, 300));
+        Drag(bench, BenchLayout.HammerPivot, BenchLayout.HammerOut);
+
+        bench.Step(Press(BenchLayout.OilCanRest), Dt);
+        Assert.True(bench.OilCan.IsHeld);
+        var oiled = 0;
+        for (var i = 0; i < 30; i++)
+        {
+            bench.Step(Hold(bench.Part(RevolverParts.Hammer).Position), Dt);
+            oiled += (bench.Events & BenchEvents.Oiled) != BenchEvents.None ? 1 : 0;
+        }
+
+        bench.Step(Release(bench.Part(RevolverParts.Hammer).Position), Dt);
+
+        Assert.Equal(1, oiled);
+        Assert.False(bench.NeedsOil(hammer));
+        Assert.False(bench.OilCan.IsHeld);
+        Assert.True(bench.Part(RevolverParts.Hammer).IsFree);
+    }
+
+    [Fact]
+    public void Step_OilCanOnAPartInTheGun_OilsNothing()
+    {
+        var bench = new OrderBench(s_shipped.Orders[3]);
+
+        bench.Step(Press(BenchLayout.OilCanRest), Dt);
+        for (var i = 0; i < 30; i++)
+        {
+            bench.Step(Hold(BenchLayout.HammerPivot), Dt);
+        }
+
+        Assert.True(bench.NeedsOil(bench.IndexOf(RevolverParts.Hammer)));
+        Assert.False(bench.Part(RevolverParts.Hammer).IsHovered);
+    }
+
+    [Fact]
+    public void Step_OilCanInTheHand_BrushCannotBeTaken()
+    {
+        _bench.Step(Press(BenchLayout.OilCanRest), Dt);
+
+        _bench.Step(Hold(BenchLayout.BrushRest), Dt);
+        _bench.Step(Press(BenchLayout.BrushRest), Dt);
+
+        Assert.True(_bench.OilCan.IsHeld);
+        Assert.False(_bench.Brush.IsHeld);
+    }
+
+    private static BenchEvents Drag(OrderBench bench, Vector2 from, Vector2 to)
+    {
+        var seen = BenchEvents.None;
+        bench.Step(Press(from), Dt);
+        seen |= bench.Events;
+        for (var i = 0; i < 90; i++)
+        {
+            bench.Step(Hold(to), Dt);
+            seen |= bench.Events;
+        }
+
+        bench.Step(Release(to), Dt);
+        return seen | bench.Events;
+    }
+
+    /// <summary>
+    /// <see cref="Drag(OrderBench, Vector2, Vector2)"/>, returning the drag events of <paramref name="part"/>.
+    /// </summary>
+    private static DragEvents DragWatching(OrderBench bench, Vector2 from, Vector2 to, int part)
+    {
+        bench.Step(Press(from), Dt);
+        var seen = bench.Gun.Events[part];
+        for (var i = 0; i < 90; i++)
+        {
+            bench.Step(Hold(to), Dt);
+            seen |= bench.Gun.Events[part];
+        }
+
+        bench.Step(Release(to), Dt);
+        return seen | bench.Gun.Events[part];
+    }
+
+    /// <summary>
+    /// Takes the screw at <paramref name="center"/> by its head, circles it counterclockwise until it comes out, and
+    /// puts it down at <paramref name="rest"/>.
+    /// </summary>
+    private static void Unscrew(OrderBench bench, Vector2 center, Vector2 rest)
+    {
+        bench.Step(Press(center + new Vector2(3, 0)), Dt);
+        var angle = 0f;
+        for (var i = 0; i < 150; i++)
+        {
+            angle -= 0.15f;
+            bench.Step(Hold(center + (new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * 15)), Dt);
+        }
+
+        for (var i = 0; i < 60; i++)
+        {
+            bench.Step(Hold(rest), Dt);
+        }
+
+        bench.Step(Release(rest), Dt);
+    }
+
+    /// <summary>
+    /// Takes the loose screw at <paramref name="rest"/>, puts it on its hole at <paramref name="center"/>, and circles
+    /// it clockwise until it is tight.
+    /// </summary>
+    private static void ScrewIn(OrderBench bench, Vector2 rest, Vector2 center)
+    {
+        bench.Step(Press(rest), Dt);
+        for (var i = 0; i < 30; i++)
+        {
+            bench.Step(Hold(center), Dt);
+        }
+
+        var angle = 0f;
+        for (var i = 0; i < 200; i++)
+        {
+            angle += 0.15f;
+            bench.Step(Hold(center + (new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * 15)), Dt);
+        }
+
+        bench.Step(Release(center + new Vector2(15, 0)), Dt);
+    }
+
+    /// <summary>
+    /// Takes the brush and rubs it row by row over the sprite of the part lying at <paramref name="at"/> until
+    /// <paramref name="dirt"/> counts as clean, then puts the brush back.
+    /// </summary>
+    private static void ScrubAround(OrderBench bench, Vector2 at, IntRect sprite, Vector2 origin, DirtLayer dirt)
+    {
+        bench.Step(Press(BenchLayout.BrushRest), Dt);
+        var corner = at - origin;
+        for (var pass = 0; pass < 3 && !dirt.IsClean; pass++)
+        {
+            for (var y = -1; y <= sprite.Height + 1 && !dirt.IsClean; y += 2)
+            {
+                for (var x = -1; x <= sprite.Width + 1; x += 2)
+                {
+                    bench.Step(Hold(corner + new Vector2(x, y)), Dt);
+                }
+            }
+        }
+
+        bench.Step(Hold(BenchLayout.BrushRest), Dt);
+        bench.Step(Release(BenchLayout.BrushRest), Dt);
     }
 }

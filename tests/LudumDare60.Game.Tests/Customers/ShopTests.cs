@@ -302,7 +302,7 @@ public sealed class ShopTests
     public void HasCustomer_FromComingInToLeaving_InEveryPhase()
     {
         var phases = new HashSet<ShopPhase>();
-        var shop = new Shop(s_shipped);
+        var shop = new Shop(new OrderBook([s_shipped.Orders[0]]));
         void note()
         {
             if (shop.HasCustomer)
@@ -394,7 +394,7 @@ public sealed class ShopTests
     }
 
     [Fact]
-    public void Step_AfterThanking_CustomerLeavesAndTheLastPlayableOrderClosesTheShop()
+    public void Step_AfterThanking_TheSecondShippedCustomerComesInWithTheGripScrewOrder()
     {
         Repair(_shop);
         FireTest(_shop);
@@ -402,11 +402,28 @@ public sealed class ShopTests
 
         var events = Wait(_shop, Shop.ThankSeconds + Shop.WalkSeconds + Shop.WaitSeconds + 0.2f);
 
-        Assert.Equal(ShopEvents.CustomerLeft, events);
-        Assert.Equal(ShopPhase.Closed, _shop.Phase);
+        Assert.Equal(ShopEvents.CustomerLeft | ShopEvents.CustomerEntered, events);
+        Assert.Equal(ShopPhase.Arriving, _shop.Phase);
         Assert.Equal(1, _shop.OrderIndex);
-        Assert.Null(_shop.Bench);
-        Assert.False(_shop.HasCustomer);
+        Assert.Equal("cardigan", _shop.Bench!.Order.Id);
+        Assert.Equal(0, _shop.Bench.IndexOf(RevolverParts.GripScrew));
+    }
+
+    [Fact]
+    public void Step_AfterTheLastOrder_CustomerLeavesAndTheShopCloses()
+    {
+        var shop = new Shop(new OrderBook([s_shipped.Orders[0]]));
+        Repair(shop);
+        FireTest(shop);
+        HandBack(shop);
+
+        var events = Wait(shop, Shop.ThankSeconds + Shop.WalkSeconds + Shop.WaitSeconds + 0.2f);
+
+        Assert.Equal(ShopEvents.CustomerLeft, events);
+        Assert.Equal(ShopPhase.Closed, shop.Phase);
+        Assert.Equal(1, shop.OrderIndex);
+        Assert.Null(shop.Bench);
+        Assert.False(shop.HasCustomer);
     }
 
     [Fact]

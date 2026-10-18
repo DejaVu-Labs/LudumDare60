@@ -41,9 +41,9 @@ SHOP (session)         order 1 -> order 2 -> order 3 -> order 4 -> order 5 -> en
 3. **Find.** One part per order hides a find (a note in a chamber, a photo under a grip panel). It pops out when
    that part comes off; clicking it opens it full size over the bench. The customer reacts (surprised face). The
    find then goes into the **finds box** on the left of the bench, which stays on screen for the whole game.
-4. **Clean and repair.** Dirty parts must be scrubbed; a broken part must be swapped for a new one from the
-   drawer. A dirty or broken part *does not fit*: dragged to its slot, it bounces back and its dirt or crack
-   flashes. This is the only "wrong move" in the game.
+4. **Clean and repair.** Dirty parts must be scrubbed, dry ones oiled; a broken part must be swapped for a new one
+   from the tray of spares. A dirty, dry or broken part *does not fit*: dragged to its slot, it does not go in, and
+   it flashes with the tool that fixes it. This is the only "wrong move" in the game.
 5. **Reassemble.** Removed parts show a faint outline at their slot. Parts go back in reverse order; a part
    whose blockers are not back yet does not snap.
 6. **Test.** Cock the hammer (the cylinder turns one chamber with a ratchet click) and click the trigger (dry
@@ -62,16 +62,18 @@ The player controls the pace. Nothing in the loop has a timer, and nothing in it
 
 `Customers/Shop` runs the loop on the orders of `orders.json`, one customer at a time; the customer's pose follows
 the visit (see [Customer sheets](art-direction.md#customer-sheets)). After a moment the door bell
-rings and the customer walks from the door to the counter; the revolver drops onto the mat with a thud, and a
-bubble shows the symptom icon. The hammer glows first (`Bench/ActionTest`): the player drags its spur back (it turns
+rings and the customer walks from the door to the counter and waits there, glowing, until the player clicks them;
+the revolver flies onto the mat and lands with a thud, and a bubble shows the symptom icon. The hammer glows first (`Bench/ActionTest`): the player drags its spur back (it turns
 around its pivot) until it clicks into the half-cock notch, where it stays; a hammer let go before the notch falls
 back down, and one in the notch cannot be pushed lower. Until then every part stays put, and a press on one gives a
-dull tick and flashes the hammer. Once every part of the order has been out, is back in its seat, and every dirty
-part is clean, the parts stay put and the test begins: the hammer glows again, the player pulls it on to full cock
+dull tick and flashes the hammer. All five orders can be played: screws come out by circling them, the grip panel and
+the hammer lift off, a broken mainspring is swapped in the tray of spares, and the hammer is oiled before it goes
+back. Parts an order keeps fixed are drawn in their seats. Once every part of the order has been out, is back in its
+seat, and is clean, oiled and whole, the parts stay put and the test begins: the hammer glows again, the player pulls it on to full cock
 (the cylinder turns one chamber), then the trigger glows and a click on it drops the hammer with a dry-fire click.
 The trigger does nothing below full cock: a dull tick, and the hammer flashes. Then the revolver shines, the customer holds out a hand, and the player drags the whole revolver
-up to it. The customer smiles, takes it, walks out with the door bell, and the next order comes in. At the first
-order the bench cannot play yet the shop stays empty. Finds, the phone message and the counter bell are not built
+up to it. The customer smiles, takes it, walks out with the door bell, and the next order comes in. After the last
+order the shop stays empty. Finds, the phone message and the counter bell are not built
 yet (see [backlog](../backlog.md#shop-loop-follow-ups)).
 
 ## Rules
@@ -94,7 +96,11 @@ yet (see [backlog](../backlog.md#shop-loop-follow-ups)).
   the base pin goes in tip first, so brought within about 4 px of the mouth of the bore it sticks to its rail with a
   soft click and is pushed in from there (pulled off to the side it comes loose again); the cylinder has no rail at
   all, it comes free after a short pull out of its window and drops back into it with a click when brought within
-  about 8 px of its place. A part put down on the revolver lies on top of it.
+  about 8 px of its place; the grip panel, the mainspring and the hammer come free and go back the same way. A part
+  put down on the revolver lies on top of it.
+- **Screws turn** (`PartPath.Screw`): the player takes the head and circles it counterclockwise; it ticks every
+  quarter turn, and after two turns it comes out into the hand. Put back on its hole it sits there loose, and circled
+  clockwise it goes in until it is tight, with a click. Circling the wrong way only strains it.
 - **Dirty parts:** each has a dirt layer and a clean threshold (about 90 % of its pixels). A dirty part can be moved
   like any other, but it does not fit: brought back to its rail or its place it does not go in, a dull tick plays and the part and the
   wire brush flash. A press on the brush picks it up; while the button stays down its bristles follow the pointer
@@ -104,8 +110,12 @@ yet (see [backlog](../backlog.md#shop-loop-follow-ups)).
   fades out with a glint and a chime, so the player never hunts for the last pixel, and the part fits again. A dirty
   part still in the gun is dragged as usual. A part brought to its rail while another part keeps it out (the base pin
   while the cylinder is still out) does not stick either, and what holds it flashes.
-- **Broken parts:** the drawer at the right of the tool strip pulses while a broken part is off. Dragging the
-  new part from the drawer onto the broken one swaps them.
+- **Broken parts:** a broken part shows its break and does not fit: brought to its place it does not go in, and the
+  part and the tray of spares on the right of the mat flash. The tray pulses while a broken part is off. Put down in
+  the tray, the broken part is swapped for the spare with a clunk: the new one lies where the broken one was put,
+  and the broken one lies in the tray instead.
+- **Dry parts:** a part that needs oil does not fit either, and flashes with the oil can, which pulses while such a
+  part is off. The oil can is carried like the brush; the tip of its spout oils the part it touches, with a drip.
 - **One find per order** (two at most), attached to a part. The find is part of the order, not a random drop.
 - **One new verb per order.** Orders 1-4 each teach one verb and reuse the earlier ones; order 5 adds nothing
   new and combines everything.
@@ -116,7 +126,7 @@ yet (see [backlog](../backlog.md#shop-loop-follow-ups)).
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Young person in a hoodie | Cylinder jammed (rust) | base pin, cylinder | pull, scrub, test, hand back | Rolled note in a chamber | 1.5 min |
 | 2 | Elderly woman in a cardigan | Grip loose and grimy | grip screw, grip panels | unscrew | Photo under a grip panel | 2 min |
-| 3 | Man in a work jacket | Hammer will not stay cocked (broken spring) | grip screw, grip panels, mainspring | replace from the drawer | Initials carved inside the frame | 2 min |
+| 3 | Man in a work jacket | Hammer will not stay cocked (broken spring) | grip screw, grip panels, mainspring | replace from the tray | Initials carved inside the frame | 2 min |
 | 4 | Teenager with headphones | Action stiff, heavy rust | base pin, cylinder, hammer screw, hammer | oil | One unspent cartridge in a chamber | 2.5 min |
 | 5 | Woman in a raincoat | "Make it work again" (everything) | all of the above | none | The find that joins both timelines | 2.5 min |
 
@@ -133,7 +143,7 @@ art exists (`Bench/BenchLayout`). Loading checks every rule at once and stops th
 properties or parts, a part whose blocker the order keeps fixed, dirty, broken, oiled or find parts the order does
 not unlock. The find texts and messages in the file are drafts.
 
-The order logic (blocking graph, part states, dirt, the brush) lives in `LudumDare60.Game` (`Bench/OrderBench`) and is
+The order logic (blocking graph, part states, dirt, oil, spares, the brush and the oil can) lives in `LudumDare60.Game` (`Bench/OrderBench`) and is
 tested without a browser.
 
 ## What feeds each loop

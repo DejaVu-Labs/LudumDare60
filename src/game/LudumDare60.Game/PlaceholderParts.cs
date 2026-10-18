@@ -7,15 +7,16 @@ namespace LudumDare60.Game;
 
 /// <summary>
 /// The revolver generated in code until the real sprites exist, in one sheet: the whole revolver in profile, muzzle to
-/// the left (barrel with its front sight, ejector housing, a color-cased frame with the cylinder window, walnut grip,
-/// brass trigger guard), and the parts that move on their own: the base pin (knurled head on the left), the cylinder
-/// in two positions of its turn, the hammer and the trigger, plus the brush, and a glow outline for each. Colors come
-/// from the palette (docs/gamedesign/art-direction.md).
+/// the left (barrel with its front sight, ejector housing, a color-cased frame with the cylinder window, the grip
+/// frame with its straps, brass trigger guard), and the parts that move on their own: the base pin (knurled head on
+/// the left), the cylinder in two positions of its turn, the hammer and the trigger, the walnut grip panel, a screw
+/// (the grip screw and the hammer screw), the mainspring whole and broken, plus the brush, the oil can and the parts
+/// tray, and a glow outline for each. Colors come from the palette (docs/gamedesign/art-direction.md).
 /// </summary>
 internal static class PlaceholderParts
 {
     public const int Width = 256;
-    public const int Height = 224;
+    public const int Height = 316;
 
     /// <summary>
     /// The revolver without the parts that move: the cylinder window and the gap for the base pin's head are
@@ -68,6 +69,51 @@ internal static class PlaceholderParts
     public static readonly IntRect HammerGlow = Around(Hammer, 96, RowB);
 
     /// <summary>
+    /// The walnut panel on the side of the grip, which hides the mainspring; its top edge meets the frame.
+    /// </summary>
+    public static readonly IntRect GripPanel = new(0, RowC, PanelWidth, PanelHeight);
+
+    /// <inheritdoc cref="PinGlow"/>
+    public static readonly IntRect GripPanelGlow = Around(GripPanel, PanelWidth, RowC);
+
+    /// <summary>
+    /// A screw head seen from the side of the gun, with its slot: the grip screw and the hammer screw.
+    /// </summary>
+    public static readonly IntRect Screw = new(90, RowC, ScrewSize, ScrewSize);
+
+    /// <inheritdoc cref="PinGlow"/>
+    public static readonly IntRect ScrewGlow = Around(Screw, 97, RowC);
+
+    /// <summary>
+    /// The flat mainspring, top end under the hammer, bottom end at the foot of the grip.
+    /// </summary>
+    public static readonly IntRect Mainspring = new(106, RowC, MainspringWidth, MainspringHeight);
+
+    /// <summary>
+    /// The mainspring snapped in the middle, the lower half bent away.
+    /// </summary>
+    public static readonly IntRect MainspringBroken = new(134, RowC, MainspringWidth, MainspringHeight);
+
+    /// <inheritdoc cref="PinGlow"/>
+    public static readonly IntRect MainspringGlow = Around(Mainspring, 162, RowC);
+
+    /// <summary>
+    /// The oil can lying on the mat, its spout up and to the left.
+    /// </summary>
+    public static readonly IntRect OilCan = new(192, RowC, OilCanWidth, OilCanHeight);
+
+    /// <inheritdoc cref="PinGlow"/>
+    public static readonly IntRect OilCanGlow = Around(OilCan, 208, RowC);
+
+    /// <summary>
+    /// The wooden tray of spare parts, seen from above.
+    /// </summary>
+    public static readonly IntRect Tray = new(0, RowD, TrayWidth, TrayHeight);
+
+    /// <inheritdoc cref="PinGlow"/>
+    public static readonly IntRect TrayGlow = Around(Tray, TrayWidth, RowD);
+
+    /// <summary>
     /// The middle of the bristles, in brush pixels: the point that scrubs.
     /// </summary>
     public static readonly Vector2 BrushOrigin = new(3, 3);
@@ -98,6 +144,26 @@ internal static class PlaceholderParts
     public static readonly Vector2 TriggerOrigin = new(1, 0);
 
     /// <summary>
+    /// The grip panel's grab point, in panel pixels: low on the panel, clear of the grip screw.
+    /// </summary>
+    public static readonly Vector2 GripPanelOrigin = new(20, 35);
+
+    /// <summary>
+    /// The middle of a screw head, in screw pixels: it turns around it.
+    /// </summary>
+    public static readonly Vector2 ScrewOrigin = new(ScrewSize / 2f, ScrewSize / 2f);
+
+    /// <summary>
+    /// The mainspring's grab point, the middle of its length, in mainspring pixels.
+    /// </summary>
+    public static readonly Vector2 MainspringOrigin = new(13, 16);
+
+    /// <summary>
+    /// The tip of the oil can's spout, in oil can pixels: the point that oils.
+    /// </summary>
+    public static readonly Vector2 OilCanOrigin = new(1, 1);
+
+    /// <summary>
     /// Where the base pin's head sits in <see cref="Body"/> when the pin is in: in front of the frame, on the
     /// cylinder's axis.
     /// </summary>
@@ -118,10 +184,32 @@ internal static class PlaceholderParts
     /// </summary>
     public static readonly Vector2 TriggerInBody = new(121, 45);
 
+    /// <summary>
+    /// Where the seated grip panel's grab point sits in <see cref="Body"/>.
+    /// </summary>
+    public static readonly Vector2 GripPanelInBody = new Vector2(PanelLeft, PanelTop) + GripPanelOrigin;
+
+    /// <summary>
+    /// Where the grip screw's middle sits in <see cref="Body"/>: through the middle of the grip panel.
+    /// </summary>
+    public static readonly Vector2 GripScrewInBody = new(146.5f, 62.5f);
+
+    /// <summary>
+    /// Where the hammer screw's middle sits in <see cref="Body"/>: on the hammer's pivot.
+    /// </summary>
+    public static readonly Vector2 HammerScrewInBody = HammerInBody + new Vector2(0.5f);
+
+    /// <summary>
+    /// Where the seated mainspring's grab point sits in <see cref="Body"/>: in the grip, along the backstrap.
+    /// </summary>
+    public static readonly Vector2 MainspringInBody = new Vector2(MainspringLeft, MainspringTop) + MainspringOrigin;
+
     private const int BodyWidth = 184;
     private const int BodyHeight = 88;
     private const int RowA = 180;
     private const int RowB = 194;
+    private const int RowC = 226;
+    private const int RowD = 276;
     private const int HeadWidth = 4;
     private const int CylinderWidth = 26;
     private const int CylinderHeight = 24;
@@ -129,6 +217,24 @@ internal static class PlaceholderParts
     private const int HammerSize = 16;
     private const int TriggerWidth = 4;
     private const int TriggerHeight = 10;
+    private const int ScrewSize = 7;
+    private const int MainspringWidth = 28;
+    private const int MainspringHeight = 32;
+    private const int OilCanWidth = 16;
+    private const int OilCanHeight = 14;
+    private const int TrayWidth = 52;
+    private const int TrayHeight = 36;
+
+    // The grip panel's sprite in body pixels: the walnut between the straps, below the frame.
+    private const int PanelLeft = 130;
+    private const int PanelTop = 40;
+    private const int PanelWidth = 44;
+    private const int PanelHeight = 47;
+
+    // The mainspring's sprite in body pixels, and the slant of the backstrap it lies along.
+    private const int MainspringLeft = 142;
+    private const int MainspringTop = 51;
+    private const float MainspringSlant = 0.71f;
 
     // The frame around the cylinder window, in body pixels.
     private const int FrameLeft = 97;
@@ -154,6 +260,12 @@ internal static class PlaceholderParts
     private static readonly Color s_walnut = Color.FromRgb(0x823d1e);
     private static readonly Color s_walnutDark = Color.FromRgb(0x622a14);
 
+    // Old oil and dirt, dark to light.
+    private static readonly Color[] s_grime =
+    [
+        Color.FromRgb(0x0d0a0a), Color.FromRgb(0x1e0d09), Color.FromRgb(0x2b120b), Color.FromRgb(0x2c201b), Color.FromRgb(0x453a30),
+    ];
+
     // Rust, dark to light, from the walnut, rust and copper ramp.
     private static readonly Color[] s_rust =
     [
@@ -161,9 +273,14 @@ internal static class PlaceholderParts
     ];
 
     /// <summary>
-    /// How much of the cylinder rust covers, from 0 (all of it) to 1 (none): pixels whose blotch value lies above it.
+    /// How much of a part rust covers, from 0 (all of it) to 1 (none): pixels whose blotch value lies above it.
     /// </summary>
     private const float RustCutoff = 0.3f;
+
+    /// <summary>
+    /// Like <see cref="RustCutoff"/>, for grime on the grip panel.
+    /// </summary>
+    private const float GrimeCutoff = 0.35f;
 
     public static Image Create()
     {
@@ -175,12 +292,23 @@ internal static class PlaceholderParts
         Fill(pixels, Brush, BrushColor);
         Fill(pixels, Hammer, HammerColor);
         Fill(pixels, Trigger, TriggerColor);
+        Fill(pixels, GripPanel, GripPanelColor);
+        Fill(pixels, Screw, ScrewColor);
+        Fill(pixels, Mainspring, (x, y) => MainspringColor(x, y, broken: false));
+        Fill(pixels, MainspringBroken, (x, y) => MainspringColor(x, y, broken: true));
+        Fill(pixels, OilCan, OilCanColor);
+        Fill(pixels, Tray, TrayColor);
         FillGlow(pixels, BodyGlow, IsBody);
         FillGlow(pixels, PinGlow, IsPin);
         FillGlow(pixels, CylinderGlow, IsCylinder);
         FillGlow(pixels, BrushGlow, IsBrush);
         FillGlow(pixels, HammerGlow, IsHammer);
         FillGlow(pixels, TriggerGlow, IsTrigger);
+        FillGlow(pixels, GripPanelGlow, IsGripPanel);
+        FillGlow(pixels, ScrewGlow, IsScrew);
+        FillGlow(pixels, MainspringGlow, (x, y) => IsMainspring(x, y, broken: false));
+        FillGlow(pixels, OilCanGlow, IsOilCan);
+        FillGlow(pixels, TrayGlow, IsTray);
         return new Image(Width, Height, pixels);
     }
 
@@ -188,23 +316,38 @@ internal static class PlaceholderParts
     /// Rust over the cylinder, for a <see cref="Cleaning.DirtLayer"/>: blotches over most of it, the cylinder's size and
     /// origin. The same pixels every time.
     /// </summary>
-    public static Image CreateCylinderRust()
+    public static Image CreateCylinderRust() => CreateDirt(CylinderWidth, CylinderHeight, IsCylinder, s_rust, RustCutoff);
+
+    /// <summary>
+    /// Rust over the hammer, the hammer's size and origin, like <see cref="CreateCylinderRust"/>.
+    /// </summary>
+    public static Image CreateHammerRust() => CreateDirt(HammerSize, HammerSize, IsHammer, s_rust, RustCutoff);
+
+    /// <summary>
+    /// Old oil and dirt over the grip panel, the panel's size and origin, like <see cref="CreateCylinderRust"/>.
+    /// </summary>
+    public static Image CreateGripPanelGrime() => CreateDirt(PanelWidth, PanelHeight, IsGripPanel, s_grime, GrimeCutoff);
+
+    /// <summary>
+    /// Blotches of <paramref name="ramp"/> over the pixels of a part, the part's size.
+    /// </summary>
+    private static Image CreateDirt(int width, int height, Func<int, int, bool> isPart, Color[] ramp, float cutoff)
     {
-        var pixels = new byte[CylinderWidth * CylinderHeight * Image.BytesPerPixel];
-        for (var y = 0; y < CylinderHeight; y++)
+        var pixels = new byte[width * height * Image.BytesPerPixel];
+        for (var y = 0; y < height; y++)
         {
-            for (var x = 0; x < CylinderWidth; x++)
+            for (var x = 0; x < width; x++)
             {
                 // Coarse blotches of 3x3 pixels, broken up per pixel.
                 var value = (Hash(x / 3, y / 3) * 0.6f) + (Hash(x + 100, y + 100) * 0.4f);
-                if (!IsCylinder(x, y) || value <= RustCutoff)
+                if (!isPart(x, y) || value <= cutoff)
                 {
                     continue;
                 }
 
-                var shade = Math.Min(s_rust.Length - 1, (int)((value - RustCutoff) / (1 - RustCutoff) * s_rust.Length));
-                var i = ((y * CylinderWidth) + x) * Image.BytesPerPixel;
-                var color = s_rust[shade];
+                var shade = Math.Min(ramp.Length - 1, (int)((value - cutoff) / (1 - cutoff) * ramp.Length));
+                var i = ((y * width) + x) * Image.BytesPerPixel;
+                var color = ramp[shade];
                 pixels[i] = color.R;
                 pixels[i + 1] = color.G;
                 pixels[i + 2] = color.B;
@@ -212,7 +355,7 @@ internal static class PlaceholderParts
             }
         }
 
-        return new Image(CylinderWidth, CylinderHeight, pixels);
+        return new Image(width, height, pixels);
     }
 
     /// <summary>
@@ -261,6 +404,21 @@ internal static class PlaceholderParts
 
         var (front, back) = GripEdges(y);
         return x >= front && x <= back;
+    }
+
+    /// <summary>
+    /// Whether body pixel (<paramref name="x"/>, <paramref name="y"/>) is under the grip panel: the walnut between the
+    /// straps, where the frame does not cover it.
+    /// </summary>
+    private static bool InPanel(int x, int y)
+    {
+        if (!InGrip(x, y) || InFrame(x, y))
+        {
+            return false;
+        }
+
+        var (front, back) = GripEdges(y);
+        return x >= front + 2 && x <= back - 2;
     }
 
     private static bool InGuard(int x, int y)
@@ -331,7 +489,7 @@ internal static class PlaceholderParts
 
         if (InGrip(x, y))
         {
-            // A steel backstrap, a brass front strap, walnut with grain in between, and the grip screw.
+            // A steel backstrap, a brass front strap, and the dark channel the grip panel covers.
             var (front, back) = GripEdges(y);
             if (x > back - 2)
             {
@@ -343,14 +501,7 @@ internal static class PlaceholderParts
                 return s_brassDark;
             }
 
-            var middle = (front + back) / 2;
-            if (MathF.Abs(x - middle) < 1.5f && y is 62 or 63)
-            {
-                return s_steelLight;
-            }
-
-            var grain = Hash(x / 3, y);
-            return grain < 0.25f ? s_walnutDark : grain < 0.8f ? s_walnut : s_walnutLight;
+            return x < front + 3 || x > back - 3 ? s_ink : s_steelDark;
         }
 
         if (InGuard(x, y))
@@ -359,6 +510,164 @@ internal static class PlaceholderParts
         }
 
         return Color.Transparent;
+    }
+
+    private static bool IsGripPanel(int x, int y)
+        => (uint)x < PanelWidth && (uint)y < PanelHeight && InPanel(x + PanelLeft, y + PanelTop);
+
+    private static Color GripPanelColor(int x, int y)
+    {
+        if (!IsGripPanel(x, y))
+        {
+            return Color.Transparent;
+        }
+
+        // Walnut with grain, darker along the edges.
+        if (!IsGripPanel(x - 1, y) || !IsGripPanel(x + 1, y) || !IsGripPanel(x, y - 1) || !IsGripPanel(x, y + 1))
+        {
+            return s_walnutDark;
+        }
+
+        var grain = Hash((x + PanelLeft) / 3, y + PanelTop);
+        return grain < 0.25f ? s_walnutDark : grain < 0.8f ? s_walnut : s_walnutLight;
+    }
+
+    private static bool IsScrew(int x, int y)
+        => (uint)x < ScrewSize && (uint)y < ScrewSize
+            && Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), ScrewOrigin) <= 3.3f;
+
+    private static Color ScrewColor(int x, int y)
+    {
+        if (!IsScrew(x, y))
+        {
+            return Color.Transparent;
+        }
+
+        // A dark rim, the slot across the middle, and light from the top.
+        if (Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), ScrewOrigin) > 2.4f)
+        {
+            return s_steelDark;
+        }
+
+        if (y == ScrewSize / 2)
+        {
+            return s_ink;
+        }
+
+        return y < ScrewSize / 2 ? s_steelLight : s_steelMid;
+    }
+
+    /// <summary>
+    /// The middle of the mainspring at row <paramref name="y"/>, in mainspring pixels: it slants like the backstrap.
+    /// A broken spring has a gap at its middle and its lower half bent away.
+    /// </summary>
+    private static bool IsMainspring(int x, int y, bool broken)
+    {
+        if ((uint)x >= MainspringWidth || (uint)y >= MainspringHeight)
+        {
+            return false;
+        }
+
+        if (broken && y is 14 or 15)
+        {
+            return false;
+        }
+
+        var middle = 2 + (y * MainspringSlant) + (broken && y >= 16 ? 1.5f : 0);
+        return MathF.Abs(x - middle) <= 1;
+    }
+
+    private static Color MainspringColor(int x, int y, bool broken)
+    {
+        if (!IsMainspring(x, y, broken))
+        {
+            return Color.Transparent;
+        }
+
+        var middle = 2 + (y * MainspringSlant) + (broken && y >= 16 ? 1.5f : 0);
+        if (broken && y is 13 or 16)
+        {
+            // The torn ends.
+            return s_rust[2];
+        }
+
+        return x < middle ? s_steelLight : s_steelMid;
+    }
+
+    private static bool IsOilCan(int x, int y)
+    {
+        if ((uint)x >= OilCanWidth || (uint)y >= OilCanHeight)
+        {
+            return false;
+        }
+
+        // The spout runs from its tip down to the body; the pump's knob sits on top of the body.
+        var spout = x <= 7 && y >= (x * 6 / 7) && y <= (x * 6 / 7) + 1;
+        var body = InEllipse(x, y, 11, 9.5f, 4.5f, 4.2f);
+        var knob = x is >= 10 and <= 12 && y is >= 3 and <= 5;
+        return spout || body || knob;
+    }
+
+    private static Color OilCanColor(int x, int y)
+    {
+        if (!IsOilCan(x, y))
+        {
+            return Color.Transparent;
+        }
+
+        if (x <= 7 && !InEllipse(x, y, 11, 9.5f, 4.5f, 4.2f))
+        {
+            return s_steelMid;
+        }
+
+        if (y <= 5)
+        {
+            return s_steelLight;
+        }
+
+        return y switch
+        {
+            <= 8 => s_brass,
+            9 => s_steelDark,
+            _ => s_brassDark,
+        };
+    }
+
+    private static bool IsTray(int x, int y)
+    {
+        if ((uint)x >= TrayWidth || (uint)y >= TrayHeight)
+        {
+            return false;
+        }
+
+        // Rounded corners: the corner pixels are cut.
+        var cornerX = x is 0 or TrayWidth - 1;
+        var cornerY = y is 0 or TrayHeight - 1;
+        return !(cornerX && cornerY);
+    }
+
+    private static Color TrayColor(int x, int y)
+    {
+        if (!IsTray(x, y))
+        {
+            return Color.Transparent;
+        }
+
+        // A walnut rim two pixels wide, lit from the top, around a dark felt bottom.
+        var rim = x <= 1 || y <= 1 || x >= TrayWidth - 2 || y >= TrayHeight - 2;
+        if (rim)
+        {
+            return y <= 1 ? s_walnutLight : s_walnut;
+        }
+
+        return y == 2 ? s_ink : s_steelDark;
+    }
+
+    private static bool InEllipse(float x, float y, float centerX, float centerY, float radiusX, float radiusY)
+    {
+        var dx = (x + 0.5f - centerX) / radiusX;
+        var dy = (y + 0.5f - centerY) / radiusY;
+        return (dx * dx) + (dy * dy) <= 1;
     }
 
     private static bool IsPin(int x, int y)
