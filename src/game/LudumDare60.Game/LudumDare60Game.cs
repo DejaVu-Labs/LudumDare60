@@ -41,6 +41,12 @@ public sealed class LudumDare60Game : IGame
     public static readonly Color MatColor = Color.FromRgb(0x0b4f45);
 
     /// <summary>
+    /// Where the top-left corner of the street is drawn, in virtual pixels: raised so that the embankment with its
+    /// lamps, railing and reflections fills the window panes and the door glass of the room.
+    /// </summary>
+    public static readonly Vector2 StreetOffset = new(0, -125);
+
+    /// <summary>
     /// How long the parts that block a refused part flash, in seconds.
     /// </summary>
     public const float HintSeconds = 0.6f;
@@ -102,9 +108,11 @@ public sealed class LudumDare60Game : IGame
     private Graphics? _graphics;
     private Audio? _audio;
     private AssetHandle<Image> _benchImage;
+    private AssetHandle<Image> _streetImage;
     private AssetHandle<OrderBook> _ordersHandle;
     private bool _hasOrders;
     private Texture _bench;
+    private Texture _street;
     private Texture _parts;
     private Texture _customers;
     private bool _hasSheets;
@@ -160,6 +168,11 @@ public sealed class LudumDare60Game : IGame
     public bool HasBackground { get; private set; }
 
     /// <summary>
+    /// Whether the street seen through the windows is loaded and drawn.
+    /// </summary>
+    public bool HasStreet { get; private set; }
+
+    /// <summary>
     /// Every order, once <c>orders.json</c> is loaded.
     /// </summary>
     public OrderBook? Orders { get; private set; }
@@ -183,6 +196,7 @@ public sealed class LudumDare60Game : IGame
         assets.Register(new ImageLoader());
         assets.Register(new OrderBookLoader());
         _benchImage = assets.Request<Image>(AssetPaths.Bench);
+        _streetImage = assets.Request<Image>(AssetPaths.Street);
         for (var i = 0; i < _customerImages.Length; i++)
         {
             _customerImages[i] = assets.Request<Image>(AssetPaths.CustomerSheets[i].Value);
@@ -269,6 +283,13 @@ public sealed class LudumDare60Game : IGame
             _bench = _graphics!.CreateTexture(bench);
             _assets.Release(_benchImage);
             HasBackground = true;
+        }
+
+        if (!HasStreet && _assets!.TryGet(_streetImage, out var street))
+        {
+            _street = _graphics!.CreateTexture(street);
+            _assets.Release(_streetImage);
+            HasStreet = true;
         }
 
         for (var i = 0; i < _customerImages.Length; i++)
@@ -397,6 +418,12 @@ public sealed class LudumDare60Game : IGame
     {
         ArgumentNullException.ThrowIfNull(batch);
         batch.Clear(MatColor);
+        if (HasStreet)
+        {
+            // Under the room: it shows only through the window panes and the door glass.
+            batch.Draw(_street, StreetOffset);
+        }
+
         if (HasBackground)
         {
             batch.Draw(_bench, Vector2.Zero);

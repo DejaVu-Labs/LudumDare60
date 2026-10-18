@@ -1100,6 +1100,7 @@ public sealed class LudumDare60GameTests
         _platform.Frame(0);
 
         Assert.False(_game.HasBackground);
+        Assert.False(_game.HasStreet);
         Assert.Equal(s_startTextures, _platform.Backend.Textures.Count);
     }
 
@@ -1111,22 +1112,43 @@ public sealed class LudumDare60GameTests
         platform.Frame(0);
 
         Assert.True(game.HasBackground);
+        Assert.True(game.HasStreet);
         Assert.Contains($"create 2 {LudumDare60Game.VirtualWidth}x{LudumDare60Game.VirtualHeight}", platform.Backend.Calls, StringComparer.Ordinal);
+        Assert.Contains($"create 3 {LudumDare60Game.VirtualWidth}x{LudumDare60Game.VirtualHeight}", platform.Backend.Calls, StringComparer.Ordinal);
     }
 
     [Fact]
-    public void Render_BackgroundLoaded_DrawsItFirstAtTheOrigin()
+    public void BackgroundTexture_WindowIsSeeThroughAndTheMatIsOpaque()
+    {
+        var (platform, _) = StartWithShippedAssets();
+
+        platform.Frame(0);
+
+        // A window pane, the door glass and the middle of the mat.
+        var room = platform.Backend.Textures[2];
+        Assert.Equal(0, AlphaAt(room, LudumDare60Game.VirtualWidth, 300, 40));
+        Assert.Equal(0, AlphaAt(room, LudumDare60Game.VirtualWidth, 510, 60));
+        Assert.Equal(255, AlphaAt(room, LudumDare60Game.VirtualWidth, 300, 250));
+        Assert.Equal(255, AlphaAt(platform.Backend.Textures[3], LudumDare60Game.VirtualWidth, 300, 40));
+    }
+
+    [Fact]
+    public void Render_BackgroundLoaded_DrawsTheStreetFirstThenTheRoomAtTheOrigin()
     {
         var (platform, _) = StartWithShippedAssets();
 
         platform.Frame(0);
 
         var frame = Assert.Single(platform.Backend.Frames);
-        var background = Assert.Single(frame.Instances);
-        Assert.Equal(Vector2.Zero, background.Position);
-        Assert.Equal(LudumDare60Game.VirtualWidth, background.SourceWidth);
-        Assert.Equal(LudumDare60Game.VirtualHeight, background.SourceHeight);
-        Assert.Equal(new RenderCommand(RenderCommandKind.DrawSprites, [2, 0, 1]), frame.Decode()[2]);
+        Assert.Equal(2, frame.Instances.Length);
+        Assert.Equal(LudumDare60Game.StreetOffset, frame.Instances[0].Position);
+        var room = frame.Instances[1];
+        Assert.Equal(Vector2.Zero, room.Position);
+        Assert.Equal(LudumDare60Game.VirtualWidth, room.SourceWidth);
+        Assert.Equal(LudumDare60Game.VirtualHeight, room.SourceHeight);
+        var commands = frame.Decode();
+        Assert.Equal(new RenderCommand(RenderCommandKind.DrawSprites, [3, 0, 1]), commands[2]);
+        Assert.Equal(new RenderCommand(RenderCommandKind.DrawSprites, [2, 1, 1]), commands[3]);
     }
 
     [Fact]
@@ -1137,8 +1159,8 @@ public sealed class LudumDare60GameTests
         platform.Frame(0);
         platform.Frame(0.01);
 
-        Assert.Equal(s_startTextures + 1, platform.Backend.Textures.Count);
-        Assert.Single(platform.Backend.Frames[1].Instances);
+        Assert.Equal(s_startTextures + 2, platform.Backend.Textures.Count);
+        Assert.Equal(2, platform.Backend.Frames[1].Instances.Length);
     }
 
     private static (ManualPlatform Platform, LudumDare60Game Game) StartWithShippedAssets()
@@ -1156,7 +1178,7 @@ public sealed class LudumDare60GameTests
     {
         // Reads finish at once, so a file requested in Initialize is loaded in the first frame.
         public Task<byte[]> ReadAsync(string path)
-            => !withBackground && string.Equals(path, AssetPaths.Bench, StringComparison.Ordinal)
+            => !withBackground && (string.Equals(path, AssetPaths.Bench, StringComparison.Ordinal) || string.Equals(path, AssetPaths.Street, StringComparison.Ordinal))
                 ? Task.FromException<byte[]>(new FileNotFoundException(path))
                 : Task.FromResult(Read(path));
 

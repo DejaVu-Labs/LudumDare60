@@ -48,6 +48,16 @@ are and reduced to the palette (nearest color in OKLab, no dithering).
 - Keep 32 colors for now. Trim (towards 24) only after the first sprites, by merging steps that never appear next to
   each other.
 
+## Backgrounds
+
+Two layers in `src/game/LudumDare60.Game.Browser/wwwroot/assets/backgrounds/`, 640x360 each, reduced to the palette;
+the sources and their 640x360 versions are in `art/reference/` (`bench-empty-*`, `street-*`):
+
+- `street.png`: the rainy street outside, opaque. Drawn first, raised by 125 px (`LudumDare60Game.StreetOffset`) so
+  the embankment with its lamps, railing and reflections fills the window.
+- `bench.png`: the room with the bench and the mat, drawn over the street. The window panes and the door glass are
+  transparent (alpha 0 or 255, nothing in between).
+
 ## Customer sheets
 
 One PNG per customer look in `src/game/LudumDare60.Game.Browser/wwwroot/assets/customers/<look>.png` (the look is

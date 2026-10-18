@@ -6,9 +6,15 @@ namespace LudumDare60.Game;
 public static class AssetPaths
 {
     /// <summary>
-    /// The workshop with the empty bench and the cutting mat, the size of the virtual screen.
+    /// The workshop with the empty bench and the cutting mat, the size of the virtual screen. The window panes and the
+    /// door glass are transparent: <see cref="Street"/> shows through them.
     /// </summary>
     public const string Bench = "backgrounds/bench.png";
+
+    /// <summary>
+    /// The rainy street outside, drawn under <see cref="Bench"/> (see <see cref="LudumDare60Game.StreetOffset"/>).
+    /// </summary>
+    public const string Street = "backgrounds/street.png";
 
     /// <summary>
     /// Every customer's order, in the order they come in (see <see cref="Orders.OrderBook"/>).
