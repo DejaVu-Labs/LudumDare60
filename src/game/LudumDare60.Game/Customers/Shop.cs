@@ -55,7 +55,7 @@ public sealed class Shop
     /// <summary>
     /// Where a customer's bust stands, in virtual pixels: on the far edge of the bench.
     /// </summary>
-    public const float CustomerBottom = 140;
+    public const float CustomerBottom = 141;
 
     /// <summary>
     /// How far left and right of their middle the player can click a customer, in virtual pixels.
