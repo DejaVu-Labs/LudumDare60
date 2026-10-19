@@ -17,7 +17,7 @@ public sealed class DebugKeysTests
 
     private LudumDare60Game Start(bool debug)
     {
-        var game = new LudumDare60Game { HasDebugKeys = debug };
+        var game = new LudumDare60Game { HasDebugKeys = debug, WaitsForPlayer = false };
         _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(game, _platform);
         _platform.Frame(Step);
         Assert.NotNull(game.Shop);

@@ -79,7 +79,8 @@ reports (see [Audio](#audio)).
    modules after the runtime starts, and the canvas stays black meanwhile). It is hidden then, and shows an error
    message if startup fails or `Main` ends with an exception (a frame that throws stops the frame loop and ends
    `Main`). From the first frame on, `LudumDare60Game` draws its own loading screen, a bar that fills as its files
-   come in, and opens the shop only once all of them are loaded (`WaitsForAssets`, `IsLoading`, `LoadProgress`). The error itself goes to the console. A
+   come in. Once all of them are loaded it shows "PRESS ANY KEY TO PLAY" over the room and opens the shop on the first
+   key, mouse button or touch (`WaitsForAssets`, `IsLoading`, `LoadProgress`, `WaitsForPlayer`, `IsOnTitle`). The error itself goes to the console. A
    module that knows why the game stopped sets a better message with `setErrorText` before it throws: `webgl2.js`
    does so when the browser has no WebGL2 and when the GPU context is lost.
 5. The runtime imports its own JS modules (`dotnet.native.js`, `dotnet.runtime.js`), so the resource loader cannot

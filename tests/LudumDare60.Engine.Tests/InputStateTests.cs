@@ -58,6 +58,35 @@ public sealed class InputStateTests
     }
 
     [Fact]
+    public void IsAnyPressed_KeyOrButtonDown_TrueUntilEdgesClear()
+    {
+        Assert.False(_state.IsAnyPressed);
+
+        Apply(KeyDown(Key.Space));
+
+        Assert.True(_state.IsAnyPressed);
+
+        _state.ClearEdges();
+
+        Assert.False(_state.IsAnyPressed);
+
+        Apply(Pointer(RawInputEventKind.PointerDown, 100, 100));
+
+        Assert.True(_state.IsAnyPressed);
+    }
+
+    [Fact]
+    public void IsAnyPressed_OnlyReleaseOrMove_False()
+    {
+        Apply(KeyDown(Key.A));
+        _state.ClearEdges();
+
+        Apply(KeyUp(Key.A), Pointer(RawInputEventKind.PointerMove, 100, 100));
+
+        Assert.False(_state.IsAnyPressed);
+    }
+
+    [Fact]
     public void KeyDownAndUpInOneStep_PressedAndReleasedButNotDown()
     {
         Apply(KeyDown(Key.A), KeyUp(Key.A));

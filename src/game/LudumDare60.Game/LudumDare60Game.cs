@@ -52,6 +52,13 @@ public sealed class LudumDare60Game : IGame
     private const float LoadingShineSeconds = 1.5f;
     private const byte LoadingShineAlpha = 0x50;
 
+    // The title screen: "PRESS ANY KEY TO PLAY" twice its sheet size on a dark band over the room, pulsing.
+    private const float TitleTextScale = 2;
+    private const float TitleTextY = 300;
+    private const int TitleBandHeight = 22;
+    private const float TitlePulseRate = 3;
+    private static readonly Color s_titleBandColor = Color.FromRgb(0x000000).WithAlpha(0xa0);
+
     /// <summary>
     /// Where the top-left corner of the street is drawn, in virtual pixels: raised so that the embankment with its
     /// lamps, railing and reflections fills the window panes and the door glass of the room.
@@ -179,6 +186,9 @@ public sealed class LudumDare60Game : IGame
     // Seconds spent on the loading screen: moves the shine along the bar while one big file is still coming.
     private float _loadingSeconds;
 
+    // Whether every file is in and Game:Ready went out.
+    private bool _isLoaded;
+
     // Every part of the revolver that has a place on the bench, back to front as the gun draws them: its layout, and
     // its index in the bench, or -1 for a part the order keeps fixed.
     private PartLayout[] _drawLayouts = [];
@@ -204,6 +214,22 @@ public sealed class LudumDare60Game : IGame
     /// Whether the game shows its loading screen: it waits for assets and some are not in yet.
     /// </summary>
     public bool IsLoading => WaitsForAssets && LoadedAssetCount < AssetCount;
+
+    /// <summary>
+    /// Whether the shop waits on a "press any key" title screen once loading is over, until the player presses a key or
+    /// a pointer button. On by default; tests that start in the shop turn it off.
+    /// </summary>
+    public bool WaitsForPlayer { get; init; } = true;
+
+    /// <summary>
+    /// Whether the player pressed a key, a mouse button or the screen on the title screen.
+    /// </summary>
+    public bool HasStarted { get; private set; }
+
+    /// <summary>
+    /// Whether the game shows its title screen: loading is over and the player has not pressed anything yet.
+    /// </summary>
+    public bool IsOnTitle => WaitsForPlayer && !HasStarted && !IsLoading;
 
     /// <summary>
     /// Share of the requested files that are in, from 0 to 1: the length of the loading bar.
@@ -347,7 +373,23 @@ public sealed class LudumDare60Game : IGame
         }
         else if (!_hasOrders)
         {
-            TakeOrders((float)context.TotalTime);
+            if (!_isLoaded && _assets!.GetState(_ordersHandle) == AssetState.Loaded)
+            {
+                _isLoaded = true;
+                _shopAnalytics = new ShopAnalytics(Analytics);
+                _shopAnalytics.Open((float)context.TotalTime);
+            }
+
+            if (IsOnTitle && context.Input.IsAnyPressed)
+            {
+                // The shop opens this frame; the press is over by the next step, so it does not reach the shop.
+                HasStarted = true;
+            }
+
+            if (!IsOnTitle)
+            {
+                TakeOrders();
+            }
         }
 
         if (Bench != _shownBench)
@@ -498,6 +540,11 @@ public sealed class LudumDare60Game : IGame
 
         if (!_hasSheets || Shop is not { } shop)
         {
+            if (_hasSheets && IsOnTitle)
+            {
+                DrawTitle(batch);
+            }
+
             return;
         }
 
@@ -610,9 +657,24 @@ public sealed class LudumDare60Game : IGame
         DrawBar(batch, left + new Vector2(shine, 0), LoadingShineWidth, s_loadingFillColor.WithAlpha(LoadingShineAlpha));
     }
 
-    private void DrawBar(SpriteBatch batch, Vector2 at, float width, Color color)
+    /// <summary>
+    /// The title screen over the room: "PRESS ANY KEY TO PLAY" on a dark band near the bottom, pulsing.
+    /// </summary>
+    private void DrawTitle(SpriteBatch batch)
     {
-        var scale = new Vector2(width / PlaceholderParts.Pixel.Width, (float)LoadingBarHeight / PlaceholderParts.Pixel.Height);
+        var text = PlaceholderParts.PressAnyKey;
+        DrawBar(batch, new Vector2(0, TitleTextY - ((TitleBandHeight - (text.Height * TitleTextScale)) / 2)), VirtualWidth, TitleBandHeight, s_titleBandColor);
+        var alpha = (byte)(175 + (80 * MathF.Sin(_time * TitlePulseRate)));
+        var at = new Vector2(MathF.Round((VirtualWidth - (text.Width * TitleTextScale)) / 2), TitleTextY);
+        batch.Draw(_parts, text, at, new SpriteOptions { Scale = new Vector2(TitleTextScale), Tint = Color.White.WithAlpha(alpha) });
+    }
+
+    private void DrawBar(SpriteBatch batch, Vector2 at, float width, Color color)
+        => DrawBar(batch, at, width, LoadingBarHeight, color);
+
+    private void DrawBar(SpriteBatch batch, Vector2 at, float width, float height, Color color)
+    {
+        var scale = new Vector2(width / PlaceholderParts.Pixel.Width, height / PlaceholderParts.Pixel.Height);
         batch.Draw(_parts, PlaceholderParts.Pixel, at, new SpriteOptions { Scale = scale, Tint = color });
     }
 
@@ -695,15 +757,12 @@ public sealed class LudumDare60Game : IGame
     /// Opens the shop once <c>orders.json</c> is loaded. A broken file fails to load, which stops the game in
     /// <see cref="Update"/> with its problems, so they cannot go unnoticed.
     /// </summary>
-    /// <param name="loadingSeconds">Seconds since the first frame, for analytics.</param>
-    private void TakeOrders(float loadingSeconds)
+    private void TakeOrders()
     {
         if (_assets!.TryGet(_ordersHandle, out var orders))
         {
             Orders = orders;
             Shop = new Shop(orders);
-            _shopAnalytics = new ShopAnalytics(Analytics);
-            _shopAnalytics.Open(loadingSeconds);
             _hasOrders = true;
         }
     }

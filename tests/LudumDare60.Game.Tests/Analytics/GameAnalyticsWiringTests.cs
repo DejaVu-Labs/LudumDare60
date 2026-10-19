@@ -23,7 +23,7 @@ public sealed class GameAnalyticsWiringTests
     [Fact]
     public void Frame_ShopOpens_SendsReadyOnceAndThenTheShopsEvents()
     {
-        var game = new LudumDare60Game { Analytics = _recorded };
+        var game = new LudumDare60Game { Analytics = _recorded, WaitsForPlayer = false };
         _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(game, _platform);
 
         _platform.Frame(Step);
@@ -38,6 +38,19 @@ public sealed class GameAnalyticsWiringTests
         Assert.Equal(ShopAnalytics.ReadyEvent, ready.Id);
         Assert.Equal(ShopPhase.Offering, game.Shop!.Phase);
         Assert.Single(_recorded.Events);
+    }
+
+    [Fact]
+    public void Frame_TitleScreen_SendsReadyBeforeAnyPress()
+    {
+        var game = new LudumDare60Game { Analytics = _recorded };
+        _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(game, _platform);
+
+        _platform.Frame(Step);
+        _platform.Frame(Step);
+
+        Assert.True(game.IsOnTitle);
+        Assert.Equal(ShopAnalytics.ReadyEvent, Assert.Single(_recorded.Events).Id);
     }
 
     [Fact]

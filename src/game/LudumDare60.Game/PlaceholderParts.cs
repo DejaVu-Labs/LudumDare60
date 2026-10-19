@@ -121,6 +121,11 @@ internal static class PlaceholderParts
     public static readonly IntRect Pixel = new(110, RowD, 4, 4);
 
     /// <summary>
+    /// "PRESS ANY KEY TO PLAY" in white, three pixels by five per letter, for the title screen.
+    /// </summary>
+    public static readonly IntRect PressAnyKey = new(118, RowD, (PressAnyKeyText.Length * 4) - 1, 5);
+
+    /// <summary>
     /// The middle of the bristles, in brush pixels: the point that scrubs.
     /// </summary>
     public static readonly Vector2 BrushOrigin = new(3, 3);
@@ -253,6 +258,25 @@ internal static class PlaceholderParts
     private const int WindowTop = 17;
     private const int WindowBottom = 42;
 
+    private const string PressAnyKeyText = "PRESS ANY KEY TO PLAY";
+
+    // Three by five letters, row by row from the top: the ones PressAnyKeyText needs.
+    private static readonly Dictionary<char, string[]> s_letters = new()
+    {
+        ['A'] = [".#.", "#.#", "###", "#.#", "#.#"],
+        ['E'] = ["###", "#..", "##.", "#..", "###"],
+        ['K'] = ["#.#", "#.#", "##.", "#.#", "#.#"],
+        ['L'] = ["#..", "#..", "#..", "#..", "###"],
+        ['N'] = ["##.", "#.#", "#.#", "#.#", "#.#"],
+        ['O'] = ["###", "#.#", "#.#", "#.#", "###"],
+        ['P'] = ["###", "#.#", "###", "#..", "#.."],
+        ['R'] = ["##.", "#.#", "##.", "#.#", "#.#"],
+        ['S'] = [".##", "#..", ".#.", "..#", "##."],
+        ['T'] = ["###", ".#.", ".#.", ".#.", ".#."],
+        ['Y'] = ["#.#", "#.#", ".#.", ".#.", ".#."],
+        [' '] = ["...", "...", "...", "...", "..."],
+    };
+
     private static readonly Color s_ink = Color.FromRgb(0x0d0a0a);
     private static readonly Color s_steelDark = Color.FromRgb(0x2c201b);
     private static readonly Color s_steel = Color.FromRgb(0x453a30);
@@ -306,6 +330,7 @@ internal static class PlaceholderParts
         Fill(pixels, OilCan, OilCanColor);
         Fill(pixels, Tray, TrayColor);
         Fill(pixels, Pixel, static (_, _) => Color.White);
+        Fill(pixels, PressAnyKey, PressAnyKeyColor);
         FillGlow(pixels, BodyGlow, IsBody);
         FillGlow(pixels, PinGlow, IsPin);
         FillGlow(pixels, CylinderGlow, IsCylinder);
@@ -869,6 +894,13 @@ internal static class PlaceholderParts
             3 => s_walnut,
             _ => s_walnutDark,
         };
+    }
+
+    private static Color PressAnyKeyColor(int x, int y)
+    {
+        // A column of space between letters.
+        var column = x % 4;
+        return column < 3 && s_letters[PressAnyKeyText[x / 4]][y][column] == '#' ? Color.White : Color.Transparent;
     }
 
     private static void Fill(byte[] pixels, IntRect rect, Func<int, int, Color> color)

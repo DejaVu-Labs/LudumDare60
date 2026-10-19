@@ -38,7 +38,7 @@ public sealed class LudumDare60GameTests
 
     // The shipped data without the background, which has its own tests; so the shop must not wait for it.
     private readonly ManualPlatform _platform = new() { Assets = new ShippedAssets(withBackground: false) };
-    private readonly LudumDare60Game _game = new() { WaitsForAssets = false };
+    private readonly LudumDare60Game _game = new() { WaitsForAssets = false, WaitsForPlayer = false };
 
     public LudumDare60GameTests()
         => _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(_game, _platform);
@@ -56,6 +56,8 @@ public sealed class LudumDare60GameTests
 
     private static RawInputEvent PointerDown(Vector2 at)
         => new(RawInputEventKind.PointerDown, 0, (ushort)PointerType.Mouse, 1, 0, at.X, at.Y, 0);
+
+    private static RawInputEvent KeyDown(Key key) => new(RawInputEventKind.KeyDown, 0, (ushort)key, 0, 0, 0, 0, 0);
 
     private static RawInputEvent PointerMove(Vector2 at)
         => new(RawInputEventKind.PointerMove, 0, (ushort)PointerType.Mouse, 1, 0, at.X, at.Y, 0);
@@ -348,7 +350,7 @@ public sealed class LudumDare60GameTests
     public void FirstFrame_NoAssetFiles_StopsTheGameNamingTheFirstRequested()
     {
         var platform = new ManualPlatform();
-        _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(new LudumDare60Game(), platform);
+        _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(new LudumDare60Game { WaitsForPlayer = false }, platform);
 
         var error = Assert.Throws<InvalidOperationException>(() => platform.Frame(0));
 
@@ -362,7 +364,7 @@ public sealed class LudumDare60GameTests
     public void FirstFrame_OneAssetFails_StopsTheGameNamingIt(string path)
     {
         var platform = new ManualPlatform { Assets = new ShippedAssets(withBackground: true, failing: path) };
-        _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(new LudumDare60Game(), platform);
+        _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(new LudumDare60Game { WaitsForPlayer = false }, platform);
 
         var error = Assert.Throws<InvalidOperationException>(() => platform.Frame(0));
 
@@ -374,7 +376,7 @@ public sealed class LudumDare60GameTests
     {
         var sheet = AssetPaths.CustomerSheets[0].Value;
         var platform = new ManualPlatform { Assets = new ShippedAssets(withBackground: true, failing: sheet) };
-        _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(new LudumDare60Game(), platform);
+        _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(new LudumDare60Game { WaitsForPlayer = false }, platform);
 
         var error = Assert.Throws<InvalidOperationException>(() => platform.Frame(0));
 
@@ -386,7 +388,7 @@ public sealed class LudumDare60GameTests
     {
         var assets = new ShippedAssets(withBackground: true, held: AssetPaths.Bench);
         var platform = new ManualPlatform { Assets = assets };
-        var game = new LudumDare60Game();
+        var game = new LudumDare60Game { WaitsForPlayer = false };
         _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(game, platform);
 
         platform.Frame(0);
@@ -405,7 +407,7 @@ public sealed class LudumDare60GameTests
     {
         var assets = new ShippedAssets(withBackground: true, held: AssetPaths.Bench);
         var platform = new ManualPlatform { Assets = assets };
-        var game = new LudumDare60Game();
+        var game = new LudumDare60Game { WaitsForPlayer = false };
         _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(game, platform);
         platform.Frame(0);
 
@@ -429,6 +431,104 @@ public sealed class LudumDare60GameTests
 
         Assert.False(game.IsLoading);
         Assert.NotNull(game.Shop);
+    }
+
+    [Fact]
+    public void Frame_AllFilesIn_ShowsTitleOverTheRoomAndKeepsShopClosed()
+    {
+        var (platform, game) = StartOnTitle();
+
+        platform.Frame(0);
+        platform.Frame(Step);
+
+        Assert.False(game.IsLoading);
+        Assert.True(game.IsOnTitle);
+        Assert.Null(game.Shop);
+        var frame = platform.Backend.Frames[^1];
+        Assert.NotNull(Sprite(frame, PlaceholderParts.PressAnyKey));
+        // The street and the room under the title.
+        Assert.Equal(2, frame.Instances.Count(i => i.SourceWidth == LudumDare60Game.VirtualWidth));
+        Assert.Null(Sprite(frame, PlaceholderParts.Tray));
+    }
+
+    [Fact]
+    public void Frame_FileStillComing_NoTitleYet()
+    {
+        var platform = new ManualPlatform { Assets = new ShippedAssets(withBackground: true, held: AssetPaths.Bench) };
+        var game = new LudumDare60Game();
+        _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(game, platform);
+
+        platform.Frame(0, KeyDown(Key.Space));
+
+        Assert.False(game.IsOnTitle);
+        Assert.Null(Sprite(platform.Backend.Frames[^1], PlaceholderParts.PressAnyKey));
+    }
+
+    [Fact]
+    public void Title_KeyPressed_OpensShopAndHidesTitle()
+    {
+        var (platform, game) = StartOnTitle();
+        platform.Frame(0);
+
+        platform.Frame(Step, KeyDown(Key.Space));
+
+        Assert.False(game.IsOnTitle);
+        Assert.NotNull(game.Shop);
+        Assert.Equal(ShopPhase.Waiting, game.Shop.Phase);
+        Assert.Null(Sprite(platform.Backend.Frames[^1], PlaceholderParts.PressAnyKey));
+    }
+
+    [Fact]
+    public void Title_PointerPressed_OpensShop()
+    {
+        var (platform, game) = StartOnTitle();
+        platform.Frame(0);
+
+        platform.Frame(Step, PointerDown(new Vector2(320, 180)));
+
+        Assert.NotNull(game.Shop);
+    }
+
+    [Fact]
+    public void Title_TouchPressed_OpensShop()
+    {
+        var (platform, game) = StartOnTitle();
+        platform.Frame(0);
+
+        platform.Frame(Step, new RawInputEvent(RawInputEventKind.PointerDown, 0, (ushort)PointerType.Touch, 7, 0, 320, 180, 0));
+
+        Assert.NotNull(game.Shop);
+    }
+
+    [Fact]
+    public void Title_KeyHeldFromLoading_DoesNotStart()
+    {
+        var assets = new ShippedAssets(withBackground: true, held: AssetPaths.Bench);
+        var platform = new ManualPlatform { Assets = assets };
+        var game = new LudumDare60Game();
+        _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(game, platform);
+        platform.Frame(0, KeyDown(Key.Space));
+
+        assets.Release();
+        platform.Frame(Step);
+        platform.Frame(Step);
+
+        Assert.True(game.IsOnTitle);
+        Assert.Null(game.Shop);
+    }
+
+    [Fact]
+    public void Title_NoPress_ShopStaysClosed()
+    {
+        var (platform, game) = StartOnTitle();
+
+        for (var i = 0; i < 120; i++)
+        {
+            platform.Frame(Step, PointerMove(new Vector2(320, 180)));
+        }
+
+        Assert.True(game.IsOnTitle);
+        Assert.Null(game.Shop);
     }
 
     [Fact]
@@ -1208,7 +1308,7 @@ public sealed class LudumDare60GameTests
     {
         // The first order with the dog-walker coming in instead of hoodie, with the room and the street.
         var platform = new ManualPlatform { Assets = new ShippedAssets(withBackground: true, firstLook: "dog-walker") };
-        var game = new LudumDare60Game();
+        var game = new LudumDare60Game { WaitsForPlayer = false };
         _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(game, platform);
         var away = PointerMove(new Vector2(600, 40));
         platform.Frame(0, Resize(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight, 1));
@@ -1245,7 +1345,7 @@ public sealed class LudumDare60GameTests
     {
         // The first order with a parcel coming in instead of hoodie, with the room and the street.
         var platform = new ManualPlatform { Assets = new ShippedAssets(withBackground: true, firstLook: "parcel") };
-        var game = new LudumDare60Game();
+        var game = new LudumDare60Game { WaitsForPlayer = false };
         _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(game, platform);
         var away = PointerMove(new Vector2(600, 40));
         platform.Frame(0, Resize(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight, 1));
@@ -1393,10 +1493,18 @@ public sealed class LudumDare60GameTests
         Assert.Equal(2, platform.Backend.Frames[1].Instances.Count(i => i.SourceWidth == LudumDare60Game.VirtualWidth));
     }
 
-    private static (ManualPlatform Platform, LudumDare60Game Game) StartWithShippedAssets()
+    private static (ManualPlatform Platform, LudumDare60Game Game) StartOnTitle()
     {
         var platform = new ManualPlatform { Assets = new ShippedAssets(withBackground: true) };
         var game = new LudumDare60Game();
+        _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(game, platform);
+        return (platform, game);
+    }
+
+    private static (ManualPlatform Platform, LudumDare60Game Game) StartWithShippedAssets()
+    {
+        var platform = new ManualPlatform { Assets = new ShippedAssets(withBackground: true) };
+        var game = new LudumDare60Game { WaitsForPlayer = false };
         _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(game, platform);
         return (platform, game);
     }

@@ -112,4 +112,26 @@ public sealed class PlaceholderPartsTests
             }
         }
     }
+
+    [Fact]
+    public void PressAnyKey_HasWhiteLettersAndClearGaps()
+    {
+        var sheet = PlaceholderParts.Create();
+        var text = PlaceholderParts.PressAnyKey;
+        var lit = 0;
+        for (var y = 0; y < text.Height; y++)
+        {
+            for (var x = 0; x < text.Width; x++)
+            {
+                var at = ((((text.Y + y) * sheet.Width) + text.X + x) * Image.BytesPerPixel) + 3;
+                lit += sheet.Pixels[at] != 0 ? 1 : 0;
+                if (x % 4 == 3)
+                {
+                    Assert.Equal(0, sheet.Pixels[at]);
+                }
+            }
+        }
+
+        Assert.InRange(lit, text.Width, text.Width * text.Height / 2);
+    }
 }

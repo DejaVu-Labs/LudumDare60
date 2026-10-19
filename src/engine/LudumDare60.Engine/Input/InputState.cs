@@ -59,6 +59,11 @@ public sealed class InputState
     /// </summary>
     public bool HasFocus { get; private set; }
 
+    /// <summary>
+    /// Whether any key or pointer button went down during this step or frame.
+    /// </summary>
+    public bool IsAnyPressed => HasAny(_keys, Pressed) || HasAny(_buttons, Pressed);
+
     public bool IsDown(Key key) => Has(_keys, (int)key, Down);
 
     /// <summary>
@@ -171,6 +176,19 @@ public sealed class InputState
     }
 
     private static bool Has(byte[] states, int index, byte flag) => (uint)index < (uint)states.Length && (states[index] & flag) != 0;
+
+    private static bool HasAny(byte[] states, byte flag)
+    {
+        foreach (var state in states)
+        {
+            if ((state & flag) != 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private static void Press(byte[] states, int index)
     {
