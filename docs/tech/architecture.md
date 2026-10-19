@@ -10,10 +10,10 @@ LudumDare60.Game.Browser ──► LudumDare60.Game ──► LudumDare60.Engine
 
 | Project | SDK | Role |
 | --- | --- | --- |
-| `src/engine/LudumDare60.Engine.Platform` | `Microsoft.NET.Sdk` | Platform contracts: `IPlatform` (with `ReportError`, a no-op by default), `IFrameSink`, raw input (`RawInputEvent`, `RawInputEventKind`, `Key`, `PointerType`), asset reads (`IAssetSource`, `AssetLoadException`), the GPU (`IGraphicsBackend`, `RenderCommandKind`, `SpriteInstance`, `Color`), sound output (`IAudioBackend`, `AudioCommandKind`, `AudioBus`, `AudioEvent`, `AudioEventKind`, `AudioLimits`). No dependencies. |
+| `src/engine/LudumDare60.Engine.Platform` | `Microsoft.NET.Sdk` | Platform contracts: `IPlatform` (with `ReportError`, a no-op by default), `IFrameSink`, raw input (`RawInputEvent`, `RawInputEventKind`, `Key`, `PointerType`), asset reads (`IAssetSource`, `AssetLoadException`), the GPU (`IGraphicsBackend`, `RenderCommandKind`, `SpriteInstance`, `Color`), sound output (`IAudioBackend`, `AudioCommandKind`, `AudioBus`, `AudioEvent`, `AudioEventKind`, `AudioLimits`), product analytics (`IAnalytics`, `ProgressionStatus`, `NullAnalytics`). No dependencies. |
 | `src/engine/LudumDare60.Engine` | `Microsoft.NET.Sdk` | `GameEngine`, `IGame`, `FrameContext`, `Input/` (`InputState`, `PointerButton`), `Assets/` (`AssetManager` and loaders), `Rendering/` (`PixelViewport`, `Graphics`, `Texture`, `SpriteBatch`, `SpriteOptions`, `IntRect`), `Sounds/` (`Audio`, `Sound`, `SoundState`, `Voice`, `SoundOptions`). Depends only on the platform contracts and the managed `StbImageSharp` package (image decoding). |
-| `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `Microsoft.NET.Sdk.StaticWebAssets` | `BrowserPlatform : IPlatform` and its JS: `wwwroot/boot.js` (runtime start), `wwwroot/load-log.js` (load timing), `wwwroot/reporting.js` (errors and load timing to Sentry), `wwwroot/frame-loop.js`, `wwwroot/input.js`, `wwwroot/assets.js`, `wwwroot/webgl2.js` (renderer, shaders in `wwwroot/shaders/`) and `wwwroot/webaudio.js` (sound). Its `wwwroot/` ships with the app under `_content/LudumDare60.Engine.Platform.Browser/`. |
-| `src/game/LudumDare60.Game` | `Microsoft.NET.Sdk` | `LudumDare60Game : IGame`, `Parts/` (the touch loop: `PartDrag` moves a part along a `PartPath` (a `LinePath`, or a screw turned by circling it) with the `DragFeel` it is given, fed one `PointerSample` per fixed step, and with a `FreeMove` lets it lie anywhere on the work surface once out and stick back to its rail, or drop straight into its seat; `PartAssembly` steps the parts of a gun and enforces which part blocks which), `Cleaning/` (`DirtLayer`: dirt pixels scrubbed off a part and counted; `BrushTool`: a tool the player picks up and puts down anywhere, the brush that scrubs and the oil can that oils), `Orders/` (the order data of `orders.json`, its loader and validation, and `RevolverParts`), `Bench/` (`OrderBench`: one order on the bench with its parts, dirt, oil, spares and tools; `ActionTest`: the hammer at half cock to take the revolver apart, then full cock and the trigger to test it; `BenchLayout`: where the revolver, its parts, the tools and the tray of spares lie), `Customers/` (`Shop`: customers coming in, the repair, the hand-back, the next customer), and placeholder parts and sounds generated in code. No platform dependency. |
+| `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `Microsoft.NET.Sdk.StaticWebAssets` | `BrowserPlatform : IPlatform` and its JS: `wwwroot/boot.js` (runtime start), `wwwroot/load-log.js` (load timing), `wwwroot/reporting.js` (errors and load timing to Sentry), `wwwroot/frame-loop.js`, `wwwroot/input.js`, `wwwroot/assets.js`, `wwwroot/webgl2.js` (renderer, shaders in `wwwroot/shaders/`), `wwwroot/webaudio.js` (sound) and `wwwroot/analytics.js` (product analytics, on the GameAnalytics SDK in `wwwroot/vendor/gameanalytics.js`). Its `wwwroot/` ships with the app under `_content/LudumDare60.Engine.Platform.Browser/`. |
+| `src/game/LudumDare60.Game` | `Microsoft.NET.Sdk` | `LudumDare60Game : IGame`, `Parts/` (the touch loop: `PartDrag` moves a part along a `PartPath` (a `LinePath`, or a screw turned by circling it) with the `DragFeel` it is given, fed one `PointerSample` per fixed step, and with a `FreeMove` lets it lie anywhere on the work surface once out and stick back to its rail, or drop straight into its seat; `PartAssembly` steps the parts of a gun and enforces which part blocks which), `Cleaning/` (`DirtLayer`: dirt pixels scrubbed off a part and counted; `BrushTool`: a tool the player picks up and puts down anywhere, the brush that scrubs and the oil can that oils), `Orders/` (the order data of `orders.json`, its loader and validation, and `RevolverParts`), `Bench/` (`OrderBench`: one order on the bench with its parts, dirt, oil, spares and tools; `ActionTest`: the hammer at half cock to take the revolver apart, then full cock and the trigger to test it; `BenchLayout`: where the revolver, its parts, the tools and the tray of spares lie), `Customers/` (`Shop`: customers coming in, the repair, the hand-back, the next customer), `Analytics/` (`ShopAnalytics`: the shop's moments as analytics events), and placeholder parts and sounds generated in code. No platform dependency. |
 | `src/game/LudumDare60.Game.Browser` | `Microsoft.NET.Sdk.WebAssembly` | Entry point, host page and `main.js`. Only wires the game and the browser platform together. |
 
 The engine and the game never reference a concrete platform. Only the entry-point project chooses one:
@@ -566,3 +566,44 @@ Web Audio the module stays silent: every sound reports `SoundFailed`, and comman
 - **Hidden page.** `visibilitychange` to hidden calls `suspend()`, because frames stop in a background tab and loops
   would play on without the game. Back to visible calls `resume()`, but only after the unlock. Losing focus alone does
   not suspend anything.
+
+## Analytics
+
+Product analytics go through one interface, `IAnalytics` (in `LudumDare60.Engine.Platform`), with two kinds of
+events, modelled on GameAnalytics: `Progression(status, level1, level2, level3, score)` for attempts that start and
+complete or fail, and `Design(eventId, value)` for anything else, with an optional number to sum and average. Events
+are rare moments of play, so a call may cost an interop call; calls never throw. `IPlatform.Analytics` is
+`NullAnalytics` unless the platform has its own.
+
+The engine does not use it. The entry point hands the platform's analytics to the game:
+
+```csharp
+var platform = new BrowserPlatform();
+var game = new LudumDare60Game { Analytics = platform.Analytics };
+```
+
+`LudumDare60Game` creates a `ShopAnalytics` when the shop opens and calls `Observe(shop, dt)` after every
+`Shop.Step`. It reads the step's shop, bench, part and test events, keeps per-order timers and counters, and sends the
+events of [docs/gamedesign/analytics.md](../gamedesign/analytics.md). Ids are built once per customer, so the steps in
+between allocate nothing. `ShopAnalyticsTests` drives a real `Shop` through order 1 and checks every event.
+
+### Browser analytics
+
+`BrowserPlatform.Analytics` is a `BrowserAnalytics` on `wwwroot/analytics.js`: one `[JSImport]` call per event
+(`addProgression`, `addDesign`), optional numbers as a flag and a value. Events sent before `RunAsync` imported the
+module are dropped (the game sends none before its first frame).
+
+- `boot.js` calls `startAnalytics('./analytics.json')` first thing, next to reporting. The config holds the
+  GameAnalytics game key, secret key and build. Without valid keys (the repository's `{}`), analytics is off and the
+  SDK is never downloaded.
+- With keys, `analytics.js` imports `vendor/gameanalytics.js` (the SDK's ES module, about 30 KB gzipped, fingerprinted
+  and in the import map like every other module), sets the build and the allowed values of custom dimension 01, and
+  calls `initialize`. The SDK starts its session only after GameAnalytics replies, and drops events sent before that,
+  so `analytics.js` queues them (at most `MAX_QUEUED`, 200) and sends them once the SDK reports ready.
+- Ids are checked against the GameAnalytics rules before they are queued: an invalid one is dropped with a console
+  warning.
+- A `pointerdown` listener on the window sets custom dimension 01 to the pointer type: `mouse`, `touch` or `pen`.
+- When startup or the game fails and `boot` does not repair and reload, `captureFatal` sends one `Critical` error
+  event.
+- The SDK batches events and posts them every few seconds, keeps the unsent ones in `localStorage`, and ends the
+  session on `beforeunload`.

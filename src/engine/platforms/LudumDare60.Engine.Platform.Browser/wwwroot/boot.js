@@ -1,5 +1,6 @@
 // @ts-check
 
+import { captureFatal, startAnalytics } from './analytics.js';
 import { getLoadLog, STEP } from './load-log.js';
 import { startReporting } from './reporting.js';
 
@@ -448,17 +449,27 @@ export async function runWithStatus(start, status, errorTextOf = getErrorText) {
  * Starts the runtime from `frameworkRoot` (relative to the page) and runs `Main`, with loading and error text in the
  * element with id `statusId`, if the page has one. Runtime files are downloaded with retries (`createResourceLoader`).
  * Startup steps, retries and the runtime's downloads go to the load log (`load-log.js`). Errors and load timing go to
- * Sentry when `reportingConfig` holds a DSN (`reporting.js`). If a runtime JS module fails to load, `boot` downloads
- * the runtime's modules again past the HTTP cache and reloads the page, once per tab (`repairOnce`).
+ * Sentry when `reportingConfig` holds a DSN (`reporting.js`). Product analytics go to GameAnalytics when
+ * `analyticsConfig` holds the game's keys (`analytics.js`), with an error event when startup or the game fails and no
+ * repair follows. If a runtime JS module
+ * fails to load, `boot` downloads the runtime's modules again past the HTTP cache and reloads the page, once per tab
+ * (`repairOnce`).
  *
  * @param {string} [frameworkRoot] Runtime folder. Defaults to the SDK's `./_framework/`.
  * @param {string} [statusId] Id of the status element.
  * @param {string} [reportingConfig] Reporting config file, relative to the page.
+ * @param {string} [analyticsConfig] Analytics config file, relative to the page.
  * @returns {Promise<number>} The exit code of `Main`.
  */
-export function boot(frameworkRoot = './_framework/', statusId = 'status', reportingConfig = './reporting.json') {
+export function boot(
+  frameworkRoot = './_framework/',
+  statusId = 'status',
+  reportingConfig = './reporting.json',
+  analyticsConfig = './analytics.json',
+) {
   const log = getLoadLog();
   const reporter = startReporting(new URL(reportingConfig, document.baseURI).href, log);
+  startAnalytics(new URL(analyticsConfig, document.baseURI).href);
   log.step(STEP.BOOT);
   return runWithStatus(
     (onReady) => {
@@ -507,6 +518,8 @@ export function boot(frameworkRoot = './_framework/', statusId = 'status', repor
       );
       await reporter.idle;
       globalThis.location.reload();
+    } else {
+      captureFatal(error);
     }
     throw error;
   });

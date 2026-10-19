@@ -21,10 +21,10 @@ stream. It ships to itch.io as an HTML5 build and is pushed with `butler`.
 
 | Path | Contents |
 | --- | --- |
-| `src/engine/LudumDare60.Engine.Platform` | Platform contracts (`IPlatform`, `IFrameSink`, `RawInputEvent`, `IAssetSource`, `IGraphicsBackend`, `SpriteInstance`, `IAudioBackend`, `AudioCommandKind`). No dependencies. |
+| `src/engine/LudumDare60.Engine.Platform` | Platform contracts (`IPlatform`, `IFrameSink`, `RawInputEvent`, `IAssetSource`, `IGraphicsBackend`, `SpriteInstance`, `IAudioBackend`, `AudioCommandKind`, `IAnalytics`). No dependencies. |
 | `src/engine/LudumDare60.Engine` | Engine: `GameEngine` (fixed-step frame loop), `IGame`, `FrameContext`, `AssetManager`, asset loaders, `Rendering/` (`Graphics`, `SpriteBatch`, `PixelViewport`), `Sounds/` (`Audio`, `Sound`, `Voice`). Depends only on the platform contracts and managed decoder packages (StbImageSharp). Never references the game or a concrete platform. |
-| `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `BrowserPlatform : IPlatform` and its JS: `boot.js` starts the .NET runtime, `load-log.js` logs load timing, `reporting.js` sends errors and load timing to Sentry, `frame-loop.js` drives frames, `input.js` queues raw input, `assets.js` fetches asset files, `webgl2.js` renders, `webaudio.js` plays sound (StaticWebAssets SDK, shipped under `_content/`). |
-| `src/game/LudumDare60.Game` | Game class library: `LudumDare60Game : IGame`, rules, content, state. No platform dependency. |
+| `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `BrowserPlatform : IPlatform` and its JS: `boot.js` starts the .NET runtime, `load-log.js` logs load timing, `reporting.js` sends errors and load timing to Sentry, `frame-loop.js` drives frames, `input.js` queues raw input, `assets.js` fetches asset files, `webgl2.js` renders, `webaudio.js` plays sound, `analytics.js` sends product analytics through the vendored GameAnalytics SDK (`vendor/gameanalytics.js`) (StaticWebAssets SDK, shipped under `_content/`). |
+| `src/game/LudumDare60.Game` | Game class library: `LudumDare60Game : IGame`, rules, content, state, and `Analytics/` (the product analytics events, see `docs/gamedesign/analytics.md`). No platform dependency. |
 | `src/game/LudumDare60.Game.Browser` | `wasmbrowser` entry point and host page. Wires the game to `BrowserPlatform` and nothing else. |
 | `tests/` | C# test projects (`*.Tests`, xUnit v3 on Microsoft.Testing.Platform), `tests/Shared/` (fakes linked into several test projects: `FakeGraphicsBackend`, `FakeAudioBackend`, `ManualPlatform`), `tests/fixtures/` (byte fixtures shared by C# and JS tests) and `tests/js/` (Node test runner). |
 | `samples/` | Small runnable experiments (renderer backends, interop spikes). Same rules as `src/`. |

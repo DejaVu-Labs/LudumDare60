@@ -28,6 +28,9 @@ Measured from the click on "Run game" on itch.io, on a broadband connection:
 | First order done | < 2 min |
 | Ending | about 11 min, 15 min at most |
 
+The game reports these moments to GameAnalytics, so the targets can be checked against real players (see
+[analytics.md](analytics.md)).
+
 If playtests run long, cut steps from orders before cutting orders: five short orders read as a richer game than
 three long ones.
 

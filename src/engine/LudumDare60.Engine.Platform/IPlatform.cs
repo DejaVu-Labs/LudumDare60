@@ -22,6 +22,12 @@ public interface IPlatform
     IAudioBackend Audio { get; }
 
     /// <summary>
+    /// Product analytics. Usable at any time; events sent before the platform's analytics are ready are queued or
+    /// dropped, as the platform decides. The default implementation drops every event (<see cref="NullAnalytics"/>).
+    /// </summary>
+    IAnalytics Analytics => NullAnalytics.Instance;
+
+    /// <summary>
     /// Drives <paramref name="frameSink"/> until the platform shuts down.
     /// </summary>
     /// <returns>A task that completes when the platform stops producing frames.</returns>

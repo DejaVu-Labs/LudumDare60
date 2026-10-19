@@ -163,6 +163,17 @@ Deferred when error and load reports shipped (see
 - Report sounds the browser fails to decode (`AudioEventKind.SoundFailed`) with the asset path, through
   `IPlatform.ReportError`.
 
+## Analytics follow-ups
+
+Deferred when product analytics shipped (see [docs/gamedesign/analytics.md](gamedesign/analytics.md)):
+
+- Events for what is not built yet: a find opened (`Order:<order>:Find`, the "first find under 60 s" target), the
+  phone message read, each hint ladder rung shown, the ending reached and "Play again".
+- Settings and the mute icon, once they exist: a design event per change, to see whether players turn the sound off.
+- A separate GameAnalytics game for dev builds, if dev traffic gets in the way of filtering by build.
+- Measure whether loading the SDK during the runtime download delays the first frame on a slow link; if it does,
+  import it after the first frame.
+
 ## Browser E2E smoke tests
 
 A `tests/*.E2E` project with `Microsoft.Playwright`: the published build boots, reaches the first frame and logs

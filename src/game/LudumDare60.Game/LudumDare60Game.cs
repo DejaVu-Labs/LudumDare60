@@ -5,6 +5,7 @@ using LudumDare60.Engine.Input;
 using LudumDare60.Engine.Platform;
 using LudumDare60.Engine.Rendering;
 using LudumDare60.Engine.Sounds;
+using LudumDare60.Game.Analytics;
 using LudumDare60.Game.Bench;
 using LudumDare60.Game.Cleaning;
 using LudumDare60.Game.Customers;
@@ -122,6 +123,7 @@ public sealed class LudumDare60Game : IGame
     private static readonly Vector2 s_bubbleOffset = new(48, -120);
 
     private AssetManager? _assets;
+    private ShopAnalytics? _shopAnalytics;
     private Graphics? _graphics;
     private Audio? _audio;
     private AssetHandle<Image> _benchImage;
@@ -232,6 +234,12 @@ public sealed class LudumDare60Game : IGame
     public bool HasDebugKeys { get; init; }
 
     /// <summary>
+    /// Where the product analytics events of docs/gamedesign/analytics.md go (see <see cref="ShopAnalytics"/>). None by
+    /// default.
+    /// </summary>
+    public IAnalytics Analytics { get; init; } = NullAnalytics.Instance;
+
+    /// <summary>
     /// Every order, once <c>orders.json</c> is loaded.
     /// </summary>
     public OrderBook? Orders { get; private set; }
@@ -278,6 +286,7 @@ public sealed class LudumDare60Game : IGame
 
         var deltaTime = (float)context.DeltaTime;
         shop.Step(PointerSample.From(context.Input), deltaTime);
+        _shopAnalytics!.Observe(shop, deltaTime);
         PlayShopSounds(shop.Events);
         _bodyHint = MathF.Max(0, _bodyHint - deltaTime);
         _hammerHint = MathF.Max(0, _hammerHint - deltaTime);
@@ -338,7 +347,7 @@ public sealed class LudumDare60Game : IGame
         }
         else if (!_hasOrders)
         {
-            TakeOrders();
+            TakeOrders((float)context.TotalTime);
         }
 
         if (Bench != _shownBench)
@@ -686,12 +695,15 @@ public sealed class LudumDare60Game : IGame
     /// Opens the shop once <c>orders.json</c> is loaded. A broken file fails to load, which stops the game in
     /// <see cref="Update"/> with its problems, so they cannot go unnoticed.
     /// </summary>
-    private void TakeOrders()
+    /// <param name="loadingSeconds">Seconds since the first frame, for analytics.</param>
+    private void TakeOrders(float loadingSeconds)
     {
         if (_assets!.TryGet(_ordersHandle, out var orders))
         {
             Orders = orders;
             Shop = new Shop(orders);
+            _shopAnalytics = new ShopAnalytics(Analytics);
+            _shopAnalytics.Open(loadingSeconds);
             _hasOrders = true;
         }
     }

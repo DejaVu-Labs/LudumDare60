@@ -195,6 +195,9 @@ run in parallel.
    *Browser JavaScript*), turn on *Settings > Security & Privacy > Prevent Storing of IP Addresses*, and add its DSN
    as the `SENTRY_DSN` repository variable. One project serves both targets; events carry `environment` `dev` or
    `release`.
+6. Optional, for [product analytics](#product-analytics): create a game on GameAnalytics, and add its game key and
+   secret key as the `GAMEANALYTICS_GAME_KEY` and `GAMEANALYTICS_SECRET_KEY` repository variables. One game serves both targets; events carry the build (`dev-42-abc1234` or `1.2.0`), so
+   filter dashboards by build.
 
 The `plan` job fails within seconds if a variable is missing, before the long AOT build. The push job fails if
 `BUTLER_API_KEY` is missing from the environment.
@@ -241,6 +244,44 @@ Privacy: the events carry the page URL, the user agent and the times above, and 
 sees the sender's IP address, so keep *Prevent Storing of IP Addresses* on. Say on the itch.io page that the game
 reports errors and load times.
 
+### Product analytics
+
+`analytics.js` (browser platform) sends the product analytics events of
+[docs/gamedesign/analytics.md](../gamedesign/analytics.md) to GameAnalytics through its JavaScript SDK (see
+[Browser analytics](architecture.md#browser-analytics)). It is off unless the page's `analytics.json` holds both keys.
+The repository ships `src/game/LudumDare60.Game.Browser/wwwroot/analytics.json` as `{}`, so local and Debug builds send
+nothing and never download the SDK. When both `GAMEANALYTICS_*` variables are set, `deploy.yml` overwrites the
+published copy after `dotnet publish`:
+
+```json
+{ "gameKey": "<32 characters>", "secretKey": "<40 characters>", "build": "dev-42-abc1234" }
+```
+
+`analytics.json` is read with `cache: 'no-cache'`, outside the import map, like `reporting.json`. The secret key is
+not secret in a browser game: the SDK signs every request with it, so every player has it. It is kept out of the
+repository for the same reason as the DSN: forks and local builds must not send into our game. To try analytics
+locally, write real keys into the published `analytics.json` (never into the repository's copy) and serve the publish
+folder; the console shows the SDK's warnings, and GameAnalytics' *Realtime* view shows the events within a minute.
+
+The SDK is vendored as `src/engine/platforms/LudumDare60.Engine.Platform.Browser/wwwroot/vendor/gameanalytics.js`:
+`dist/GameAnalytics.esm.js` of the npm package `gameanalytics` 5.0.0 (MIT, SHA-256
+`933dfa32376e1c23540dff58b8b68a7c72a4ca8190d48e51e1b5bc00fbaab30d`), unchanged except for the license comment on
+top. The minified UMD build cannot be imported as a module, which the import map needs. To update it:
+
+```bash
+npm pack gameanalytics@<version>
+tar -xzf gameanalytics-<version>.tgz package/dist/GameAnalytics.esm.js package/LICENSE
+```
+
+Then replace everything below the comment in `vendor/gameanalytics.js`, update the version and hash in the comment
+and here, check that the calls in `analytics.js` (`GameAnalyticsSdk`) still exist in `dist/GameAnalytics.d.ts`, and
+check the *Realtime* view once after deploying to dev.
+
+Privacy: the SDK stores a random user id and its event queue in `localStorage`, and sends the device, OS and
+browser, the build, the session length and the events above. GameAnalytics sees the sender's IP address. There is no
+consent prompt; say on the itch.io page that the game collects anonymous gameplay statistics. Ad blockers often block
+GameAnalytics, so expect events from only part of the players.
+
 ### Updating butler
 
 `deploy.yml` downloads butler from `broth.itch.zone` at a pinned version and checks its SHA-256. To update, read the
@@ -259,3 +300,5 @@ latest version from <https://broth.itch.zone/butler/linux-amd64/LATEST>, then se
 - [ ] No console errors. File count is under 1000.
 - [ ] Asset requests in the network tab carry `?v=<commit hash>`.
 - [ ] With `SENTRY_DSN` set, the published `reporting.json` has the DSN, and a `load` transaction shows up in Sentry.
+- [ ] With the `GAMEANALYTICS_*` variables set, the published `analytics.json` has both keys, and `Game:Ready` shows up
+  in GameAnalytics' *Realtime* view.

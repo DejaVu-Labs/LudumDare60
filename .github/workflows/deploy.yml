@@ -5,7 +5,8 @@
 #   manual run        -> either, picked in the form
 #
 # Setup (see docs/tech/build-and-deploy.md#continuous-deployment): repository variables ITCH_USER, ITCH_GAME and
-# ITCH_DEV_GAME, and a BUTLER_API_KEY secret in both environments.
+# ITCH_DEV_GAME, and a BUTLER_API_KEY secret in both environments. Optional: SENTRY_DSN, GAMEANALYTICS_GAME_KEY and
+# GAMEANALYTICS_SECRET_KEY.
 name: Deploy
 
 on:
@@ -112,6 +113,19 @@ jobs:
           jq -n --arg dsn "$SENTRY_DSN" --arg release "$RELEASE" --arg environment "$ENVIRONMENT" \
             '{dsn: $dsn, release: $release, environment: $environment}' > "$PUBLISH_DIR/reporting.json"
           echo "Sentry reporting on: $ENVIRONMENT $RELEASE" >> "$GITHUB_STEP_SUMMARY"
+
+      # Product analytics (analytics.js) stay off unless both GameAnalytics keys are set as repository variables. The
+      # published analytics.json is "{}" otherwise. The keys ship to every player anyway, like the Sentry DSN.
+      - name: Write analytics config
+        if: vars.GAMEANALYTICS_GAME_KEY != '' && vars.GAMEANALYTICS_SECRET_KEY != ''
+        env:
+          GAME_KEY: ${{ vars.GAMEANALYTICS_GAME_KEY }}
+          SECRET_KEY: ${{ vars.GAMEANALYTICS_SECRET_KEY }}
+          BUILD: ${{ needs.plan.outputs.version }}
+        run: |
+          jq -n --arg gameKey "$GAME_KEY" --arg secretKey "$SECRET_KEY" --arg build "$BUILD" \
+            '{gameKey: $gameKey, secretKey: $secretKey, build: $build}' > "$PUBLISH_DIR/analytics.json"
+          echo "GameAnalytics on: $BUILD" >> "$GITHUB_STEP_SUMMARY"
 
       # itch.io HTML5 limits: index.html at the root, at most 1000 files.
       - name: Check output

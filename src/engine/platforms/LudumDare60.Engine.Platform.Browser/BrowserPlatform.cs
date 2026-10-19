@@ -59,6 +59,26 @@ public sealed class BrowserPlatform(
     /// hidden.</remarks>
     public IAudioBackend Audio => _audio;
 
+    /// <inheritdoc />
+    /// <remarks>GameAnalytics, through <c>analytics.js</c>, when the page ships an <c>analytics.json</c> with the game's
+    /// keys. Events sent before <see cref="RunAsync"/> imported the module are dropped; <c>analytics.js</c> queues the
+    /// others until the SDK's session has started.</remarks>
+    public IAnalytics Analytics { get; } = new BrowserAnalytics(
+        progression: static (status, progression01, progression02, progression03, hasScore, score) =>
+        {
+            if (AnalyticsInterop.IsImported)
+            {
+                AnalyticsInterop.AddProgression(status, progression01, progression02, progression03, hasScore, score);
+            }
+        },
+        design: static (eventId, hasValue, value) =>
+        {
+            if (AnalyticsInterop.IsImported)
+            {
+                AnalyticsInterop.AddDesign(eventId, hasValue, value);
+            }
+        });
+
     private static bool s_reportsUnhandledExceptions;
 
     /// <inheritdoc />
@@ -73,6 +93,7 @@ public sealed class BrowserPlatform(
 
         await ReportingInterop.ImportAsync();
         ReportUnhandledExceptions();
+        await AnalyticsInterop.ImportAsync();
         await _graphics.InitializeAsync(canvasId);
         await _audio.InitializeAsync();
         await FrameLoopInterop.ImportAsync();
