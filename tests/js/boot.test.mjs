@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 
 import {
   createResourceLoader,
+  createRetryingFetch,
   createWatchedFetch,
   STALL_MS,
   ERROR_TEXT,
@@ -636,4 +637,29 @@ test('watchedFetch_NetworkError_PassedThrough', async () => {
   }, { digest, ...manualTimers() });
 
   await assert.rejects(watched('https://x/a.wasm', {}), (error) => error === failure);
+});
+
+test('createRetryingFetch_FailsThenOk_RetriesAndReportsUrl', async () => {
+  const { fetchLike, requests } = scriptedFetch([new TypeError('no data for 10 s'), 200]);
+  const { sleep, waits } = recordedSleep();
+  /** @type {unknown[][]} */
+  const retries = [];
+  const retrying = createRetryingFetch(fetchLike, sleep, (...args) => retries.push(args));
+
+  const response = await retrying('https://x/assets/bench.png?v=1', { cache: 'default' });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(requests.map((r) => r.init), [{ cache: 'default' }, { cache: 'reload' }]);
+  assert.deepEqual(waits, [RETRY_DELAYS_MS[0]]);
+  assert.deepEqual(retries, [['https://x/assets/bench.png?v=1', 1, RETRY_DELAYS_MS[0], 'TypeError: no data for 10 s']]);
+});
+
+test('createRetryingFetch_NotFound_NoRetry', async () => {
+  const { fetchLike, requests } = scriptedFetch([404]);
+  const { sleep } = recordedSleep();
+
+  const response = await createRetryingFetch(fetchLike, sleep, () => {})('https://x/missing.png', { cache: 'default' });
+
+  assert.equal(response.status, 404);
+  assert.equal(requests.length, 1);
 });

@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createAssetReader } from '../../src/engine/platforms/LudumDare60.Engine.Platform.Browser/wwwroot/assets.js';
+import { createAssetReader, fileName } from '../../src/engine/platforms/LudumDare60.Engine.Platform.Browser/wwwroot/assets.js';
 
 const page = 'https://html-classic.itch.zone/html/123/index.html?v=456';
 
@@ -157,4 +157,10 @@ test('read_WithTimingNetworkError_ReportsFailureAndRejects', async () => {
   await assert.rejects(reader.read(1, 'a.bin', false), TypeError);
 
   assert.deepEqual(calls[1], ['finished', 'a.bin', 1, -1]);
+});
+
+test('fileName_UrlWithQuery_LastSegment', () => {
+  assert.equal(fileName('https://x/html/1/assets/backgrounds/bench.png?v=abc'), 'bench.png');
+  assert.equal(fileName('assets/a.ogg#t'), 'a.ogg');
+  assert.equal(fileName('plain.json'), 'plain.json');
 });

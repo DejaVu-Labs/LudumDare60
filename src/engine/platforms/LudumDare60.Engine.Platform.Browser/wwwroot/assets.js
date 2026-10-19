@@ -1,11 +1,13 @@
 // @ts-check
 
+import { browserWatchedFetch, createRetryingFetch, delay, RETRY_DELAYS_MS } from './boot.js';
 import { getLoadLog } from './load-log.js';
 
 /**
  * Asset reads of the browser platform. C# starts a read with `read(id, url, noCache)`, which fetches the whole file
  * and keeps its bytes under `id`, then copies them into a `byte[]` of the reported length with `take(id, span)`. A file
- * costs two interop calls.
+ * costs two interop calls. Reads are downloaded like the runtime's files: aborted after `STALL_MS` without data and
+ * retried (`createRetryingFetch` in `boot.js`).
  */
 
 /**
@@ -92,15 +94,27 @@ export function createAssetReader(fetchFile, baseUri, timing = NO_TIMING) {
   };
 }
 
+/**
+ * @param {string} url
+ * @returns {string} The last path segment, without the query.
+ */
+export function fileName(url) {
+  const path = url.split(/[?#]/, 1)[0];
+  return path.slice(path.lastIndexOf('/') + 1);
+}
+
 /** @type {AssetReader | undefined} */
 let reader;
 
 /** @returns {AssetReader} */
 function getReader() {
+  const log = getLoadLog();
   reader ??= createAssetReader(
-    (url, init) => globalThis.fetch(url, init),
+    createRetryingFetch(browserWatchedFetch(), delay, (url, attempt, delayMs, reason) =>
+      log.retry(fileName(url), attempt, RETRY_DELAYS_MS.length, delayMs, reason),
+    ),
     () => globalThis.document.baseURI,
-    getLoadLog(),
+    log,
   );
   return reader;
 }

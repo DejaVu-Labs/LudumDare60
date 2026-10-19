@@ -343,10 +343,35 @@ function sessionStore() {
 }
 
 /**
+ * Downloads with `fetchWithRetry`, the default delays, and a report before each retry. Game assets use it
+ * (`assets.js`), so a dropped connection costs a retry instead of a missing background.
+ *
+ * @param {FetchLike} fetchLike Usually `browserWatchedFetch()`.
+ * @param {(ms: number) => Promise<void>} sleep
+ * @param {(url: string, attempt: number, delayMs: number, reason: string) => void} onRetry
+ * @returns {FetchLike}
+ */
+export function createRetryingFetch(fetchLike, sleep, onRetry) {
+  return (url, init) =>
+    fetchWithRetry(url, init, fetchLike, sleep, RETRY_DELAYS_MS, (attempt, delayMs, reason) =>
+      onRetry(url, attempt, delayMs, reason),
+    );
+}
+
+/** @returns {FetchLike} `fetch` behind `createWatchedFetch`, on the page's timers and Web Crypto. */
+export function browserWatchedFetch() {
+  return createWatchedFetch((url, init) => fetch(url, init), {
+    digest: (algorithm, bytes) => crypto.subtle.digest(algorithm, bytes),
+    setTimer: (callback, ms) => setTimeout(callback, ms),
+    clearTimer: (timer) => clearTimeout(/** @type {number | undefined} */ (timer)),
+  });
+}
+
+/**
  * @param {number} ms
  * @returns {Promise<void>}
  */
-function delay(ms) {
+export function delay(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
@@ -452,11 +477,7 @@ export function boot(frameworkRoot = './_framework/', statusId = 'status', repor
         (dotnet) =>
           dotnet.withResourceLoader(
             createResourceLoader(
-              createWatchedFetch((url, init) => fetch(url, init), {
-                digest: (algorithm, bytes) => crypto.subtle.digest(algorithm, bytes),
-                setTimer: (callback, ms) => setTimeout(callback, ms),
-                clearTimer: (timer) => clearTimeout(/** @type {number | undefined} */ (timer)),
-              }),
+              browserWatchedFetch(),
               delay,
               (name, attempt, delayMs, reason) => log.retry(name, attempt, RETRY_DELAYS_MS.length, delayMs, reason),
             ),
