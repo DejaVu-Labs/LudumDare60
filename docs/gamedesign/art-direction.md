@@ -70,16 +70,19 @@ times larger, with the bottom middle on the far edge of the bench (y = 140):
    instead of the counter (`Customers/CustomerSeats`): `robe` sits on the bench under the revolver painting, bottom
    middle at (156, 141), drawn 0.9 times larger since that bench stands at the back wall; `dog-walker` walks the dog on
    the pavement right behind the window, bottom middle at (370, 150), 1.1 times larger, the feet and most of the dog
-   hidden below the sill. A customer outside is drawn between the street and the room, so the window frame and the wall
+   hidden below the sill; `clown` smokes outside the shop door, seen through its glass, bottom middle at (526, 175),
+   1.1 times larger, the feet behind the door's lower panel. A customer outside is drawn between the street and the room, so the window frame and the wall
    cover them, and tinted darker and cooler (`LudumDare60Game.OutsideTint`, `#a5aad2`). The symptom bubble moves and
    scales with them and stays over the room. They switch places at once, without a walk.
 3. **Pleased:** with the revolver back, until they are out of the door.
 
-Sheets so far: `hoodie`, `robe`, `dog-walker` and `parcel`. Looks without a sheet are drawn as code placeholders. A
+Sheets so far: `hoodie`, `robe`, `dog-walker`, `clown` and `parcel`, one for every look. Looks without a sheet would be
+drawn as code placeholders. A
 sheet made from a concept may leave out palette colors the character does not have (`robe`, `dog-walker` and `parcel`
 use no cool or mat colors, so the concept's blue rim light turns gray instead of blue). A frame may be drawn at another
-scale than its neighbors: the `dog-walker` waiting frame holds the whole figure and the dog, the other two frames a
-bust. A frame stands on the bottom of its figure, so an object that is not cut off (a box) rests on the frame's bottom
+scale than its neighbors: the `dog-walker` waiting frame holds the whole figure and the dog, the `clown` one the whole
+figure smoking, the other two frames a bust. The concept's reds have no match in the palette, so the clown's nose, bow
+and stripes come out rust brown; the smoke is left out. A frame stands on the bottom of its figure, so an object that is not cut off (a box) rests on the frame's bottom
 edge.
 
 The fifth customer is not a person: `parcel` is a box that comes with no sender (closed when it comes in, open from the

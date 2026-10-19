@@ -130,7 +130,7 @@ yet (see [backlog](../backlog.md#shop-loop-follow-ups)).
 | 1 | Young person in a hoodie | Cylinder jammed (rust) | base pin, cylinder | pull, scrub, test, hand back | Rolled note in a chamber | 1.5 min |
 | 2 | Old man in a robe | Grip loose and grimy | grip screw, grip panels | unscrew | Photo under a grip panel | 2 min |
 | 3 | Woman walking a dog | Hammer will not stay cocked (broken spring) | grip screw, grip panels, mainspring | replace from the tray | Initials carved inside the frame | 2 min |
-| 4 | Teenager with headphones | Action stiff, heavy rust | base pin, cylinder, hammer screw, hammer | oil | One unspent cartridge in a chamber | 2.5 min |
+| 4 | Sad clown | Action stiff, heavy rust | base pin, cylinder, hammer screw, hammer | oil | One unspent cartridge in a chamber | 2.5 min |
 | 5 | A parcel with no sender | "Make it work again" (everything) | all of the above | none | The find that joins both timelines | 2.5 min |
 
 Ending: about 30 s. All five finds are laid out on the mat, one last phone message, credits, "Play again".

@@ -23,11 +23,11 @@ public sealed class LudumDare60GameTests
     private const int CustomerTexture = 2;
     private const int CustomerGlowTexture = 3;
     private const int RobeCustomerTexture = 4;
-    private const int RustTexture = 10;
+    private const int RustTexture = 12;
     private const int RoomTexture = 2;
     private const int StreetTexture = 3;
     private const int DogWalkerTextureWithBackground = 8;
-    private const int ParcelTextureWithBackground = 10;
+    private const int ParcelTextureWithBackground = 12;
 
     // Textures the first frame creates without the background: the two placeholder sheets, and a sheet and its glow per
     // drawn customer.
@@ -651,10 +651,10 @@ public sealed class LudumDare60GameTests
     {
         _platform.Frame(0);
 
-        // Glow ids: a customer sheet's glow comes right after it; the parcel is the fourth sheet.
+        // Glow ids: a customer sheet's glow comes right after it; the parcel is the fifth sheet.
         var glowWidth = CustomerSheet.PoseCount * (CustomerSheet.FrameWidth + 2);
         var lastRow = CustomerSheet.FrameHeight + 1;
-        var parcelGlow = _platform.Backend.Textures[CustomerTexture + 7];
+        var parcelGlow = _platform.Backend.Textures[CustomerTexture + 9];
         var hoodieGlow = _platform.Backend.Textures[CustomerGlowTexture];
         Assert.Contains(Enumerable.Range(0, glowWidth), x => AlphaAt(parcelGlow, glowWidth, x, lastRow) == 255);
         Assert.DoesNotContain(Enumerable.Range(0, glowWidth), x => AlphaAt(hoodieGlow, glowWidth, x, lastRow) == 255);

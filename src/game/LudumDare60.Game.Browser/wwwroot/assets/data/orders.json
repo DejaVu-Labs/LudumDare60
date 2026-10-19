@@ -35,8 +35,8 @@
       "targetSeconds": 120
     },
     {
-      "id": "headphones",
-      "customer": { "look": "headphones", "description": "Teenager with headphones" },
+      "id": "clown",
+      "customer": { "look": "clown", "description": "Sad clown" },
       "symptom": "stiff-action",
       "parts": ["base-pin", "cylinder", "hammer-screw", "hammer"],
       "dirty": [
@@ -45,7 +45,7 @@
       ],
       "oil": ["hammer"],
       "find": { "id": "cartridge", "part": "cylinder" },
-      "message": "that bullet was still live?? my dad says someone brought you one from the same box",
+      "message": "that bullet was still live?? the circus sold it to me as a prop. someone brought you one from the same box",
       "targetSeconds": 150
     },
     {

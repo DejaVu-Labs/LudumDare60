@@ -25,7 +25,7 @@ about retention or money:
 
 Every id is built by `Analytics/ShopAnalytics` in the game, except the session, the error and the dimension, which
 the browser platform adds. `<order>` is the order's `id` from `orders.json` (`hoodie`, `robe`, `dog-walker`,
-`headphones`, `parcel`). Seconds are rounded to hundredths.
+`clown`, `parcel`). Seconds are rounded to hundredths.
 
 ### Session
 

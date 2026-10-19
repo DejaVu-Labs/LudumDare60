@@ -102,9 +102,9 @@ Customers come in, hand over the revolver and take it back (`Customers/Shop`, se
   face (`Expression.Surprised` exists, nothing sets it yet).
 - The phone message after the customer leaves, and the counter bell that calls the next customer at once.
 - The shop's end once the orders run out; today it just stays empty (`ShopPhase.Closed`).
-- A customer sheet for the last look (`headphones`): until it exists that customer is a code placeholder. A blink, a
-  walk instead of a slide, the door opening. A walk to and from a waiting place: `robe` jumps between the counter and
-  the bench under the painting, `dog-walker` between the counter and the street (`CustomerSeats`).
+- A blink, a walk instead of a slide, the door opening. A walk to and from a waiting place: `robe` jumps between the
+  counter and the bench under the painting, `dog-walker` and `clown` between the counter and the street
+  (`CustomerSeats`).
 
 ## Cleaning follow-ups
 

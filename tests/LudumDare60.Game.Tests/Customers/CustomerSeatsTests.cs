@@ -19,9 +19,27 @@ public sealed class CustomerSeatsTests
         Assert.True(seat.IsOutside);
     }
 
+    [Fact]
+    public void TryGetWaitingSeat_Clown_SmokesOutsideTheDoor()
+    {
+        Assert.True(CustomerSeats.TryGetWaitingSeat("clown", out var seat));
+        Assert.Equal(CustomerSeats.OutsideTheDoor, seat);
+        Assert.True(seat.IsOutside);
+    }
+
+    [Fact]
+    public void OutsideTheDoor_StandsBehindTheDoorGlassWithTheFeetBelowIt()
+    {
+        // The door's glass runs from about x = 508 to 544 and from y = 30 to 150: the figure stands in it, its feet
+        // behind the panel below.
+        var spot = CustomerSeats.OutsideTheDoor;
+        Assert.InRange(spot.Bottom.X, 508, 544);
+        Assert.True(spot.Bottom.Y > 150);
+        Assert.True(spot.Bottom.Y - (spot.Scale * CustomerSheet.FrameHeight) < 150);
+    }
+
     [Theory]
     [InlineData("hoodie")]
-    [InlineData("headphones")]
     [InlineData("parcel")]
     [InlineData("unknown")]
     public void TryGetWaitingSeat_LookThatStands_ReturnsFalse(string look)
@@ -49,7 +67,7 @@ public sealed class CustomerSeatsTests
     [InlineData("hoodie")]
     [InlineData("robe")]
     [InlineData("dog-walker")]
-    [InlineData("headphones")]
+    [InlineData("clown")]
     public void TryGetFixedPlace_CustomerWhoWalksIn_ReturnsFalse(string look)
         => Assert.False(CustomerSeats.TryGetFixedPlace(look, out _));
 

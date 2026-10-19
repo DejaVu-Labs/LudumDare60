@@ -30,6 +30,7 @@ public static class AssetPaths
         new("hoodie", "customers/hoodie.png"),
         new("robe", "customers/robe.png"),
         new("dog-walker", "customers/dog-walker.png"),
+        new("clown", "customers/clown.png"),
         new("parcel", "customers/parcel.png"),
     ];
 }

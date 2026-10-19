@@ -22,6 +22,12 @@ public static class CustomerSeats
     public static readonly CustomerSeat OutsideTheWindow = new(new Vector2(370, 150), 1.1f, IsOutside: true);
 
     /// <summary>
+    /// Outside the shop door, smoking: seen through the door's glass, drawn as large as behind the window, with the feet
+    /// below the glass, behind the door's lower panel.
+    /// </summary>
+    public static readonly CustomerSeat OutsideTheDoor = new(new Vector2(526, 175), 1.1f, IsOutside: true);
+
+    /// <summary>
     /// The right end of the counter, next to the door: where a parcel lies, from the moment it comes in until it is
     /// gone again.
     /// </summary>
@@ -41,6 +47,12 @@ public static class CustomerSeats
         if (string.Equals(look, "dog-walker", StringComparison.Ordinal))
         {
             seat = OutsideTheWindow;
+            return true;
+        }
+
+        if (string.Equals(look, "clown", StringComparison.Ordinal))
+        {
+            seat = OutsideTheDoor;
             return true;
         }
 
