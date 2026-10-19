@@ -82,7 +82,9 @@ sheet made from a concept may leave out palette colors the character does not ha
 use no cool or mat colors, so the concept's blue rim light turns gray instead of blue). A frame may be drawn at another
 scale than its neighbors: the `dog-walker` waiting frame holds the whole figure and the dog, the `clown` one the whole
 figure smoking, the other two frames a bust. The concept's reds have no match in the palette, so the clown's nose, bow
-and stripes come out rust brown; the smoke is left out. A frame stands on the bottom of its figure, so an object that is not cut off (a box) rests on the frame's bottom
+and stripes come out rust brown. The concept's smoke does not survive the reduction, so the waiting frame has a
+thin wisp drawn on afterwards, light steel gray, thinning out and darker towards the top. The clown's busts are taken
+from a wider window than the figure needs, so his head comes out the size of the other customers'. A frame stands on the bottom of its figure, so an object that is not cut off (a box) rests on the frame's bottom
 edge.
 
 The fifth customer is not a person: `parcel` is a box that comes with no sender (closed when it comes in, open from the
