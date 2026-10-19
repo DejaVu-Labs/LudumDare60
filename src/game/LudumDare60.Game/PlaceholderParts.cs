@@ -391,6 +391,18 @@ internal static class PlaceholderParts
     public static GrabShape CreateHammerGrab() => new(HammerWidth, HammerHeight, HammerOrigin, IsHammer, margin: 1);
 
     /// <summary>
+    /// The hammer's pixels above the hammer screw and the screw's own grab margin, and one around them: where the thumb
+    /// takes the hammer in the gun to cock it. The screw on the pivot stays the screw's.
+    /// </summary>
+    public static GrabShape CreateCockGrab()
+        => new(HammerWidth, HammerHeight, HammerOrigin, static (x, y) => y < HammerOrigin.Y - (ScrewSize / 2) - 3 && IsHammer(x, y), margin: 1);
+
+    /// <summary>
+    /// The trigger's pixels below the frame, and one around them: where the player pulls it.
+    /// </summary>
+    public static GrabShape CreateTriggerGrab() => new(TriggerWidth, TriggerHeight, TriggerOrigin, IsTrigger, margin: 1);
+
+    /// <summary>
     /// A screw head's pixels and two around them: the head is small.
     /// </summary>
     public static GrabShape CreateScrewGrab() => new(ScrewSize, ScrewSize, ScrewOrigin, IsScrew, margin: 2);

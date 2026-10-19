@@ -49,6 +49,26 @@ public sealed class PlaceholderPartsTests
         => AssertCoversSprite(PlaceholderParts.CreateHammerGrab(), PlaceholderParts.Hammer, PlaceholderParts.HammerOrigin);
 
     [Fact]
+    public void CreateTriggerGrab_CoversTheWholeTrigger()
+        => AssertCoversSprite(PlaceholderParts.CreateTriggerGrab(), PlaceholderParts.Trigger, PlaceholderParts.TriggerOrigin);
+
+    [Fact]
+    public void CreateCockGrab_CoversTheSpurButNotTheHammerScrew()
+    {
+        var grab = PlaceholderParts.CreateCockGrab();
+        var screwReach = (PlaceholderParts.Screw.Width / 2f) + 2;
+
+        Assert.True(grab.Contains(PlaceholderParts.HammerSpur));
+        for (var y = -screwReach; y <= screwReach; y++)
+        {
+            for (var x = -screwReach; x <= screwReach; x++)
+            {
+                Assert.False(grab.Contains(new Vector2(x, y)), $"({x}, {y}) from the pivot takes the hammer, not the screw.");
+            }
+        }
+    }
+
+    [Fact]
     public void CreateScrewGrab_CoversTheWholeHead()
         => AssertCoversSprite(PlaceholderParts.CreateScrewGrab(), PlaceholderParts.Screw, PlaceholderParts.ScrewOrigin);
 

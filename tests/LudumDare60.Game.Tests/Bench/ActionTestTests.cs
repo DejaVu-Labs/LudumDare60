@@ -48,6 +48,26 @@ public sealed class ActionTestTests
     }
 
     [Fact]
+    public void Step_PressOnTheBottomOfTheFingerPiece_HoversAndTriesTheTrigger()
+    {
+        // The lowest drawn pixel of the trigger: its hook, far from the pivot.
+        var hook = BenchLayout.TriggerPivot - PlaceholderParts.TriggerOrigin + new Vector2(2.5f, PlaceholderParts.Trigger.Height - 1.5f);
+
+        _test.Step(Press(hook), Dt, canCock: true, canGrab: true);
+
+        Assert.True(_test.IsTriggerHovered);
+        Assert.Equal(TestEvents.TriggerRefused, _test.Events);
+    }
+
+    [Fact]
+    public void Step_PressOnTheHammerScrew_DoesNotTakeTheHammer()
+    {
+        _test.Step(Press(BenchLayout.HammerScrewSeated), Dt, canCock: true, canGrab: true);
+
+        Assert.False(_test.IsHammerHeld);
+    }
+
+    [Fact]
     public void Constructor_HammerDown()
     {
         Assert.Equal(HammerState.Down, _test.State);

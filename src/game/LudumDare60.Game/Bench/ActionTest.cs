@@ -25,16 +25,6 @@ public sealed class ActionTest
     public const float HalfCock = 0.45f;
 
     /// <summary>
-    /// How close to the spur the pointer must be to take the hammer.
-    /// </summary>
-    public const float SpurRadius = 6;
-
-    /// <summary>
-    /// How close to the trigger the pointer must be to pull it.
-    /// </summary>
-    public const float TriggerRadius = 6;
-
-    /// <summary>
     /// How long the trigger stays pulled after firing, in seconds.
     /// </summary>
     public const float TriggerPullSeconds = 0.2f;
@@ -44,6 +34,11 @@ public sealed class ActionTest
 
     // How close to full cock the hammer must come for the sear to catch it.
     private const float FullCockCatch = 0.97f;
+
+    // Where the hammer and the trigger take the pointer, by their shapes: the hammer around its pivot as far as it is
+    // turned back, the trigger around its pivot.
+    private static readonly GrabShape s_cockGrab = PlaceholderParts.CreateCockGrab();
+    private static readonly GrabShape s_triggerGrab = PlaceholderParts.CreateTriggerGrab();
 
     private static readonly Vector2 s_spurCocked = Vector2.Transform(PlaceholderParts.HammerSpur, Matrix3x2.CreateRotation(CockAngle));
 
@@ -71,9 +66,9 @@ public sealed class ActionTest
     public Vector2 Spur => _spurPath.PointAt(Share * _spurPath.Length);
 
     /// <summary>
-    /// The point of the trigger the player clicks, on the mat.
+    /// A point of the trigger the player clicks, on the mat: the middle of the finger piece.
     /// </summary>
-    public static Vector2 TriggerCenter => BenchLayout.TriggerPivot + new Vector2(1, 5);
+    public static Vector2 TriggerCenter => BenchLayout.TriggerPivot + new Vector2(4, 11);
 
     public HammerState State { get; private set; }
 
@@ -90,7 +85,7 @@ public sealed class ActionTest
     public bool IsHammerHeld { get; private set; }
 
     /// <summary>
-    /// Whether the pointer is over the spur and could take the hammer.
+    /// Whether the pointer is over the hammer, above its screw, and could take it.
     /// </summary>
     public bool IsHammerHovered { get; private set; }
 
@@ -142,7 +137,7 @@ public sealed class ActionTest
         TriggerPull = MathF.Max(0, TriggerPull - (deltaTime / TriggerPullSeconds));
         MoveHammer(input, deltaTime, canCock, canGrab);
 
-        IsTriggerHovered = canGrab && !IsHammerHeld && Vector2.Distance(input.Position, TriggerCenter) <= TriggerRadius;
+        IsTriggerHovered = canGrab && !IsHammerHeld && s_triggerGrab.Contains(input.Position - BenchLayout.TriggerPivot);
         if (!input.IsPressed || !IsTriggerHovered)
         {
             return;
@@ -166,7 +161,7 @@ public sealed class ActionTest
     {
         if (!IsHammerHeld)
         {
-            IsHammerHovered = canGrab && State != HammerState.FullCock && Vector2.Distance(input.Position, Spur) <= SpurRadius;
+            IsHammerHovered = canGrab && State != HammerState.FullCock && s_cockGrab.Contains(input.Position - BenchLayout.HammerPivot, Share * CockAngle);
             if (!input.IsPressed || !IsHammerHovered)
             {
                 return;
