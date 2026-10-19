@@ -111,9 +111,9 @@ yet (see [backlog](../backlog.md#shop-loop-follow-ups)).
   part still in the gun is dragged as usual. A part brought to its rail while another part keeps it out (the base pin
   while the cylinder is still out) does not stick either, and what holds it flashes.
 - **Broken parts:** a broken part shows its break and does not fit: brought to its place it does not go in, and the
-  part and the tray of spares on the right of the mat flash. The tray pulses while a broken part is off. Put down in
-  the tray, the broken part is swapped for the spare with a clunk: the new one lies where the broken one was put,
-  and the broken one lies in the tray instead.
+  part and the tray of spares in the bottom-left corner of the mat flash. The tray pulses while a broken part is off.
+  Put down in the tray, the broken part is swapped for the spare with a clunk: the new one lies where the broken one
+  was put, and the broken one lies in the tray instead.
 - **Dry parts:** a part that needs oil does not fit either, and flashes with the oil can, which pulses while such a
   part is off. The oil can is carried like the brush; the tip of its spout oils the part it touches, with a drip.
 - **The tools stay.** The brush and the oil can belong to the shop, not to an order (`Shop.Brush`, `Shop.OilCan`):

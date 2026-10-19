@@ -120,10 +120,10 @@ public static class BenchLayout
     public static readonly Vector2 HammerOut = HammerPivot + new Vector2(60, -20);
 
     /// <summary>
-    /// The top-left corner of the tray of spare parts, on the right of the mat: a broken part put down in it is
-    /// swapped for a spare.
+    /// The top-left corner of the tray of spare parts, in the bottom-left corner of the mat under the brush and the oil
+    /// can: a broken part put down in it is swapped for a spare.
     /// </summary>
-    public static readonly Vector2 TrayMin = new(425, 222);
+    public static readonly Vector2 TrayMin = new(55, 278);
 
     /// <summary>
     /// The bottom-right corner of the tray.

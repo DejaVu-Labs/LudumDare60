@@ -1376,8 +1376,8 @@ public sealed class LudumDare60GameTests
     {
         StartWithSound();
 
-        // Out of the way of every repair step: the bottom-left corner of the mat.
-        var spot = new Vector2(100, 300);
+        // Out of the way of every repair step: the bottom-right corner of the mat.
+        var spot = new Vector2(440, 300);
         _platform.Frame(Step, PointerDown(BenchLayout.OilCanRest + new Vector2(5, 3)));
         HoldAt(spot, 2);
         _platform.Frame(Step, PointerUp(spot));
