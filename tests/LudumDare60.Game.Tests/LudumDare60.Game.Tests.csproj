@@ -13,6 +13,7 @@
   <ItemGroup>
     <!-- The shipped asset files, so tests load the real background. -->
     <None Include="..\..\src\game\LudumDare60.Game.Browser\wwwroot\assets\**" LinkBase="assets" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\art\palette\six-chambers.gpl" Link="six-chambers.gpl" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

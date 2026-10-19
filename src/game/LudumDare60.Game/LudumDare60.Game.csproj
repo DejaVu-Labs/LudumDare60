@@ -5,6 +5,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="..\..\..\art\sprites\revolver.png" LogicalName="revolver.png" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="LudumDare60.Game.Tests" />
   </ItemGroup>
 

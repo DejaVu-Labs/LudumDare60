@@ -90,6 +90,24 @@ the revolver flies out of it, and no hand comes out to take the revolver back. B
 its glow all around, under the box too: the sheet leaves a pixel under each box, and its glow is made with `openBottom:
 false`.
 
+## Revolver sprites
+
+`art/sprites/revolver.png` (preview `revolver-x4.png`), made from the Figma frame of the revolver (a Nagant in profile,
+muzzle to the left) and its separate parts (hammer, screw, base pin). It is embedded in the game assembly rather than
+shipped under `wwwroot/assets/`, because the parts' shapes (grab areas, glows, dirt) are built before the first frame
+(`RevolverSheet`, read by `PlaceholderParts`). One sheet, 189x175:
+
+- top: the body, 185x108, without the parts that move: the cylinder window, the hammer's slot and the gap in front of
+  the ejector housing where the base pin's head shows are transparent; the grip frame under the panel is a flat dark
+  steel fill;
+- the row below, from x = 0 at y = 110: the cylinder and the cylinder one flute further round, the hammer, the trigger
+  (only what shows below the frame, no outline where it goes under it), the walnut grip panel, the base pin and,
+  under it, the screw.
+
+The layers are composited at the Figma frame's 1x size, so every part shares the body's pixel grid, then reduced like
+the customer sheets: box filter down to 184 px across, nearest palette color in OKLab, alpha 0 or 255, single stray
+pixels repainted, a 1-pixel ink outline. Where each part lies in the body is in `PlaceholderParts` (`*InBody`).
+
 ## Concept art prompts
 
 For external image generators. These images are mood references only: in the Compo every asset is drawn by

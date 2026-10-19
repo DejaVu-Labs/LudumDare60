@@ -87,7 +87,9 @@ order their blocking graph allows (`Parts/PartAssembly`). Still to do:
 - Show the hand how to unscrew: a faint circular arrow around a screw while it is held, for players who drag
   straight.
 - An oiled part could show a wet sheen for a moment; today it only glints.
-- Replace the code-generated frame, pin, cylinder and click with the real sprites and recordings.
+- The revolver is drawn from its sprites now (`art/sprites/revolver.png`); still generated in code: the mainspring, the
+  brush, the oil can and the tray. Draw those, and replace the code-generated click with a recording. The grip frame
+  under the panel is a flat fill and the turned cylinder only moves the flutes: draw both by hand.
 
 ## Shop loop follow-ups
 

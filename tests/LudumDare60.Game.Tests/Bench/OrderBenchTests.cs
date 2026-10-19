@@ -71,7 +71,7 @@ public sealed class OrderBenchTests
     private BenchEvents Rub(float y)
     {
         var seen = BenchEvents.None;
-        for (var x = -13; x <= 13; x += 2)
+        for (var x = -(PlaceholderParts.Cylinder.Width / 2); x <= PlaceholderParts.Cylinder.Width / 2; x += 2)
         {
             _bench.Step(Hold(BenchLayout.CylinderOut + new Vector2(x, y)), Dt);
             seen |= _bench.Events;
@@ -257,7 +257,7 @@ public sealed class OrderBenchTests
         _bench.Step(Press(BenchLayout.BrushRest), Dt);
 
         var cleaned = 0;
-        for (var y = -10; y <= 10; y++)
+        for (var y = -(PlaceholderParts.Cylinder.Height / 2); y <= PlaceholderParts.Cylinder.Height / 2; y++)
         {
             if ((Rub(y) & BenchEvents.Cleaned) != BenchEvents.None)
             {
@@ -293,7 +293,7 @@ public sealed class OrderBenchTests
     {
         TakeApart();
         _bench.Step(Press(BenchLayout.BrushRest), Dt);
-        for (var y = -10; y <= 10 && !Rust.IsClean; y++)
+        for (var y = -(PlaceholderParts.Cylinder.Height / 2); y <= PlaceholderParts.Cylinder.Height / 2 && !Rust.IsClean; y++)
         {
             Rub(y);
         }

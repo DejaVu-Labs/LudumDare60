@@ -51,7 +51,7 @@ public static class BenchLayout
     /// A good place for the cylinder once it is out: below the revolver, on the mat, clear of the trigger guard. The
     /// cylinder can lie anywhere; this is where the tests and the brush's first place expect it.
     /// </summary>
-    public static readonly Vector2 CylinderOut = CylinderSeated + new Vector2(0, 64);
+    public static readonly Vector2 CylinderOut = CylinderSeated + new Vector2(0, 70);
 
     /// <summary>
     /// The hammer's pivot on the mat.
@@ -74,9 +74,10 @@ public static class BenchLayout
     public const float GripPanelPull = 8;
 
     /// <summary>
-    /// A good place for the grip panel once it is off: below the grip, on the mat.
+    /// A good place for the grip panel once it is off: right of the grip and down, past the end of its pull, on the
+    /// mat, clear of the mainspring.
     /// </summary>
-    public static readonly Vector2 GripPanelOut = GripPanelSeated + new Vector2(30, 40);
+    public static readonly Vector2 GripPanelOut = GripPanelSeated + new Vector2(40, 12);
 
     /// <summary>
     /// The middle of the grip screw, through the grip panel.
@@ -101,7 +102,7 @@ public static class BenchLayout
     /// <summary>
     /// The way the mainspring slides out of the bottom of the grip, along the backstrap.
     /// </summary>
-    public static readonly Vector2 MainspringPullDirection = Vector2.Normalize(new Vector2(0.71f, 1));
+    public static readonly Vector2 MainspringPullDirection = Vector2.Normalize(new Vector2(PlaceholderParts.MainspringSlant, 1));
 
     /// <summary>
     /// How far the mainspring slides out before it comes free in the hand.
@@ -116,7 +117,7 @@ public static class BenchLayout
     /// <summary>
     /// A good place for the hammer once it is out: above the revolver's frame, on the mat.
     /// </summary>
-    public static readonly Vector2 HammerOut = HammerPivot + new Vector2(60, -30);
+    public static readonly Vector2 HammerOut = HammerPivot + new Vector2(60, -20);
 
     /// <summary>
     /// The top-left corner of the tray of spare parts, on the right of the mat: a broken part put down in it is

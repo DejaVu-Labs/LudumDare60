@@ -102,9 +102,10 @@ public sealed partial class ShopAnalyticsTests
 
         Step(Press(BenchLayout.BrushRest));
         var rust = _shop.Bench!.Dirt(RevolverParts.Cylinder)!;
-        for (var y = -10; y <= 10 && !rust.IsClean; y++)
+        // Every other row: the brush is wider than a row, and the scrub stays shorter than a stall.
+        for (var y = 1 - (PlaceholderParts.Cylinder.Height / 2); y <= (PlaceholderParts.Cylinder.Height / 2) - 1 && !rust.IsClean; y += 2)
         {
-            for (var x = -13; x <= 13; x += 2)
+            for (var x = -(PlaceholderParts.Cylinder.Width / 2); x <= PlaceholderParts.Cylinder.Width / 2; x += 2)
             {
                 Step(Hold(BenchLayout.CylinderOut + new Vector2(x, y)));
             }

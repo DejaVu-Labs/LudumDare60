@@ -120,9 +120,9 @@ public sealed class ShopTests
 
         shop.Step(Press(BenchLayout.BrushRest), Dt);
         var rust = shop.Bench!.Dirt(RevolverParts.Cylinder)!;
-        for (var y = -10; y <= 10 && !rust.IsClean; y++)
+        for (var y = -(PlaceholderParts.Cylinder.Height / 2); y <= PlaceholderParts.Cylinder.Height / 2 && !rust.IsClean; y++)
         {
-            for (var x = -13; x <= 13; x += 2)
+            for (var x = -(PlaceholderParts.Cylinder.Width / 2); x <= PlaceholderParts.Cylinder.Width / 2; x += 2)
             {
                 shop.Step(Hold(BenchLayout.CylinderOut + new Vector2(x, y)), Dt);
                 seen |= shop.Events;

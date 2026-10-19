@@ -265,10 +265,10 @@ public sealed class LudumDare60GameTests
         for (var pass = 0; pass < 4 && !Rust.IsClean; pass++)
         {
             _platform.Frame(Step, PointerDown(BenchLayout.BrushRest));
-            for (var y = -9; y <= 9 && !Rust.IsClean; y += 2)
+            for (var y = 1 - (PlaceholderParts.Cylinder.Height / 2); y <= (PlaceholderParts.Cylinder.Height / 2) - 1 && !Rust.IsClean; y += 2)
             {
-                _platform.Frame(Step, PointerMove(center + new Vector2(-13, y)));
-                _platform.Frame(Step, PointerMove(center + new Vector2(13, y)));
+                _platform.Frame(Step, PointerMove(center + new Vector2(-(PlaceholderParts.Cylinder.Width / 2), y)));
+                _platform.Frame(Step, PointerMove(center + new Vector2(PlaceholderParts.Cylinder.Width / 2, y)));
             }
 
             // Put the brush back where it lies out of the way, not on the cylinder.
@@ -602,9 +602,9 @@ public sealed class LudumDare60GameTests
         Assert.Equal(0, AlphaAt(pixels, PlaceholderParts.Width, (int)pinHead.X, (int)pinHead.Y));
         Assert.Equal(255, AlphaAt(pixels, PlaceholderParts.Width, 50, 18));
 
-        // The barrel's top edge is at row 14: its glow one row above, none inside.
-        Assert.Equal(255, AlphaAt(pixels, PlaceholderParts.Width, glow.X + 51, glow.Y + 14));
-        Assert.Equal(0, AlphaAt(pixels, PlaceholderParts.Width, glow.X + 51, glow.Y + 19));
+        // The barrel's top edge is at row 7: its glow one row above, none inside.
+        Assert.Equal(255, AlphaAt(pixels, PlaceholderParts.Width, glow.X + 51, glow.Y + 7));
+        Assert.Equal(0, AlphaAt(pixels, PlaceholderParts.Width, glow.X + 51, glow.Y + 12));
     }
 
     [Fact]
