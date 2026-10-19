@@ -41,6 +41,16 @@ public sealed class LudumDare60Game : IGame
     /// </summary>
     public static readonly Color MatColor = Color.FromRgb(0x0b4f45);
 
+    // The loading screen: the page's own "Loading..." colours, a bar in the middle of the virtual screen.
+    private static readonly Color LoadingColor = Color.FromRgb(0x000000);
+    private static readonly Color LoadingTrackColor = Color.FromRgb(0x24303a);
+    private static readonly Color LoadingFillColor = Color.FromRgb(0xc4d8e8);
+    private const int LoadingBarWidth = 200;
+    private const int LoadingBarHeight = 6;
+    private const int LoadingShineWidth = 24;
+    private const float LoadingShineSeconds = 1.5f;
+    private const byte LoadingShineAlpha = 0x50;
+
     /// <summary>
     /// Where the top-left corner of the street is drawn, in virtual pixels: raised so that the embankment with its
     /// lamps, railing and reflections fills the window panes and the door glass of the room.
@@ -164,6 +174,9 @@ public sealed class LudumDare60Game : IGame
     private Texture[] _dirtTextures = [];
     private bool[] _hasDirtTexture = [];
 
+    // Seconds spent on the loading screen: moves the shine along the bar while one big file is still coming.
+    private float _loadingSeconds;
+
     // Every part of the revolver that has a place on the bench, back to front as the gun draws them: its layout, and
     // its index in the bench, or -1 for a part the order keeps fixed.
     private PartLayout[] _drawLayouts = [];
@@ -178,6 +191,39 @@ public sealed class LudumDare60Game : IGame
     /// Whether the street seen through the windows is loaded and drawn.
     /// </summary>
     public bool HasStreet { get; private set; }
+
+    /// <summary>
+    /// Whether the shop waits for every file the game requests before it opens, with a loading screen until then. On by
+    /// default; tests that leave the room and the street out on purpose turn it off.
+    /// </summary>
+    public bool WaitsForAssets { get; init; } = true;
+
+    /// <summary>
+    /// Whether the game shows its loading screen: it waits for assets and some are not in yet.
+    /// </summary>
+    public bool IsLoading => WaitsForAssets && LoadedAssetCount < AssetCount;
+
+    /// <summary>
+    /// Share of the requested files that are in, from 0 to 1: the length of the loading bar.
+    /// </summary>
+    public float LoadProgress => (float)LoadedAssetCount / AssetCount;
+
+    // The room, the street, a sheet per customer look, and orders.json.
+    private int AssetCount => 3 + _customerImages.Length;
+
+    private int LoadedAssetCount
+    {
+        get
+        {
+            var count = (HasBackground ? 1 : 0) + (HasStreet ? 1 : 0);
+            foreach (var loaded in _hasCustomerSheet)
+            {
+                count += loaded ? 1 : 0;
+            }
+
+            return count + (_hasOrders || (_assets is not null && _assets.GetState(_ordersHandle) == AssetState.Loaded) ? 1 : 0);
+        }
+    }
 
     /// <summary>
     /// Whether the debug keys work: 1 to 9 bring in the customer of that order at once, 0 brings the current one in
@@ -285,7 +331,12 @@ public sealed class LudumDare60Game : IGame
         }
 
         ThrowIfAnyAssetFailed();
-        if (!_hasOrders)
+        UploadLoadedImages();
+        if (IsLoading)
+        {
+            _loadingSeconds += (float)context.DeltaTime;
+        }
+        else if (!_hasOrders)
         {
             TakeOrders();
         }
@@ -296,34 +347,6 @@ public sealed class LudumDare60Game : IGame
         }
 
         UploadScrubbedDirt();
-        if (!HasBackground && _assets!.TryGet(_benchImage, out var bench))
-        {
-            // The texture keeps no copy of the pixels, and nothing reads them back, so the image can go.
-            _bench = _graphics!.CreateTexture(bench);
-            _assets.Release(_benchImage);
-            HasBackground = true;
-        }
-
-        if (!HasStreet && _assets!.TryGet(_streetImage, out var street))
-        {
-            _street = _graphics!.CreateTexture(street);
-            _assets.Release(_streetImage);
-            HasStreet = true;
-        }
-
-        for (var i = 0; i < _customerImages.Length; i++)
-        {
-            if (!_hasCustomerSheet[i] && _assets!.TryGet(_customerImages[i], out var sheet))
-            {
-                _customerSheets[i] = _graphics!.CreateTexture(sheet);
-                // A bust is cut off at the bottom, so its glow is open there; a parcel is whole and glows all around.
-                var openBottom = !CustomerSeats.TryGetFixedPlace(AssetPaths.CustomerSheets[i].Key, out _);
-                _customerGlows[i] = _graphics.CreateTexture(CustomerSheet.CreateGlow(sheet, openBottom));
-                _assets.Release(_customerImages[i]);
-                _hasCustomerSheet[i] = true;
-            }
-        }
-
         if (_hasScrubVoice && Bench is { } orderBench)
         {
             // Louder and a little higher the faster the bristles move over the part; dirt rasps more than bare steel.
@@ -440,6 +463,12 @@ public sealed class LudumDare60Game : IGame
     public void Render(SpriteBatch batch)
     {
         ArgumentNullException.ThrowIfNull(batch);
+        if (IsLoading)
+        {
+            DrawLoading(batch);
+            return;
+        }
+
         batch.Clear(MatColor);
         if (HasStreet)
         {
@@ -551,6 +580,66 @@ public sealed class LudumDare60Game : IGame
     }
 
     private static byte Blink(float hint) => (int)(hint * HintBlinkRate) % 2 == 0 ? GlowActive : GlowHintLow;
+
+    /// <summary>
+    /// The loading screen: a bar in the middle of a dark screen that fills as files come in, with a shine running along
+    /// it so a slow download still looks alive.
+    /// </summary>
+    private void DrawLoading(SpriteBatch batch)
+    {
+        batch.Clear(LoadingColor);
+        if (!_hasSheets)
+        {
+            return;
+        }
+
+        var left = new Vector2((VirtualWidth - LoadingBarWidth) / 2f, (VirtualHeight - LoadingBarHeight) / 2f);
+        DrawBar(batch, left, LoadingBarWidth, LoadingTrackColor);
+        DrawBar(batch, left, LoadingBarWidth * LoadProgress, LoadingFillColor);
+        var lap = _loadingSeconds / LoadingShineSeconds % 1f;
+        var shine = lap * (LoadingBarWidth - LoadingShineWidth);
+        DrawBar(batch, left + new Vector2(shine, 0), LoadingShineWidth, LoadingFillColor.WithAlpha(LoadingShineAlpha));
+    }
+
+    private void DrawBar(SpriteBatch batch, Vector2 at, float width, Color color)
+    {
+        var scale = new Vector2(width / PlaceholderParts.Pixel.Width, (float)LoadingBarHeight / PlaceholderParts.Pixel.Height);
+        batch.Draw(_parts, PlaceholderParts.Pixel, at, new SpriteOptions { Scale = scale, Tint = color });
+    }
+
+    /// <summary>
+    /// Turns the images that finished loading into textures, and lets go of the images.
+    /// </summary>
+    private void UploadLoadedImages()
+    {
+        if (!HasBackground && _assets!.TryGet(_benchImage, out var bench))
+        {
+            // The texture keeps no copy of the pixels, and nothing reads them back, so the image can go.
+            _bench = _graphics!.CreateTexture(bench);
+            _assets.Release(_benchImage);
+            HasBackground = true;
+        }
+
+        if (!HasStreet && _assets!.TryGet(_streetImage, out var street))
+        {
+            _street = _graphics!.CreateTexture(street);
+            _assets.Release(_streetImage);
+            HasStreet = true;
+        }
+
+        for (var i = 0; i < _customerImages.Length; i++)
+        {
+            if (!_hasCustomerSheet[i] && _assets!.TryGet(_customerImages[i], out var sheet))
+            {
+                _customerSheets[i] = _graphics!.CreateTexture(sheet);
+                // A bust is cut off at the bottom, so its glow is open there; a parcel is whole and glows all around.
+                var openBottom = !CustomerSeats.TryGetFixedPlace(AssetPaths.CustomerSheets[i].Key, out _);
+                _customerGlows[i] = _graphics.CreateTexture(CustomerSheet.CreateGlow(sheet, openBottom));
+                _assets.Release(_customerImages[i]);
+                _hasCustomerSheet[i] = true;
+            }
+        }
+    }
 
     /// <summary>
     /// Stops the game when a file it requested failed to load, naming the first one in request order. The game needs every

@@ -97,4 +97,19 @@ public sealed class PlaceholderPartsTests
         Assert.False(shape.Contains(new Vector2(1, PlaceholderParts.Mainspring.Height - 1) - PlaceholderParts.MainspringOrigin));
         Assert.False(shape.Contains(new Vector2(PlaceholderParts.Mainspring.Width - 1, 1) - PlaceholderParts.MainspringOrigin));
     }
+
+    [Fact]
+    public void Pixel_IsOpaqueWhite()
+    {
+        var sheet = PlaceholderParts.Create();
+        var pixel = PlaceholderParts.Pixel;
+        for (var y = pixel.Y; y < pixel.Bottom; y++)
+        {
+            for (var x = pixel.X; x < pixel.Right; x++)
+            {
+                var at = ((y * sheet.Width) + x) * Image.BytesPerPixel;
+                Assert.Equal([255, 255, 255, 255], sheet.Pixels.Slice(at, 4).ToArray());
+            }
+        }
+    }
 }

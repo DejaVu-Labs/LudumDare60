@@ -36,9 +36,9 @@ public sealed class LudumDare60GameTests
     // Sound ids in creation order.
     private const int DoorBellSound = 2;
 
-    // The shipped data without the background, which has its own tests.
+    // The shipped data without the background, which has its own tests; so the shop must not wait for it.
     private readonly ManualPlatform _platform = new() { Assets = new ShippedAssets(withBackground: false) };
-    private readonly LudumDare60Game _game = new();
+    private readonly LudumDare60Game _game = new() { WaitsForAssets = false };
 
     public LudumDare60GameTests()
         => _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(_game, _platform);
@@ -379,6 +379,66 @@ public sealed class LudumDare60GameTests
         var error = Assert.Throws<InvalidOperationException>(() => platform.Frame(0));
 
         Assert.Equal($"{sheet} did not load.", error.Message);
+    }
+
+    [Fact]
+    public void Frame_AFileStillComing_ShowsLoadingBarAndKeepsShopClosed()
+    {
+        var assets = new ShippedAssets(withBackground: true, held: AssetPaths.Bench);
+        var platform = new ManualPlatform { Assets = assets };
+        var game = new LudumDare60Game();
+        _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(game, platform);
+
+        platform.Frame(0);
+
+        var assetCount = 3 + AssetPaths.CustomerSheets.Count;
+        Assert.True(game.IsLoading);
+        Assert.Equal((float)(assetCount - 1) / assetCount, game.LoadProgress, 5);
+        Assert.Null(game.Shop);
+        var frame = platform.Backend.Frames[^1];
+        Assert.NotNull(Sprite(frame, PlaceholderParts.Pixel));
+        Assert.Null(Sprite(frame, PlaceholderParts.Tray));
+    }
+
+    [Fact]
+    public void Frame_LastFileArrives_OpensShopAndDrawsScene()
+    {
+        var assets = new ShippedAssets(withBackground: true, held: AssetPaths.Bench);
+        var platform = new ManualPlatform { Assets = assets };
+        var game = new LudumDare60Game();
+        _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(game, platform);
+        platform.Frame(0);
+
+        assets.Release();
+        platform.Frame(0.1);
+
+        Assert.False(game.IsLoading);
+        Assert.Equal(1f, game.LoadProgress);
+        Assert.NotNull(game.Shop);
+        var frame = platform.Backend.Frames[^1];
+        Assert.Null(Sprite(frame, PlaceholderParts.Pixel));
+        Assert.NotNull(Sprite(frame, PlaceholderParts.Tray));
+    }
+
+    [Fact]
+    public void Frame_AllFilesInFirstFrame_OpensShopAtOnce()
+    {
+        var (platform, game) = StartWithShippedAssets();
+
+        platform.Frame(0);
+
+        Assert.False(game.IsLoading);
+        Assert.NotNull(game.Shop);
+    }
+
+    [Fact]
+    public void Frame_NotWaitingForAssets_OpensShopWithoutBackground()
+    {
+        _platform.Frame(0);
+
+        Assert.False(_game.IsLoading);
+        Assert.False(_game.HasBackground);
+        Assert.NotNull(_game.Shop);
     }
 
     [Fact]
@@ -1348,14 +1408,27 @@ public sealed class LudumDare60GameTests
     /// failed read would stop the game.</param>
     /// <param name="firstLook">When set, the first order's customer has this look instead of hoodie.</param>
     /// <param name="failing">When set, the read of this file fails.</param>
-    private sealed class ShippedAssets(bool withBackground, string? firstLook = null, string? failing = null) : IAssetSource
+    /// <param name="held">When set, the read of this file finishes only on <see cref="Release"/>.</param>
+    private sealed class ShippedAssets(bool withBackground, string? firstLook = null, string? failing = null, string? held = null) : IAssetSource
     {
+        private readonly TaskCompletionSource<byte[]> _held = new();
+
+        /// <summary>
+        /// Finishes the read of the held file.
+        /// </summary>
+        public void Release() => _held.SetResult(Read(held!));
+
         // Reads finish at once, so a file requested in Initialize is loaded in the first frame.
         public Task<byte[]> ReadAsync(string path)
         {
             if (string.Equals(path, failing, StringComparison.Ordinal))
             {
                 return Task.FromException<byte[]>(new FileNotFoundException(path));
+            }
+
+            if (string.Equals(path, held, StringComparison.Ordinal))
+            {
+                return _held.Task;
             }
 
             if (!withBackground && (string.Equals(path, AssetPaths.Bench, StringComparison.Ordinal) || string.Equals(path, AssetPaths.Street, StringComparison.Ordinal)))

@@ -115,6 +115,12 @@ internal static class PlaceholderParts
     public static readonly IntRect TrayGlow = Around(Tray, TrayWidth, RowD);
 
     /// <summary>
+    /// A solid white block, scaled and tinted into bars (the loading screen). 4 by 4, so filtering at its edges never
+    /// reaches the transparent pixels around it.
+    /// </summary>
+    public static readonly IntRect Pixel = new(110, RowD, 4, 4);
+
+    /// <summary>
     /// The middle of the bristles, in brush pixels: the point that scrubs.
     /// </summary>
     public static readonly Vector2 BrushOrigin = new(3, 3);
@@ -299,6 +305,7 @@ internal static class PlaceholderParts
         Fill(pixels, MainspringBroken, (x, y) => MainspringColor(x, y, broken: true));
         Fill(pixels, OilCan, OilCanColor);
         Fill(pixels, Tray, TrayColor);
+        Fill(pixels, Pixel, static (_, _) => Color.White);
         FillGlow(pixels, BodyGlow, IsBody);
         FillGlow(pixels, PinGlow, IsPin);
         FillGlow(pixels, CylinderGlow, IsCylinder);

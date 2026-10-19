@@ -461,8 +461,15 @@ export function boot(frameworkRoot = './_framework/', statusId = 'status', repor
   const reporter = startReporting(new URL(reportingConfig, document.baseURI).href, log);
   log.step(STEP.BOOT);
   return runWithStatus(
-    (onReady) =>
-      startRuntime(
+    (onReady) => {
+      // "Loading..." stays until the game has drawn a frame: after the runtime starts, Main still imports the
+      // platform's modules, and the canvas would be black meanwhile. From then on the game shows its own loading screen.
+      log.subscribe((entry) => {
+        if (entry.kind === 'step' && entry.message === STEP.FIRST_FRAME) {
+          onReady();
+        }
+      });
+      return startRuntime(
         resolveRuntimeUrl(frameworkRoot, document.baseURI),
         async (url) => {
           const runtime = await import(url);
@@ -472,7 +479,6 @@ export function boot(frameworkRoot = './_framework/', statusId = 'status', repor
         () => {
           log.downloads('/_framework/', 'runtime downloaded');
           log.step(STEP.RUNTIME_CREATED);
-          onReady();
         },
         (dotnet) =>
           dotnet.withResourceLoader(
@@ -482,7 +488,8 @@ export function boot(frameworkRoot = './_framework/', statusId = 'status', repor
               (name, attempt, delayMs, reason) => log.retry(name, attempt, RETRY_DELAYS_MS.length, delayMs, reason),
             ),
           ),
-      ),
+      );
+    },
     document.getElementById(statusId),
   ).catch(async (error) => {
     reporter.captureError(error, 'boot');
