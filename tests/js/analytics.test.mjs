@@ -185,6 +185,22 @@ test('createAnalytics_SdkFailsToLoad_DropsEvents', async (t) => {
   assert.equal(timers.active.size, 0);
 });
 
+test('createAnalytics_SdkReadinessThrows_EventsWaitInsteadOfThrowingIntoTheGame', async () => {
+  const sdk = fakeSdk();
+  sdk.isSdkReady = () => {
+    throw new Error('broken SDK');
+  };
+  const timers = fakeTimers();
+  const analytics = createAnalytics(Promise.resolve(CONFIG), async () => sdk, timers);
+  await analytics.started;
+
+  analytics.design('Game:Ready', 1);
+  analytics.progression(PROGRESSION.START, 'Order', 'hoodie', null);
+  timers.tick();
+
+  assert.equal(callsOf(sdk.calls, 'addDesignEvent').length, 0);
+});
+
 test('createAnalytics_EventsBeforeTheSession_QueuesThemUntilTheSdkIsReady', async () => {
   const sdk = fakeSdk();
   const timers = fakeTimers();

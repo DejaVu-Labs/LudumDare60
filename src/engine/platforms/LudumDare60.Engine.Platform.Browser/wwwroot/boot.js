@@ -1,8 +1,8 @@
 // @ts-check
 
-import { captureFatal, startAnalytics } from './analytics.js';
 import { getLoadLog, STEP } from './load-log.js';
-import { startReporting } from './reporting.js';
+
+/** @typedef {import('./reporting.js').Reporter} Reporter */
 
 /**
  * Starts the .NET runtime and runs the app's `Main`. The host page's `main.js` calls `boot` with the folder that
@@ -10,6 +10,37 @@ import { startReporting } from './reporting.js';
  * A page element with id `status` (optional) shows loading text until the runtime is ready, and an error message if
  * startup or the game fails.
  */
+
+/**
+ * Stands in for the error reporter when `reporting.js` does not load or start.
+ *
+ * @type {Pick<Reporter, 'captureError' | 'idle'>}
+ */
+export const NO_REPORTER = Object.freeze({ captureError() {}, idle: Promise.resolve() });
+
+/** How long a repair waits for pending error reports before it reloads the page, in milliseconds. */
+export const REPORT_WAIT_MS = 3000;
+
+/**
+ * Imports an optional module (error reporting, product analytics) and starts it, without the game depending on it:
+ * a module that does not load (a content blocker stripping a file named like a tracker, a dropped connection) or a
+ * start that throws gives `fallback` instead, with a console warning. The game starts either way.
+ *
+ * @template M, T
+ * @param {() => Promise<M>} importModule Usually `() => import('./module.js')`.
+ * @param {(module: M) => T} start
+ * @param {T} fallback
+ * @returns {Promise<T>}
+ */
+export function startOptional(importModule, start, fallback) {
+  return Promise.resolve()
+    .then(importModule)
+    .then(start)
+    .catch((error) => {
+      console.warn('[boot] an optional module did not start; the game goes on without it:', error);
+      return fallback;
+    });
+}
 
 /** Shown in the status element when startup or the game fails. Details go to the console. */
 export const ERROR_TEXT = 'Something went wrong. Reload the page to try again.';
@@ -468,8 +499,21 @@ export function boot(
   analyticsConfig = './analytics.json',
 ) {
   const log = getLoadLog();
-  const reporter = startReporting(new URL(reportingConfig, document.baseURI).href, log);
-  startAnalytics(new URL(analyticsConfig, document.baseURI).href);
+  // Reporting and analytics are optional: blocked or broken, they never stop the game from starting.
+  /** @type {Promise<Pick<Reporter, 'captureError' | 'idle'>>} */
+  const reporterReady = startOptional(
+    () => import('./reporting.js'),
+    (module) => module.startReporting(new URL(reportingConfig, document.baseURI).href, log),
+    NO_REPORTER,
+  );
+  const analyticsReady = startOptional(
+    () => import('./analytics.js'),
+    (module) => {
+      module.startAnalytics(new URL(analyticsConfig, document.baseURI).href);
+      return module;
+    },
+    null,
+  );
   log.step(STEP.BOOT);
   return runWithStatus(
     (onReady) => {
@@ -503,7 +547,12 @@ export function boot(
     },
     document.getElementById(statusId),
   ).catch(async (error) => {
-    reporter.captureError(error, 'boot');
+    const reporter = await reporterReady;
+    try {
+      reporter.captureError(error, 'boot');
+    } catch {
+      // Reporting must never get in the way of the repair below.
+    }
     if (repairOnce(error, sessionStore())) {
       const status = document.getElementById(statusId);
       if (status !== null) {
@@ -516,10 +565,14 @@ export function boot(
         runtimeModuleUrls(importMap?.textContent ?? null, frameworkUrl, document.baseURI),
         (url, init) => fetch(url, init),
       );
-      await reporter.idle;
+      await Promise.race([reporter.idle, delay(REPORT_WAIT_MS)]);
       globalThis.location.reload();
     } else {
-      captureFatal(error);
+      try {
+        (await analyticsReady)?.captureFatal(error);
+      } catch {
+        // Analytics must never take the error text down with it.
+      }
     }
     throw error;
   });

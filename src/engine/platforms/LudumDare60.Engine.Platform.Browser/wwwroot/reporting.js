@@ -373,6 +373,8 @@ export function createReporter(config, deps) {
       } catch {
         // A blocked or failed report is not worth a console line of its own.
       }
+    }).catch(() => {
+      // A report that cannot even be built is dropped; the chain stays usable for the next one.
     });
   }
 

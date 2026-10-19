@@ -91,9 +91,10 @@ public sealed class BrowserPlatform(
     {
         ArgumentNullException.ThrowIfNull(frameSink);
 
-        await ReportingInterop.ImportAsync();
+        // Error reporting and analytics are optional: blocked or broken, the game runs without them.
+        await OptionalImport.TryAsync(ReportingInterop.ImportAsync);
         ReportUnhandledExceptions();
-        await AnalyticsInterop.ImportAsync();
+        await OptionalImport.TryAsync(AnalyticsInterop.ImportAsync);
         await _graphics.InitializeAsync(canvasId);
         await _audio.InitializeAsync();
         await FrameLoopInterop.ImportAsync();

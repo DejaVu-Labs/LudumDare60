@@ -162,7 +162,12 @@ export function createAnalytics(config, loadSdk, timers) {
   let timer = null;
 
   function isReady() {
-    return sdk !== null && (typeof sdk.isSdkReady !== 'function' || sdk.isSdkReady(true, false));
+    try {
+      return sdk !== null && (typeof sdk.isSdkReady !== 'function' || sdk.isSdkReady(true, false));
+    } catch {
+      // A broken SDK is never ready: events wait in the bounded queue instead of throwing into the game.
+      return false;
+    }
   }
 
   function stopPolling() {

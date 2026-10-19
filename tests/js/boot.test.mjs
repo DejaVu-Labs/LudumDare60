@@ -21,7 +21,9 @@ import {
   runtimeModuleUrls,
   runWithStatus,
   setErrorText,
+  startOptional,
   startRuntime,
+  NO_REPORTER,
 } from '../../src/engine/platforms/LudumDare60.Engine.Platform.Browser/wwwroot/boot.js';
 
 const page = 'https://html-classic.itch.zone/html/123/index.html';
@@ -662,4 +664,45 @@ test('createRetryingFetch_NotFound_NoRetry', async () => {
 
   assert.equal(response.status, 404);
   assert.equal(requests.length, 1);
+});
+
+test('startOptional_ModuleLoadsAndStarts_ReturnsWhatStartReturns', async () => {
+  const started = await startOptional(async () => ({ name: 'reporting' }), (module) => `${module.name} started`, 'fallback');
+
+  assert.equal(started, 'reporting started');
+});
+
+test('startOptional_ModuleBlocked_ReturnsTheFallbackWithAWarning', async (t) => {
+  const warn = t.mock.method(console, 'warn', () => {});
+
+  const started = await startOptional(
+    async () => {
+      throw new TypeError('Failed to fetch dynamically imported module: analytics.js');
+    },
+    () => 'started',
+    NO_REPORTER,
+  );
+
+  assert.equal(started, NO_REPORTER);
+  assert.equal(warn.mock.callCount(), 1);
+});
+
+test('startOptional_StartThrows_ReturnsTheFallback', async (t) => {
+  t.mock.method(console, 'warn', () => {});
+
+  const started = await startOptional(
+    async () => ({}),
+    () => {
+      throw new Error('no fetch');
+    },
+    null,
+  );
+
+  assert.equal(started, null);
+});
+
+test('NO_REPORTER_StandsInForReporting_DoesNothingAndIsIdle', async () => {
+  NO_REPORTER.captureError(new Error('boom'), 'boot');
+
+  assert.equal(await NO_REPORTER.idle, undefined);
 });
