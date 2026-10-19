@@ -42,9 +42,9 @@ public sealed class LudumDare60Game : IGame
     public static readonly Color MatColor = Color.FromRgb(0x0b4f45);
 
     // The loading screen: the page's own "Loading..." colours, a bar in the middle of the virtual screen.
-    private static readonly Color s_LoadingColor = Color.FromRgb(0x000000);
-    private static readonly Color s_LoadingTrackColor = Color.FromRgb(0x24303a);
-    private static readonly Color s_LoadingFillColor = Color.FromRgb(0xc4d8e8);
+    private static readonly Color s_loadingColor = Color.FromRgb(0x000000);
+    private static readonly Color s_loadingTrackColor = Color.FromRgb(0x24303a);
+    private static readonly Color s_loadingFillColor = Color.FromRgb(0xc4d8e8);
     private const int LoadingBarWidth = 200;
     private const int LoadingBarHeight = 6;
     private const int LoadingShineWidth = 24;
@@ -587,18 +587,18 @@ public sealed class LudumDare60Game : IGame
     /// </summary>
     private void DrawLoading(SpriteBatch batch)
     {
-        batch.Clear(s_LoadingColor);
+        batch.Clear(s_loadingColor);
         if (!_hasSheets)
         {
             return;
         }
 
         var left = new Vector2((VirtualWidth - LoadingBarWidth) / 2f, (VirtualHeight - LoadingBarHeight) / 2f);
-        DrawBar(batch, left, LoadingBarWidth, s_LoadingTrackColor);
-        DrawBar(batch, left, LoadingBarWidth * LoadProgress, s_LoadingFillColor);
+        DrawBar(batch, left, LoadingBarWidth, s_loadingTrackColor);
+        DrawBar(batch, left, LoadingBarWidth * LoadProgress, s_loadingFillColor);
         var lap = _loadingSeconds / LoadingShineSeconds % 1f;
         var shine = lap * (LoadingBarWidth - LoadingShineWidth);
-        DrawBar(batch, left + new Vector2(shine, 0), LoadingShineWidth, s_LoadingFillColor.WithAlpha(LoadingShineAlpha));
+        DrawBar(batch, left + new Vector2(shine, 0), LoadingShineWidth, s_loadingFillColor.WithAlpha(LoadingShineAlpha));
     }
 
     private void DrawBar(SpriteBatch batch, Vector2 at, float width, Color color)
