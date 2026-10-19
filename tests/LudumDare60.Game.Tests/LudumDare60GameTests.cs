@@ -632,17 +632,17 @@ public sealed class LudumDare60GameTests
     {
         StartWithSound();
         var elephant = (ShopDecor.ElephantMin + ShopDecor.ElephantMax) / 2;
-        int Trumpets() => _platform.AudioBackend.AllCommands().Count(c => c.Kind == AudioCommandKind.Play && (int)c.Arguments[0] == ElephantSound);
+        int trumpets() => _platform.AudioBackend.AllCommands().Count(c => c.Kind == AudioCommandKind.Play && (int)c.Arguments[0] == ElephantSound);
 
         _platform.Frame(Step, PointerDown(elephant));
         _platform.Frame(Step, PointerUp(elephant));
         _platform.Frame(Step, PointerDown(elephant));
         _platform.Frame(Step, PointerUp(elephant));
-        Assert.Equal(1, Trumpets());
+        Assert.Equal(1, trumpets());
 
         Idle((int)(ShopDecor.ElephantSeconds * 60) + 1);
         _platform.Frame(Step, PointerDown(elephant));
-        Assert.Equal(2, Trumpets());
+        Assert.Equal(2, trumpets());
         Assert.Equal(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "assets", AssetPaths.ElephantSound)), _platform.AudioBackend.Sounds[ElephantSound]);
     }
 
