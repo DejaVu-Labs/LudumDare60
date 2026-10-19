@@ -152,6 +152,8 @@ public sealed class LudumDare60Game : IGame
     private bool _hasSheets;
     private Sound _click;
     private Sound _scrubLoop;
+    private AssetHandle<byte[]> _scrubSound;
+    private bool _hasScrubSound;
     private Sound _doorBell;
     private bool _hasSounds;
     private Voice _scrubVoice;
@@ -244,14 +246,14 @@ public sealed class LudumDare60Game : IGame
     /// </summary>
     public float LoadProgress => (float)LoadedAssetCount / AssetCount;
 
-    // The room, the street, a sheet per customer look, and orders.json.
-    private int AssetCount => 3 + _customerImages.Length;
+    // The room, the street, a sheet per customer look, orders.json and the scrub sound.
+    private int AssetCount => 4 + _customerImages.Length;
 
     private int LoadedAssetCount
     {
         get
         {
-            var count = (HasBackground ? 1 : 0) + (HasStreet ? 1 : 0);
+            var count = (HasBackground ? 1 : 0) + (HasStreet ? 1 : 0) + (_hasScrubSound ? 1 : 0);
             foreach (var loaded in _hasCustomerSheet)
             {
                 count += loaded ? 1 : 0;
@@ -318,6 +320,7 @@ public sealed class LudumDare60Game : IGame
         }
 
         _ordersHandle = assets.Request<OrderBook>(AssetPaths.Orders);
+        _scrubSound = assets.Request<byte[]>(AssetPaths.ScrubSound);
     }
 
     public void FixedUpdate(in FrameContext context)
@@ -381,18 +384,19 @@ public sealed class LudumDare60Game : IGame
     {
         if (!_hasSheets)
         {
-            // Textures and sounds can be created from the first frame on.
+            // Textures and sounds can be created from the first frame on. The scrub loop comes from its file once it
+            // is in (see UseLoadedSounds).
             _parts = _graphics!.CreateTexture(PlaceholderParts.Create());
             _customers = _graphics.CreateTexture(PlaceholderCustomers.Create());
             _hasSheets = true;
             _click = _audio!.CreateSound(PlaceholderSounds.CreateClick());
-            _scrubLoop = _audio.CreateSound(PlaceholderSounds.CreateScrubLoop());
             _doorBell = _audio.CreateSound(PlaceholderSounds.CreateDoorBell());
             _hasSounds = true;
         }
 
         ThrowIfAnyAssetFailed();
         UploadLoadedImages();
+        UseLoadedSounds();
         if (IsLoading)
         {
             _loadingSeconds += (float)context.DeltaTime;
@@ -770,6 +774,21 @@ public sealed class LudumDare60Game : IGame
     /// file: the platform has already retried the download, so a failure means the player's network or the build is
     /// broken, and stopping shows the error text and reports it, where going on would show a scene with a missing layer.
     /// </summary>
+    /// <summary>
+    /// Creates the scrub loop once <see cref="AssetPaths.ScrubSound"/> is in. The loading screen waits for it, so the
+    /// brush cannot be in the hand before; without it (a test that skips the files) the brush is silent.
+    /// </summary>
+    private void UseLoadedSounds()
+    {
+        if (!_hasScrubSound && _assets!.TryGet(_scrubSound, out var scrub))
+        {
+            // The audio device decodes its own copy, so the file can go.
+            _scrubLoop = _audio!.CreateSound(scrub);
+            _assets.Release(_scrubSound);
+            _hasScrubSound = true;
+        }
+    }
+
     private void ThrowIfAnyAssetFailed()
     {
         // Loaded images are released, so only the ones still waiting are checked.
@@ -794,6 +813,11 @@ public sealed class LudumDare60Game : IGame
         if (!_hasOrders)
         {
             ThrowIfFailed(_ordersHandle);
+        }
+
+        if (!_hasScrubSound)
+        {
+            ThrowIfFailed(_scrubSound);
         }
     }
 
@@ -1301,7 +1325,7 @@ public sealed class LudumDare60Game : IGame
         if ((events & BrushEvents.PickedUp) != BrushEvents.None)
         {
             PlaySound(s_brushPickUp);
-            if (!_hasScrubVoice)
+            if (!_hasScrubVoice && _hasScrubSound)
             {
                 // Silent until the bristles move over a part; Update sets the volume every frame.
                 _scrubVoice = _audio!.PlayLoop(_scrubLoop, AudioBus.Sfx, s_silent);

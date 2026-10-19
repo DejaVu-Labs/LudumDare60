@@ -33,8 +33,9 @@ public sealed class LudumDare60GameTests
     // drawn customer.
     private static readonly int s_startTextures = 2 + (2 * AssetPaths.CustomerSheets.Count);
 
-    // Sound ids in creation order.
-    private const int DoorBellSound = 2;
+    // Sound ids in creation order: the click and the door bell on the first frame, then the scrub loop from its file.
+    private const int DoorBellSound = 1;
+    private const int ScrubSound = 2;
 
     // The shipped data without the background, which has its own tests; so the shop must not wait for it.
     private readonly ManualPlatform _platform = new() { Assets = new ShippedAssets(withBackground: false) };
@@ -393,7 +394,7 @@ public sealed class LudumDare60GameTests
 
         platform.Frame(0);
 
-        var assetCount = 3 + AssetPaths.CustomerSheets.Count;
+        var assetCount = 4 + AssetPaths.CustomerSheets.Count;
         Assert.True(game.IsLoading);
         Assert.Equal((float)(assetCount - 1) / assetCount, game.LoadProgress, 5);
         Assert.Null(game.Shop);
@@ -602,7 +603,7 @@ public sealed class LudumDare60GameTests
     }
 
     [Fact]
-    public void FirstFrame_CreatesTheClickTheScrubLoopAndTheDoorBellAsWav()
+    public void FirstFrame_CreatesTheClickTheDoorBellAndTheScrubLoopAsWav()
     {
         _platform.Frame(0);
 
@@ -612,6 +613,28 @@ public sealed class LudumDare60GameTests
         Assert.Equal("WAVE"u8.ToArray(), click[8..12]);
         Assert.Equal(44 + (PlaceholderSounds.SampleRate * 60 / 1000 * 2), click.Length);
         Assert.Equal(PlaceholderSounds.CreateDoorBell(), _platform.AudioBackend.Sounds[DoorBellSound]);
+    }
+
+    [Fact]
+    public void ScrubSoundLoaded_CreatesTheScrubLoopFromTheFile()
+    {
+        _platform.Frame(0);
+        _platform.Frame(0.01);
+
+        var recording = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "assets", AssetPaths.ScrubSound));
+        Assert.Equal(recording, _platform.AudioBackend.Sounds[ScrubSound]);
+        Assert.Equal(3, _platform.AudioBackend.Sounds.Count);
+    }
+
+    [Fact]
+    public void FirstFrame_ScrubSoundFails_StopsTheGameNamingIt()
+    {
+        var platform = new ManualPlatform { Assets = new ShippedAssets(withBackground: true, failing: AssetPaths.ScrubSound) };
+        _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(new LudumDare60Game { WaitsForPlayer = false }, platform);
+
+        var error = Assert.Throws<InvalidOperationException>(() => platform.Frame(0));
+
+        Assert.Equal($"{AssetPaths.ScrubSound} did not load.", error.Message);
     }
 
     [Fact]
@@ -1057,7 +1080,7 @@ public sealed class LudumDare60GameTests
         Assert.True(Bench.Brush.IsHeld);
         Assert.Equal(new Vector2(400, 200), Drawn(LastFrame, PlaceholderParts.Brush).Position);
         var loop = Assert.Single(_platform.AudioBackend.AllCommands(), c => c.Kind == AudioCommandKind.PlayLoop);
-        Assert.Equal(1, loop.Arguments[1]);
+        Assert.Equal(ScrubSound, loop.Arguments[1]);
         Assert.All(VoiceVolumes(), volume => Assert.Equal(0, volume));
     }
 

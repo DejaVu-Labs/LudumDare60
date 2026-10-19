@@ -17,6 +17,12 @@ public static class AssetPaths
     public const string Street = "backgrounds/street.png";
 
     /// <summary>
+    /// The wire brush over a part, a seamless loop the game plays while the brush is in the hand, louder and higher the
+    /// faster it rubs. Cut from a CC0 recording (Freesound 379919, steel brush on an aluminium tube).
+    /// </summary>
+    public const string ScrubSound = "sounds/scrub.wav";
+
+    /// <summary>
     /// Every customer's order, in the order they come in (see <see cref="Orders.OrderBook"/>).
     /// </summary>
     public const string Orders = "data/orders.json";

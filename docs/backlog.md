@@ -111,9 +111,11 @@ Customers come in, hand over the revolver and take it back (`Customers/Shop`, se
 Scrubbing works on order 1's cylinder (`Cleaning/DirtLayer`, see [concepts.md](gamedesign/concepts.md#rendering)).
 Still to do:
 
-- Record a wire brush on rusty steel (and on clean steel) to replace the synthesized scrub loop
-  (`PlaceholderSounds.CreateScrubLoop`); keep it a seamless loop that sounds steady at any speed, since the game
-  drives its volume and pitch.
+- The scrub loop is a recording now (`assets/sounds/scrub.wav`: 2 s cut from 3.2 s into Freesound 379919, a steel
+  brush on an aluminium tube, CC0, crossfaded into a seamless loop, 48 kHz mono). Still missing: a separate take on
+  clean steel;
+  today clean steel only plays the same loop quieter and higher. In the Compo every sound must be our own: re-record
+  it then.
 - Hide the system cursor while the brush is in the hand (needs the cursor visibility command from
   [Platform commands](#platform-commands-game-to-platform)).
 - A dirty part brought to its rail could bounce back a little instead of only not sticking (core-loop step 4).
