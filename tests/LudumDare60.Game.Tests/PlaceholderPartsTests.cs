@@ -133,14 +133,19 @@ public sealed class PlaceholderPartsTests
         }
     }
 
-    public static TheoryData<string> Texts => ["PressAnyKey", "ToBeContinued"];
+    public static TheoryData<string> Texts => ["PressAnyKey", "ToBeContinued", "Springs"];
 
     [Theory]
     [MemberData(nameof(Texts))]
     public void Text_HasWhiteLettersAndClearGaps(string name)
     {
         var sheet = PlaceholderParts.Create();
-        var text = string.Equals(name, "PressAnyKey", StringComparison.Ordinal) ? PlaceholderParts.PressAnyKey : PlaceholderParts.ToBeContinued;
+        var text = name switch
+        {
+            "PressAnyKey" => PlaceholderParts.PressAnyKey,
+            "ToBeContinued" => PlaceholderParts.ToBeContinued,
+            _ => PlaceholderParts.Springs,
+        };
         var lit = 0;
         for (var y = 0; y < text.Height; y++)
         {
@@ -167,6 +172,17 @@ public sealed class PlaceholderPartsTests
         Assert.True(ending.X > title.X + title.Width);
         Assert.True(ending.X + ending.Width <= PlaceholderParts.Width);
         Assert.True(ending.Y + ending.Height <= PlaceholderParts.Height);
+    }
+
+    [Fact]
+    public void Springs_LiesBesideToBeContinuedInsideTheSheet()
+    {
+        var ending = PlaceholderParts.ToBeContinued;
+        var label = PlaceholderParts.Springs;
+
+        Assert.True(label.X > ending.X + ending.Width);
+        Assert.True(label.X + label.Width <= PlaceholderParts.Width);
+        Assert.True(label.Y + label.Height <= PlaceholderParts.Height);
     }
 
     [Fact]

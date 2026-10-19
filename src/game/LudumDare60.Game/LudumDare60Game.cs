@@ -57,6 +57,8 @@ public sealed class LudumDare60Game : IGame
     private const float TitleTextY = 300;
     private const int TitleBandHeight = 22;
     private const float TitlePulseRate = 3;
+    // The tray's label: paper white, from the palette.
+    private static readonly Color s_trayLabelColor = Color.FromRgb(0xfaebbc);
     private static readonly Color s_titleBandColor = Color.FromRgb(0x000000).WithAlpha(0xa0);
 
     // The ending: a moment after the shop closes the room fades to black, then "TO BE CONTINUED" fades in, three times
@@ -647,7 +649,14 @@ public sealed class LudumDare60Game : IGame
         batch.Draw(_parts, PlaceholderParts.Tray, BenchLayout.TrayMin);
         if (shop.HasGun && _shownBench is { } bench)
         {
-            DrawRevolver(batch, bench);
+            DrawTraySpare(batch, bench);
+        }
+
+        // The label over the spare, so the spring never hides it.
+        batch.Draw(_parts, PlaceholderParts.Springs, BenchLayout.TrayLabel, new SpriteOptions { Tint = s_trayLabelColor });
+        if (shop.HasGun && _shownBench is { } gunBench)
+        {
+            DrawRevolver(batch, gunBench);
         }
 
         // The tools lie on top of everything, and in the hand they are above the parts they work on. They stay on the
@@ -662,10 +671,9 @@ public sealed class LudumDare60Game : IGame
     }
 
     /// <summary>
-    /// Draws what of the revolver lies on the bench: the spare in the tray, the parts in the gun and the ones loose on
-    /// the mat.
+    /// Draws the spare part in the tray: the whole one, or, once swapped, the broken part.
     /// </summary>
-    private void DrawRevolver(SpriteBatch batch, OrderBench bench)
+    private void DrawTraySpare(SpriteBatch batch, OrderBench bench)
     {
         if (bench.SparePart >= 0)
         {
@@ -673,7 +681,13 @@ public sealed class LudumDare60Game : IGame
             var inTray = bench.IsBroken(bench.SparePart) ? spare.Sprite : spare.BrokenSprite ?? spare.Sprite;
             batch.Draw(_parts, inTray, BenchLayout.TraySpare, new SpriteOptions { Origin = spare.Origin });
         }
+    }
 
+    /// <summary>
+    /// Draws what of the revolver lies on the bench: the parts in the gun and the ones loose on the mat.
+    /// </summary>
+    private void DrawRevolver(SpriteBatch batch, OrderBench bench)
+    {
         // Parts in the gun back to front: under the frame first, so what of them is still inside is hidden, then over
         // it, the hammer and the trigger turning around their pivots, and what sits on the hammer.
         var gun = BenchLayout.GunPosition + _gunOffset;

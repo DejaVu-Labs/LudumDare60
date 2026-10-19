@@ -131,6 +131,11 @@ public static class BenchLayout
     public static readonly Vector2 TrayMax = TrayMin + new Vector2(PlaceholderParts.Tray.Width, PlaceholderParts.Tray.Height);
 
     /// <summary>
+    /// The top-left corner of the tray's "SPRINGS" label, centered at the top of the tray, inside its rim.
+    /// </summary>
+    public static readonly Vector2 TrayLabel = TrayMin + new Vector2((PlaceholderParts.Tray.Width - PlaceholderParts.Springs.Width) / 2, 4);
+
+    /// <summary>
     /// Where the spare part in the tray lies, by its grab point.
     /// </summary>
     public static readonly Vector2 TraySpare = TrayMin + new Vector2(16, 18);

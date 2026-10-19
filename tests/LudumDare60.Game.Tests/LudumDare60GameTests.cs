@@ -1366,9 +1366,10 @@ public sealed class LudumDare60GameTests
         Assert.Null(Sprite(LastFrame, PlaceholderParts.Body));
         Assert.Null(Sprite(LastFrame, PlaceholderParts.Hammer));
 
-        // The tools stay on the bench where the player left them.
+        // The tools stay on the bench where the player left them, and the tray keeps its label.
         Assert.Equal(Shop.Brush.Position, Drawn(LastFrame, PlaceholderParts.Brush).Position);
         Assert.Equal(BenchLayout.TrayMin, Drawn(LastFrame, PlaceholderParts.Tray).Position);
+        Assert.Equal(BenchLayout.TrayLabel, Drawn(LastFrame, PlaceholderParts.Springs).Position);
     }
 
     [Fact]

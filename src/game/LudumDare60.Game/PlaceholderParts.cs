@@ -137,6 +137,11 @@ internal static class PlaceholderParts
     public static readonly IntRect ToBeContinued = new(88, RowD, (ToBeContinuedText.Length * 4) - 1, 5);
 
     /// <summary>
+    /// "SPRINGS" in white, in the same letters, the label on the tray of spares; tinted when drawn.
+    /// </summary>
+    public static readonly IntRect Springs = new(152, RowD, (SpringsText.Length * 4) - 1, 5);
+
+    /// <summary>
     /// The middle of the bristles, in brush pixels: the point that scrubs.
     /// </summary>
     public static readonly Vector2 BrushOrigin = new(10, 30);
@@ -283,8 +288,9 @@ internal static class PlaceholderParts
 
     private const string PressAnyKeyText = "PRESS ANY KEY TO PLAY";
     private const string ToBeContinuedText = "TO BE CONTINUED";
+    private const string SpringsText = "SPRINGS";
 
-    // Three by five letters, row by row from the top: the ones PressAnyKeyText and ToBeContinuedText need.
+    // Three by five letters, row by row from the top: the ones the texts above need.
     private static readonly Dictionary<char, string[]> s_letters = new()
     {
         ['A'] = [".#.", "#.#", "###", "#.#", "#.#"],
@@ -292,6 +298,7 @@ internal static class PlaceholderParts
         ['C'] = [".##", "#..", "#..", "#..", ".##"],
         ['D'] = ["##.", "#.#", "#.#", "#.#", "##."],
         ['E'] = ["###", "#..", "##.", "#..", "###"],
+        ['G'] = [".##", "#..", "#.#", "#.#", ".##"],
         ['I'] = ["###", ".#.", ".#.", ".#.", "###"],
         ['K'] = ["#.#", "#.#", "##.", "#.#", "#.#"],
         ['L'] = ["#..", "#..", "#..", "#..", "###"],
@@ -360,6 +367,7 @@ internal static class PlaceholderParts
         Fill(pixels, Pixel, static (_, _) => Color.White);
         Fill(pixels, PressAnyKey, static (x, y) => TextColor(PressAnyKeyText, x, y));
         Fill(pixels, ToBeContinued, static (x, y) => TextColor(ToBeContinuedText, x, y));
+        Fill(pixels, Springs, static (x, y) => TextColor(SpringsText, x, y));
         FillGlow(pixels, BodyGlow, IsBody);
         FillGlow(pixels, PinGlow, IsPin);
         FillGlow(pixels, CylinderGlow, IsCylinder);
