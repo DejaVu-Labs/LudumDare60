@@ -168,4 +168,30 @@ public sealed class PlaceholderPartsTests
         Assert.True(ending.X + ending.Width <= PlaceholderParts.Width);
         Assert.True(ending.Y + ending.Height <= PlaceholderParts.Height);
     }
+
+    [Fact]
+    public void CreateRust_CylinderAndHammer_AreEightyPercentOpaque()
+    {
+        foreach (var rust in new[] { PlaceholderParts.CreateCylinderRust(), PlaceholderParts.CreateHammerRust() })
+        {
+            var alphas = new HashSet<byte>();
+            for (var i = 3; i < rust.Pixels.Length; i += Image.BytesPerPixel)
+            {
+                alphas.Add(rust.Pixels[i]);
+            }
+
+            byte[] expected = [0, 204];
+            Assert.Equal(expected, alphas.Order().ToArray());
+        }
+    }
+
+    [Fact]
+    public void CreateGripPanelGrime_IsOpaque()
+    {
+        var grime = PlaceholderParts.CreateGripPanelGrime();
+        for (var i = 3; i < grime.Pixels.Length; i += Image.BytesPerPixel)
+        {
+            Assert.True(grime.Pixels[i] is 0 or 255);
+        }
+    }
 }

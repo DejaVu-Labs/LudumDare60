@@ -332,6 +332,11 @@ internal static class PlaceholderParts
     /// </summary>
     private const float GrimeCutoff = 0.35f;
 
+    /// <summary>
+    /// How opaque rust is, out of 255: 80%, so the part shows a little through it.
+    /// </summary>
+    private const byte RustAlpha = 204;
+
     public static Image Create()
     {
         var pixels = new byte[Width * Height * Image.BytesPerPixel];
@@ -369,17 +374,17 @@ internal static class PlaceholderParts
     /// Rust over the cylinder, for a <see cref="Cleaning.DirtLayer"/>: blotches over most of it, the cylinder's size and
     /// origin. The same pixels every time.
     /// </summary>
-    public static Image CreateCylinderRust() => CreateDirt(CylinderWidth, CylinderHeight, IsCylinder, s_rust, RustCutoff);
+    public static Image CreateCylinderRust() => CreateDirt(CylinderWidth, CylinderHeight, IsCylinder, s_rust, RustCutoff, RustAlpha);
 
     /// <summary>
     /// Rust over the hammer, the hammer's size and origin, like <see cref="CreateCylinderRust"/>.
     /// </summary>
-    public static Image CreateHammerRust() => CreateDirt(HammerWidth, HammerHeight, IsHammer, s_rust, RustCutoff);
+    public static Image CreateHammerRust() => CreateDirt(HammerWidth, HammerHeight, IsHammer, s_rust, RustCutoff, RustAlpha);
 
     /// <summary>
     /// Old oil and dirt over the grip panel, the panel's size and origin, like <see cref="CreateCylinderRust"/>.
     /// </summary>
-    public static Image CreateGripPanelGrime() => CreateDirt(PanelWidth, PanelHeight, IsGripPanel, s_grime, GrimeCutoff);
+    public static Image CreateGripPanelGrime() => CreateDirt(PanelWidth, PanelHeight, IsGripPanel, s_grime, GrimeCutoff, byte.MaxValue);
 
     /// <summary>
     /// The revolver's opaque pixels with the revolver at <paramref name="at"/>, asked with work surface points: what
@@ -432,9 +437,9 @@ internal static class PlaceholderParts
         => new(MainspringWidth, MainspringHeight, MainspringOrigin, (x, y) => IsMainspring(x, y, broken: false) || IsMainspring(x, y, broken: true), margin: 2);
 
     /// <summary>
-    /// Blotches of <paramref name="ramp"/> over the pixels of a part, the part's size.
+    /// Blotches of <paramref name="ramp"/> over the pixels of a part, the part's size, <paramref name="alpha"/> opaque.
     /// </summary>
-    private static Image CreateDirt(int width, int height, Func<int, int, bool> isPart, Color[] ramp, float cutoff)
+    private static Image CreateDirt(int width, int height, Func<int, int, bool> isPart, Color[] ramp, float cutoff, byte alpha)
     {
         var pixels = new byte[width * height * Image.BytesPerPixel];
         for (var y = 0; y < height; y++)
@@ -454,7 +459,7 @@ internal static class PlaceholderParts
                 pixels[i] = color.R;
                 pixels[i + 1] = color.G;
                 pixels[i + 2] = color.B;
-                pixels[i + 3] = color.A;
+                pixels[i + 3] = alpha;
             }
         }
 
