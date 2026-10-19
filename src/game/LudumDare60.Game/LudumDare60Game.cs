@@ -42,9 +42,9 @@ public sealed class LudumDare60Game : IGame
     public static readonly Color MatColor = Color.FromRgb(0x0b4f45);
 
     // The loading screen: the page's own "Loading..." colours, a bar in the middle of the virtual screen.
-    private static readonly Color LoadingColor = Color.FromRgb(0x000000);
-    private static readonly Color LoadingTrackColor = Color.FromRgb(0x24303a);
-    private static readonly Color LoadingFillColor = Color.FromRgb(0xc4d8e8);
+    private static readonly Color s_LoadingColor = Color.FromRgb(0x000000);
+    private static readonly Color s_LoadingTrackColor = Color.FromRgb(0x24303a);
+    private static readonly Color s_LoadingFillColor = Color.FromRgb(0xc4d8e8);
     private const int LoadingBarWidth = 200;
     private const int LoadingBarHeight = 6;
     private const int LoadingShineWidth = 24;
