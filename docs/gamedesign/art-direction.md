@@ -128,7 +128,11 @@ the left of the mat, under the lamp, clear of the revolver and of the parts take
 `assets/props/phone.png` (source `art/sprites/phone.png`), 42x39: the player's phone lying on the bench, screen up,
 showing a music player, cut from a concept on white and reduced like the tools. It lies on the wood right of the mat,
 near the bench's front corner (`ShopDecor.PhoneAt`, top-left (509, 287)), drawn right over the room, under everything
-else.
+else. It is the music player: it glows while the pointer rests on it, and each click plays the next track
+(`PhonePlayer`, `AssetPaths.MusicTracks`: a blues, then HoliznaCC0's "Everything You Ever Dreamed" and "2 Hour Delay"),
+crossfading over 1 s; the click after the last track fades the music out, back to the rain alone. The quiet rain
+loop plays under everything all the time. The tracks are mono 22.05 kHz Vorbis, 1.8 MB together against 15.7 MB for
+the originals, and the loading screen does not wait for them.
 
 ## Concept art prompts
 

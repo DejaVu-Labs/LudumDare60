@@ -118,6 +118,13 @@ public sealed class LudumDare60Game : IGame
     private static readonly SoundOptions s_doorBell = new() { Volume = 0.5f };
     private static readonly SoundOptions s_elephant = new() { Volume = 0.6f };
 
+    // A tap on the phone's glass: the metal click, high and soft.
+    private static readonly SoundOptions s_phoneTap = new() { Pitch = 1.8f, Volume = 0.5f };
+
+    // The phone's music at full volume, well over the rain; tracks crossfade over MusicFadeSeconds.
+    private const float MusicVolume = 1f;
+    private const float MusicFadeSeconds = 1;
+
     // The rain outside: barely there, under the room's own sounds.
     private static readonly SoundOptions s_rain = new() { Volume = 0.25f };
     private static readonly SoundOptions s_halfCock = new() { Pitch = 1.1f, Volume = 0.5f };
@@ -148,6 +155,16 @@ public sealed class LudumDare60Game : IGame
     private AssetHandle<Image> _benchImage;
     private AssetHandle<Image> _phoneImage;
     private Texture _phone;
+    private Texture _phoneGlow;
+
+    // The phone sprite's opaque pixels, row by row: what of it takes a click.
+    private bool[] _phoneMask = [];
+    private int _phoneWidth;
+    private bool _isPhoneHovered;
+    private readonly PhonePlayer _phonePlayer = new(AssetPaths.MusicTracks.Count);
+    private readonly AssetHandle<byte[]>[] _trackFiles = new AssetHandle<byte[]>[AssetPaths.MusicTracks.Count];
+    private readonly Sound[] _tracks = new Sound[AssetPaths.MusicTracks.Count];
+    private readonly bool[] _hasTrack = new bool[AssetPaths.MusicTracks.Count];
     private AssetHandle<Image> _streetImage;
     private AssetHandle<OrderBook> _ordersHandle;
     private bool _hasOrders;
@@ -344,6 +361,10 @@ public sealed class LudumDare60Game : IGame
         _scrubSound = assets.Request<byte[]>(AssetPaths.ScrubSound);
         _elephantFile = assets.Request<byte[]>(AssetPaths.ElephantSound);
         _rainFile = assets.Request<byte[]>(AssetPaths.RainAmbience);
+        for (var i = 0; i < _trackFiles.Length; i++)
+        {
+            _trackFiles[i] = assets.Request<byte[]>(AssetPaths.MusicTracks[i]);
+        }
     }
 
     public void FixedUpdate(in FrameContext context)
@@ -366,7 +387,9 @@ public sealed class LudumDare60Game : IGame
         shop.Step(PointerSample.From(context.Input), deltaTime);
         _shopAnalytics!.Observe(shop, deltaTime);
         PlayShopSounds(shop.Events);
-        TrumpetIfElephantPressed(PointerSample.From(context.Input), deltaTime);
+        var pointer = PointerSample.From(context.Input);
+        TrumpetIfElephantPressed(pointer, deltaTime);
+        UsePhone(pointer);
         _bodyHint = MathF.Max(0, _bodyHint - deltaTime);
         _hammerHint = MathF.Max(0, _hammerHint - deltaTime);
         if ((shop.Events & ShopEvents.Repaired) != ShopEvents.None)
@@ -594,6 +617,11 @@ public sealed class LudumDare60Game : IGame
 
         if (HasPhone)
         {
+            if (_isPhoneHovered)
+            {
+                batch.Draw(_phoneGlow, ShopDecor.PhoneAt - Vector2.One);
+            }
+
             batch.Draw(_phone, ShopDecor.PhoneAt);
         }
 
@@ -800,6 +828,15 @@ public sealed class LudumDare60Game : IGame
         if (!HasPhone && _assets!.TryGet(_phoneImage, out var phone))
         {
             _phone = _graphics!.CreateTexture(phone);
+            _phoneGlow = _graphics.CreateTexture(CreateGlow(phone));
+            _phoneWidth = phone.Width;
+            _phoneMask = new bool[phone.Width * phone.Height];
+            var pixels = phone.Pixels;
+            for (var i = 0; i < _phoneMask.Length; i++)
+            {
+                _phoneMask[i] = pixels[(i * Image.BytesPerPixel) + 3] >= 128;
+            }
+
             _assets.Release(_phoneImage);
             HasPhone = true;
         }
@@ -839,6 +876,62 @@ public sealed class LudumDare60Game : IGame
             _assets.Release(_rainFile);
             _hasRain = true;
         }
+
+        for (var i = 0; i < _trackFiles.Length; i++)
+        {
+            if (!_hasTrack[i] && _assets!.TryGet(_trackFiles[i], out var track))
+            {
+                _tracks[i] = _audio!.CreateSound(track);
+                _assets.Release(_trackFiles[i]);
+                _hasTrack[i] = true;
+                if (_phonePlayer.Track == i)
+                {
+                    // Clicked before its file was in.
+                    _audio.PlayMusic(_tracks[i], MusicFadeSeconds, MusicVolume);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// The phone takes the pointer where its sprite is opaque: it glows while the pointer rests on it, and a press
+    /// plays the next track, crossfading, or fades the music out after the last one.
+    /// </summary>
+    private void UsePhone(in PointerSample pointer)
+    {
+        var onPhone = HasPhone && PhonePlayer.IsOnPhone(pointer.Position, _phoneMask, _phoneWidth);
+        _isPhoneHovered = onPhone && !pointer.IsDown;
+        if (!onPhone || !pointer.IsPressed || !_hasSounds)
+        {
+            return;
+        }
+
+        PlaySound(s_phoneTap);
+        var track = _phonePlayer.Next();
+        if (track < 0)
+        {
+            _audio!.StopMusic(MusicFadeSeconds);
+        }
+        else if (_hasTrack[track])
+        {
+            _audio!.PlayMusic(_tracks[track], MusicFadeSeconds, MusicVolume);
+        }
+        else
+        {
+            // Its file is not in yet: the last track fades out now, and this one starts in UseLoadedSounds.
+            _audio!.StopMusic(MusicFadeSeconds);
+        }
+    }
+
+    /// <summary>
+    /// A one pixel glow around the outside of <paramref name="sprite"/>, two pixels larger than it each way.
+    /// </summary>
+    private static Image CreateGlow(Image sprite)
+    {
+        var width = sprite.Width + 2;
+        var pixels = new byte[width * (sprite.Height + 2) * Image.BytesPerPixel];
+        SpriteOutline.Draw(sprite.Pixels, sprite.Width, new IntRect(0, 0, sprite.Width, sprite.Height), pixels, width, 0, 0, openBottom: false);
+        return new Image(width, sprite.Height + 2, pixels);
     }
 
     /// <summary>
@@ -898,6 +991,14 @@ public sealed class LudumDare60Game : IGame
         if (!_hasRain)
         {
             ThrowIfFailed(_rainFile);
+        }
+
+        for (var i = 0; i < _trackFiles.Length; i++)
+        {
+            if (!_hasTrack[i])
+            {
+                ThrowIfFailed(_trackFiles[i]);
+            }
         }
     }
 

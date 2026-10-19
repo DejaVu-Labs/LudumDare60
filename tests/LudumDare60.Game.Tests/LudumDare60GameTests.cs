@@ -23,7 +23,7 @@ public sealed class LudumDare60GameTests
     private const int CustomerTexture = 2;
     private const int CustomerGlowTexture = 3;
     private const int RobeCustomerTexture = 4;
-    private const int RustTexture = 13;
+    private const int RustTexture = 14;
     private const int RoomTexture = 2;
     private const int StreetTexture = 3;
     private const int DogWalkerTextureWithBackground = 8;
@@ -31,14 +31,15 @@ public sealed class LudumDare60GameTests
     private const int PhoneTextureWithBackground = 14;
 
     // Textures the first frame creates without the background: the two placeholder sheets, a sheet and its glow per
-    // drawn customer, and the phone.
-    private static readonly int s_startTextures = 3 + (2 * AssetPaths.CustomerSheets.Count);
+    // drawn customer, and the phone and its glow.
+    private static readonly int s_startTextures = 4 + (2 * AssetPaths.CustomerSheets.Count);
 
     // Sound ids in creation order: the click and the door bell on the first frame, then the scrub loop from its file.
     private const int DoorBellSound = 1;
     private const int ScrubSound = 2;
     private const int ElephantSound = 3;
     private const int RainSound = 4;
+    private const int FirstTrackSound = 5;
 
     // The shipped data without the background, which has its own tests; so the shop must not wait for it.
     private readonly ManualPlatform _platform = new() { Assets = new ShippedAssets(withBackground: false) };
@@ -610,7 +611,7 @@ public sealed class LudumDare60GameTests
     {
         _platform.Frame(0);
 
-        Assert.Equal(5, _platform.AudioBackend.Sounds.Count);
+        Assert.Equal(8, _platform.AudioBackend.Sounds.Count);
         var click = _platform.AudioBackend.Sounds[0];
         Assert.Equal("RIFF"u8.ToArray(), click[..4]);
         Assert.Equal("WAVE"u8.ToArray(), click[8..12]);
@@ -626,7 +627,7 @@ public sealed class LudumDare60GameTests
 
         var recording = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "assets", AssetPaths.ScrubSound));
         Assert.Equal(recording, _platform.AudioBackend.Sounds[ScrubSound]);
-        Assert.Equal(5, _platform.AudioBackend.Sounds.Count);
+        Assert.Equal(8, _platform.AudioBackend.Sounds.Count);
     }
 
     [Fact]
@@ -661,6 +662,44 @@ public sealed class LudumDare60GameTests
     }
 
     [Fact]
+    public void PhoneClicked_PlaysEachTrackInTurnOnTheMusicBusThenFadesOut()
+    {
+        StartWithSound();
+        var phone = ShopDecor.PhoneAt + new Vector2(21.5f, 20.5f);
+        var music = () => _platform.AudioBackend.AllCommands()
+            .Where(c => c.Kind == AudioCommandKind.PlayLoop && (int)c.Arguments[2] == (int)AudioBus.Music)
+            .Select(c => (int)c.Arguments[1])
+            .ToArray();
+
+        for (var click = 0; click < AssetPaths.MusicTracks.Count; click++)
+        {
+            _platform.Frame(Step, PointerDown(phone));
+            _platform.Frame(Step, PointerUp(phone));
+        }
+
+        Assert.Equal(Enumerable.Range(FirstTrackSound, AssetPaths.MusicTracks.Count), music());
+        var stops = _platform.AudioBackend.AllCommands().Count(c => c.Kind == AudioCommandKind.StopVoice);
+        var taps = PlayedPitches().Count(p => Math.Abs(p - 1.8) < 1e-6);
+        _platform.Frame(Step, PointerDown(phone));
+        Assert.Equal(stops + 1, _platform.AudioBackend.AllCommands().Count(c => c.Kind == AudioCommandKind.StopVoice));
+        Assert.Equal(taps + 1, PlayedPitches().Count(p => Math.Abs(p - 1.8) < 1e-6));
+        Assert.Equal(AssetPaths.MusicTracks.Count, music().Length);
+    }
+
+    [Fact]
+    public void PointerOverThePhone_DrawsItsGlow()
+    {
+        StartWithSound();
+        var glowAt = ShopDecor.PhoneAt - Vector2.One;
+        Assert.DoesNotContain(LastFrame.Instances, i => i.Position == glowAt);
+
+        _platform.Frame(Step, PointerMove(ShopDecor.PhoneAt + new Vector2(21.5f, 20.5f)));
+        _platform.Frame(Step);
+
+        Assert.Contains(LastFrame.Instances, i => i.Position == glowAt);
+    }
+
+    [Fact]
     public void PressBesideTheElephant_PlaysNoTrumpet()
     {
         StartWithSound();
@@ -690,7 +729,7 @@ public sealed class LudumDare60GameTests
         _platform.Frame(0.01);
 
         Assert.Equal(s_startTextures, _platform.Backend.Textures.Count);
-        Assert.Equal(5, _platform.AudioBackend.Sounds.Count);
+        Assert.Equal(8, _platform.AudioBackend.Sounds.Count);
         Assert.Equal(2, _platform.Backend.Frames.Count);
     }
 

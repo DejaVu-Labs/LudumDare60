@@ -40,6 +40,18 @@ public static class AssetPaths
     public const string RainAmbience = "sounds/rain.ogg";
 
     /// <summary>
+    /// The tracks on the phone (<see cref="PhonePlayer"/>), in the order clicks play them: a blues, then two tracks by
+    /// HoliznaCC0 (CC0), "Everything You Ever Dreamed" and "2 Hour Delay". Mono, 22.05 kHz Vorbis; the first two are
+    /// 6 dB louder. They are not waited for: a track clicked before its file is in starts once it is.
+    /// </summary>
+    public static readonly IReadOnlyList<string> MusicTracks =
+    [
+        "music/blues.ogg",
+        "music/everything-you-ever-dreamed.ogg",
+        "music/two-hour-delay.ogg",
+    ];
+
+    /// <summary>
     /// Every customer's order, in the order they come in (see <see cref="Orders.OrderBook"/>).
     /// </summary>
     public const string Orders = "data/orders.json";
