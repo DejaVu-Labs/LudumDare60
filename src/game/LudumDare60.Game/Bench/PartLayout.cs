@@ -22,6 +22,8 @@ namespace LudumDare60.Game.Bench;
 /// to stick to it again; null for a part that stays on its rail.</param>
 /// <param name="BrokenSprite">How the part looks broken, for an order that has it swapped for a spare; null for a part
 /// the bench has no spare of.</param>
+/// <param name="Grab">The pixels the part is taken by, for a part a circle of <paramref name="GrabRadius"/> does not
+/// fit; null to take it within that circle.</param>
 public sealed record PartLayout(
     PartPath Path,
     float GrabRadius,
@@ -33,7 +35,8 @@ public sealed record PartLayout(
     float ClickPitch,
     IntRect? TurnedSprite = null,
     FreeMove? Free = null,
-    IntRect? BrokenSprite = null)
+    IntRect? BrokenSprite = null,
+    GrabShape? Grab = null)
 {
     /// <summary>
     /// Where the part sits in the gun as the customer brings it.

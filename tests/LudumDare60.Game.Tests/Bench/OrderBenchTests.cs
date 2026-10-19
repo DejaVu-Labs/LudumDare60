@@ -1,4 +1,5 @@
 using System.Numerics;
+using LudumDare60.Engine.Assets;
 using LudumDare60.Engine.Rendering;
 using LudumDare60.Game.Bench;
 using LudumDare60.Game.Cleaning;
@@ -13,6 +14,8 @@ public sealed class OrderBenchTests
 
     private static readonly OrderBook s_shipped = new OrderBookLoader().Load(
         AssetPaths.Orders, File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "assets", AssetPaths.Orders)));
+
+    private static readonly Image s_parts = PlaceholderParts.Create();
 
     private readonly OrderBench _bench = new(s_shipped.Orders[0]);
 
@@ -599,6 +602,68 @@ public sealed class OrderBenchTests
 
         bench.Step(Hold(BenchLayout.BrushRest), Dt);
         bench.Step(Release(BenchLayout.BrushRest), Dt);
+    }
+
+    /// <summary>
+    /// The middle of the first drawn pixel of <paramref name="sprite"/> on the bench, row by row from the top or from
+    /// the bottom, for the part drawn at <paramref name="at"/>.
+    /// </summary>
+    private static Vector2 EdgePixel(IntRect sprite, Vector2 origin, Vector2 at, bool fromTop)
+    {
+        for (var row = 0; row < sprite.Height; row++)
+        {
+            var y = fromTop ? row : sprite.Height - 1 - row;
+            for (var x = 0; x < sprite.Width; x++)
+            {
+                if (s_parts.Pixels[((((sprite.Y + y) * s_parts.Width) + sprite.X + x) * Image.BytesPerPixel) + 3] != 0)
+                {
+                    return at - origin + new Vector2(x + 0.5f, y + 0.5f);
+                }
+            }
+        }
+
+        throw new InvalidOperationException("The sprite is empty.");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Step_PressOnEitherEndOfThePanel_TakesIt(bool top)
+    {
+        var bench = new OrderBench(s_shipped.Orders[1]);
+        Unscrew(bench, BenchLayout.GripScrewSeated, new Vector2(120, 300));
+        var edge = EdgePixel(PlaceholderParts.GripPanel, PlaceholderParts.GripPanelOrigin, BenchLayout.GripPanelSeated, top);
+
+        bench.Step(Press(edge), Dt);
+
+        Assert.True(bench.Part(RevolverParts.GripPanels).IsHeld);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Step_PressOnEitherEndOfTheMainspring_TakesIt(bool top)
+    {
+        var bench = new OrderBench(s_shipped.Orders[2]);
+        Unscrew(bench, BenchLayout.GripScrewSeated, new Vector2(120, 300));
+        Drag(bench, BenchLayout.GripPanelSeated, BenchLayout.GripPanelOut);
+        var edge = EdgePixel(PlaceholderParts.MainspringBroken, PlaceholderParts.MainspringOrigin, BenchLayout.MainspringSeated, top);
+
+        bench.Step(Press(edge), Dt);
+
+        Assert.True(bench.Part(RevolverParts.Mainspring).IsHeld);
+    }
+
+    [Fact]
+    public void Step_PressOnTheGripScrewOverThePanel_TakesTheScrew()
+    {
+        var bench = new OrderBench(s_shipped.Orders[1]);
+
+        bench.Step(Press(BenchLayout.GripScrewSeated), Dt);
+
+        Assert.True(bench.Part(RevolverParts.GripScrew).IsHeld);
+        Assert.False(bench.Part(RevolverParts.GripPanels).IsHeld);
+        Assert.Equal(DragEvents.None, bench.Gun.Events[bench.IndexOf(RevolverParts.GripPanels)] & DragEvents.Refused);
     }
 
     [Fact]

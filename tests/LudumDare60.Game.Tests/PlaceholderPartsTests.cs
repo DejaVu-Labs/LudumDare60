@@ -1,0 +1,66 @@
+using System.Numerics;
+using LudumDare60.Engine.Assets;
+using LudumDare60.Engine.Rendering;
+using LudumDare60.Game.Parts;
+
+namespace LudumDare60.Game.Tests;
+
+public sealed class PlaceholderPartsTests
+{
+    private static readonly Image s_sheet = PlaceholderParts.Create();
+
+    private static bool IsOpaque(IntRect sprite, int x, int y)
+        => s_sheet.Pixels[((((sprite.Y + y) * s_sheet.Width) + sprite.X + x) * Image.BytesPerPixel) + 3] != 0;
+
+    /// <summary>
+    /// Asserts that every drawn pixel of <paramref name="sprite"/> takes the part.
+    /// </summary>
+    private static void AssertCoversSprite(GrabShape shape, IntRect sprite, Vector2 origin)
+    {
+        var drawn = 0;
+        for (var y = 0; y < sprite.Height; y++)
+        {
+            for (var x = 0; x < sprite.Width; x++)
+            {
+                if (IsOpaque(sprite, x, y))
+                {
+                    drawn++;
+                    Assert.True(shape.Contains(new Vector2(x + 0.5f, y + 0.5f) - origin), $"Pixel ({x}, {y}) does not take the part.");
+                }
+            }
+        }
+
+        Assert.True(drawn > 0);
+    }
+
+    [Fact]
+    public void CreateGripPanelGrab_CoversTheWholePanel()
+        => AssertCoversSprite(PlaceholderParts.CreateGripPanelGrab(), PlaceholderParts.GripPanel, PlaceholderParts.GripPanelOrigin);
+
+    [Fact]
+    public void CreateGripPanelGrab_OutsideThePanel_DoesNotTakeIt()
+    {
+        var shape = PlaceholderParts.CreateGripPanelGrab();
+
+        Assert.False(shape.Contains(new Vector2(-2, -2) - PlaceholderParts.GripPanelOrigin));
+        Assert.False(shape.Contains(new Vector2(PlaceholderParts.GripPanel.Width + 2, 0) - PlaceholderParts.GripPanelOrigin));
+    }
+
+    [Fact]
+    public void CreateMainspringGrab_CoversTheWholeSpring()
+        => AssertCoversSprite(PlaceholderParts.CreateMainspringGrab(), PlaceholderParts.Mainspring, PlaceholderParts.MainspringOrigin);
+
+    [Fact]
+    public void CreateMainspringGrab_CoversTheBrokenSpring()
+        => AssertCoversSprite(PlaceholderParts.CreateMainspringGrab(), PlaceholderParts.MainspringBroken, PlaceholderParts.MainspringOrigin);
+
+    [Fact]
+    public void CreateMainspringGrab_BesideTheSpring_DoesNotTakeIt()
+    {
+        var shape = PlaceholderParts.CreateMainspringGrab();
+
+        // The spring slants down to the right: the bottom-left and top-right corners are well clear of it.
+        Assert.False(shape.Contains(new Vector2(1, PlaceholderParts.Mainspring.Height - 1) - PlaceholderParts.MainspringOrigin));
+        Assert.False(shape.Contains(new Vector2(PlaceholderParts.Mainspring.Width - 1, 1) - PlaceholderParts.MainspringOrigin));
+    }
+}

@@ -40,9 +40,11 @@ public sealed class PartDrag
     /// <param name="feel">Breakaway, friction and snapping.</param>
     /// <param name="stop">Where the part starts: <see cref="PartStop.Start"/> or <see cref="PartStop.End"/>.</param>
     /// <param name="free">How the part moves once it is out, or null to keep it on its rail.</param>
+    /// <param name="shape">The pixels the part is taken by, or null to take it within <paramref name="grabRadius"/> of
+    /// <see cref="Position"/>.</param>
     /// <exception cref="ArgumentOutOfRangeException">A distance, rate or speed is negative or not a number, the strain
     /// is outside [0, 1], the snap zones of the two ends touch, or <paramref name="stop"/> is not an end.</exception>
-    public PartDrag(PartPath path, float grabRadius, in DragFeel feel, PartStop stop = PartStop.Start, FreeMove? free = null)
+    public PartDrag(PartPath path, float grabRadius, in DragFeel feel, PartStop stop = PartStop.Start, FreeMove? free = null, GrabShape? shape = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(grabRadius);
         ArgumentOutOfRangeException.ThrowIfNegative(feel.BreakawayAtStart, nameof(feel));
@@ -70,6 +72,7 @@ public sealed class PartDrag
         Feel = feel;
         Stop = stop;
         _free = free;
+        Shape = shape;
         Distance = PreviousDistance = StopDistance(stop);
         PreviousPosition = Position;
     }
@@ -77,6 +80,11 @@ public sealed class PartDrag
     public PartPath Path { get; }
 
     public float GrabRadius { get; }
+
+    /// <summary>
+    /// The pixels the part is taken by, or null for a part taken within <see cref="GrabRadius"/> of its position.
+    /// </summary>
+    public GrabShape? Shape { get; }
 
     public DragFeel Feel { get; }
 
@@ -128,9 +136,11 @@ public sealed class PartDrag
     public Vector2 GetRenderPosition(float alpha) => Vector2.Lerp(PreviousPosition, Position, alpha);
 
     /// <summary>
-    /// Whether <paramref name="point"/> lies within <see cref="GrabRadius"/> of the part.
+    /// Whether <paramref name="point"/> lies on the part's <see cref="Shape"/>, or within <see cref="GrabRadius"/> of
+    /// the part when it has none.
     /// </summary>
-    public bool IsUnder(Vector2 point) => Vector2.DistanceSquared(point, Position) <= GrabRadius * GrabRadius;
+    public bool IsUnder(Vector2 point)
+        => Shape is { } shape ? shape.Contains(point - Position) : Vector2.DistanceSquared(point, Position) <= GrabRadius * GrabRadius;
 
     /// <summary>
     /// Advances the part by one fixed step.

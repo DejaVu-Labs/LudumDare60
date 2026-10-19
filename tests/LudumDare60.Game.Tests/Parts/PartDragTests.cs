@@ -131,6 +131,33 @@ public sealed class PartDragTests
     public void IsUnder_Point_ChecksTheGrabRadius(float x, float y, bool expected)
         => Assert.Equal(expected, _part.IsUnder(new Vector2(x, y)));
 
+    [Theory]
+    [InlineData(100, 50, true)]
+    [InlineData(127, 50, true)]
+    [InlineData(127, 54, false)]
+    [InlineData(106, 50, true)]
+    [InlineData(99, 47, false)]
+    public void IsUnder_WithShape_ChecksTheShapeInsteadOfTheGrabRadius(float x, float y, bool expected)
+    {
+        // A 30x3 bar reaching right from the grab point, much longer than the grab radius.
+        var shape = new GrabShape(30, 3, new Vector2(1, 1), static (_, _) => true, margin: 0);
+        var part = new PartDrag(s_path, 6, DragFeel.Default, shape: shape);
+
+        Assert.Equal(expected, part.IsUnder(new Vector2(x, y)));
+    }
+
+    [Fact]
+    public void Step_PressOnTheFarEndOfItsShape_GrabsIt()
+    {
+        var shape = new GrabShape(30, 3, new Vector2(1, 1), static (_, _) => true, margin: 0);
+        var part = new PartDrag(s_path, 6, DragFeel.Default, shape: shape);
+
+        var events = part.Step(Press(127), Dt);
+
+        Assert.Equal(DragEvents.Grabbed, events);
+        Assert.True(part.IsHeld);
+    }
+
     [Fact]
     public void Step_PressAwayFromPart_DoesNotGrab()
     {

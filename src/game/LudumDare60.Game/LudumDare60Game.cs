@@ -515,7 +515,8 @@ public sealed class LudumDare60Game : IGame
         DrawTurning(batch, PlaceholderParts.Trigger, PlaceholderParts.TriggerGlow, PlaceholderParts.TriggerOrigin, BenchLayout.TriggerPivot + _gunOffset, _triggerAngle, _triggerGlow);
         DrawLayers(batch, bench, PartLayer.OverHammer, PartLayer.OverHammer);
 
-        // Parts loose on the mat lie on top of everything, even when put down on the revolver.
+        // Parts loose on the mat lie on top of everything, even when put down on the revolver, a later one over an
+        // earlier one: the order PartAssembly picks them in for the pointer.
         for (var i = 0; i < bench.Count; i++)
         {
             if (bench.Gun[i].IsFree)

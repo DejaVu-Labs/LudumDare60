@@ -2,6 +2,7 @@ using System.Numerics;
 using LudumDare60.Engine.Assets;
 using LudumDare60.Engine.Platform;
 using LudumDare60.Engine.Rendering;
+using LudumDare60.Game.Parts;
 
 namespace LudumDare60.Game;
 
@@ -327,6 +328,18 @@ internal static class PlaceholderParts
     /// Old oil and dirt over the grip panel, the panel's size and origin, like <see cref="CreateCylinderRust"/>.
     /// </summary>
     public static Image CreateGripPanelGrime() => CreateDirt(PanelWidth, PanelHeight, IsGripPanel, s_grime, GrimeCutoff);
+
+    /// <summary>
+    /// The grip panel's pixels and one around them: the whole panel takes it, not only its grab point.
+    /// </summary>
+    public static GrabShape CreateGripPanelGrab() => new(PanelWidth, PanelHeight, GripPanelOrigin, IsGripPanel, margin: 1);
+
+    /// <summary>
+    /// The mainspring's pixels, whole or broken, and two around them: the spring is thin, and takes it along its
+    /// whole length.
+    /// </summary>
+    public static GrabShape CreateMainspringGrab()
+        => new(MainspringWidth, MainspringHeight, MainspringOrigin, (x, y) => IsMainspring(x, y, broken: false) || IsMainspring(x, y, broken: true), margin: 2);
 
     /// <summary>
     /// Blotches of <paramref name="ramp"/> over the pixels of a part, the part's size.

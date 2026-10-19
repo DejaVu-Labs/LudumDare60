@@ -160,6 +160,93 @@ public sealed class PartAssemblyTests
     }
 
     [Fact]
+    public void Step_OverlappingPartsAtDifferentDepths_TheHigherOneGetsThePointer()
+    {
+        var a = new PartDrag(new LinePath(new Vector2(10, 10), new Vector2(50, 10)), 6, DragFeel.Default);
+        var b = new PartDrag(new LinePath(new Vector2(12, 10), new Vector2(12, 50)), 6, DragFeel.Default);
+        var parts = new PartAssembly(a, b);
+        parts.SetDepth(1, 1);
+
+        parts.Step(Press(new Vector2(11, 10)), Dt);
+
+        Assert.True(b.IsHeld);
+        Assert.False(a.IsHeld);
+        Assert.Equal(DragEvents.None, parts.Events[0]);
+    }
+
+    [Fact]
+    public void Step_LoosePartOverAPartInTheGun_TheLooseOneGetsThePointer()
+    {
+        var free = new FreeMove(Vector2.Zero, new Vector2(200), DockRadius: 2, DockSpan: 0, SeatsOnDock: true);
+        var a = new PartDrag(new LinePath(new Vector2(10, 10), new Vector2(50, 10)), 6, DragFeel.Default);
+        var b = new PartDrag(new LinePath(new Vector2(100, 10), new Vector2(100, 40)), 6, DragFeel.Default, free: free);
+        var parts = new PartAssembly(a, b);
+        parts.SetDepth(0, 5);
+        CarryOut(parts, 1, new Vector2(100, 10), new Vector2(11, 10));
+
+        parts.Step(Press(new Vector2(11, 10)), Dt);
+
+        Assert.True(b.IsHeld);
+        Assert.False(a.IsHeld);
+    }
+
+    [Fact]
+    public void Step_TwoLooseParts_TheLaterOneLiesOnTopAndGetsThePointer()
+    {
+        var free = new FreeMove(Vector2.Zero, new Vector2(200), DockRadius: 2, DockSpan: 0, SeatsOnDock: true);
+        var a = new PartDrag(new LinePath(new Vector2(100, 10), new Vector2(100, 40)), 6, DragFeel.Default, free: free);
+        var b = new PartDrag(new LinePath(new Vector2(150, 10), new Vector2(150, 40)), 6, DragFeel.Default, free: free);
+        var parts = new PartAssembly(a, b);
+        CarryOut(parts, 1, new Vector2(150, 10), new Vector2(60, 100));
+        CarryOut(parts, 0, new Vector2(100, 10), new Vector2(61, 100));
+
+        parts.Step(Press(new Vector2(60.5f, 100)), Dt);
+
+        Assert.True(b.IsHeld);
+        Assert.False(a.IsHeld);
+    }
+
+    [Fact]
+    public void PartUnder_OverlappingParts_IsTheOneOnTop()
+    {
+        var a = new PartDrag(new LinePath(new Vector2(10, 10), new Vector2(50, 10)), 6, DragFeel.Default);
+        var b = new PartDrag(new LinePath(new Vector2(12, 10), new Vector2(12, 50)), 6, DragFeel.Default);
+        var parts = new PartAssembly(a, b);
+
+        Assert.Equal(0, parts.PartUnder(new Vector2(11, 10)));
+        Assert.Equal(1, parts.PartUnder(new Vector2(17, 10)));
+        Assert.Equal(-1, parts.PartUnder(new Vector2(100, 100)));
+
+        parts.SetDepth(1, 1);
+
+        Assert.Equal(1, parts.PartUnder(new Vector2(11, 10)));
+    }
+
+    /// <summary>
+    /// Takes <paramref name="part"/> at <paramref name="from"/>, pulls it down out of the gun and puts it down at
+    /// <paramref name="to"/>.
+    /// </summary>
+    private static void CarryOut(PartAssembly parts, int part, Vector2 from, Vector2 to)
+    {
+        parts.Step(Press(from), Dt);
+        for (var i = 0; i < 60 && !parts[part].IsFree; i++)
+        {
+            parts.Step(Hold(from + new Vector2(0, 60)), Dt);
+        }
+
+        for (var i = 0; i < 120; i++)
+        {
+            parts.Step(Hold(to), Dt);
+        }
+
+        parts.Step(Release(to), Dt);
+        Assert.True(parts[part].IsFree);
+        Assert.False(parts[part].IsHeld);
+        Assert.Equal(to.X, parts[part].Position.X, 0.1f);
+        Assert.Equal(to.Y, parts[part].Position.Y, 0.1f);
+    }
+
+    [Fact]
     public void SetLocked_FreePart_CannotBeGrabbedAndIsNotRefused()
     {
         _gun.SetLocked(Pin, locked: true);

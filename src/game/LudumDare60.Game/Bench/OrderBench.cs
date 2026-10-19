@@ -76,10 +76,15 @@ public sealed class OrderBench
         {
             BenchLayout.TryGetPart(_ids[i], out var layout);
             _layouts[i] = layout!;
-            parts[i] = new PartDrag(layout!.Path, layout.GrabRadius, layout.Feel, PartStop.Start, layout.Free);
+            parts[i] = new PartDrag(layout!.Path, layout.GrabRadius, layout.Feel, PartStop.Start, layout.Free, layout.Grab);
         }
 
         Gun = new PartAssembly(parts);
+        for (var i = 0; i < count; i++)
+        {
+            Gun.SetDepth(i, (int)_layouts[i].Layer);
+        }
+
         foreach (var block in RevolverParts.Blocks)
         {
             var blocker = IndexOf(block.Blocker);
@@ -334,21 +339,9 @@ public sealed class OrderBench
         var toolTaken = brushTaken || OilCan.IsHeld || (OilCanEvents & BrushEvents.PickedUp) != BrushEvents.None;
         Gun.Step(toolTaken ? s_noPointer : input, deltaTime);
         SwapPutDownBrokenParts();
-        if (!toolTaken && input.IsPressed)
+        if (!toolTaken && input.IsPressed && !hammerOpen && Gun.PartUnder(input.Position) is var pressed and >= 0)
         {
-            for (var i = 0; i < Count; i++)
-            {
-                if (!Gun[i].IsUnder(input.Position))
-                {
-                    continue;
-                }
-
-                if (!hammerOpen)
-                {
-                    Report(BenchEvents.HammerFirst, i);
-                    break;
-                }
-            }
+            Report(BenchEvents.HammerFirst, pressed);
         }
 
         for (var i = 0; i < Count; i++)

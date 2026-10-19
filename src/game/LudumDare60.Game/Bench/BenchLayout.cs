@@ -206,7 +206,8 @@ public static class BenchLayout
         PlaceholderParts.GripPanelOrigin,
         PartLayer.OverGrip,
         ClickPitch: 0.7f,
-        Free: new FreeMove(MatMin, MatMax, DockRadius: 8, DockSpan: 0, SeatsOnDock: true));
+        Free: new FreeMove(MatMin, MatMax, DockRadius: 8, DockSpan: 0, SeatsOnDock: true),
+        Grab: PlaceholderParts.CreateGripPanelGrab());
 
     private static readonly PartLayout s_mainspring = new(
         new LinePath(MainspringSeated, MainspringSeated + (MainspringPullDirection * MainspringPull)),
@@ -218,7 +219,8 @@ public static class BenchLayout
         PartLayer.InGrip,
         ClickPitch: 1.3f,
         Free: new FreeMove(MatMin, MatMax, DockRadius: 7, DockSpan: 0, SeatsOnDock: true),
-        BrokenSprite: PlaceholderParts.MainspringBroken);
+        BrokenSprite: PlaceholderParts.MainspringBroken,
+        Grab: PlaceholderParts.CreateMainspringGrab());
 
     private static readonly PartLayout s_hammerScrew = s_gripScrew with
     {
