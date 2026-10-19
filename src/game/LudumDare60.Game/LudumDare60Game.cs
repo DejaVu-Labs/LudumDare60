@@ -587,18 +587,18 @@ public sealed class LudumDare60Game : IGame
     /// </summary>
     private void DrawLoading(SpriteBatch batch)
     {
-        batch.Clear(LoadingColor);
+        batch.Clear(s_LoadingColor);
         if (!_hasSheets)
         {
             return;
         }
 
         var left = new Vector2((VirtualWidth - LoadingBarWidth) / 2f, (VirtualHeight - LoadingBarHeight) / 2f);
-        DrawBar(batch, left, LoadingBarWidth, LoadingTrackColor);
-        DrawBar(batch, left, LoadingBarWidth * LoadProgress, LoadingFillColor);
+        DrawBar(batch, left, LoadingBarWidth, s_LoadingTrackColor);
+        DrawBar(batch, left, LoadingBarWidth * LoadProgress, s_LoadingFillColor);
         var lap = _loadingSeconds / LoadingShineSeconds % 1f;
         var shine = lap * (LoadingBarWidth - LoadingShineWidth);
-        DrawBar(batch, left + new Vector2(shine, 0), LoadingShineWidth, LoadingFillColor.WithAlpha(LoadingShineAlpha));
+        DrawBar(batch, left + new Vector2(shine, 0), LoadingShineWidth, s_LoadingFillColor.WithAlpha(LoadingShineAlpha));
     }
 
     private void DrawBar(SpriteBatch batch, Vector2 at, float width, Color color)
