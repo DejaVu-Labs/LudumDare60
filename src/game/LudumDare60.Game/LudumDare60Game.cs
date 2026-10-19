@@ -117,6 +117,9 @@ public sealed class LudumDare60Game : IGame
     private static readonly SoundOptions s_handedBack = new() { Pitch = 0.9f, Volume = 0.6f };
     private static readonly SoundOptions s_doorBell = new() { Volume = 0.5f };
     private static readonly SoundOptions s_elephant = new() { Volume = 0.6f };
+
+    // The rain outside: barely there, under the room's own sounds.
+    private static readonly SoundOptions s_rain = new() { Volume = 0.25f };
     private static readonly SoundOptions s_halfCock = new() { Pitch = 1.1f, Volume = 0.5f };
     private static readonly SoundOptions s_cocked = new() { Pitch = 0.9f, Volume = 0.9f };
     private static readonly SoundOptions s_cylinderTurn = new() { Pitch = 1.3f, Volume = 0.45f };
@@ -160,6 +163,8 @@ public sealed class LudumDare60Game : IGame
     private AssetHandle<byte[]> _elephantFile;
     private Sound _elephantSound;
     private bool _hasElephantSound;
+    private AssetHandle<byte[]> _rainFile;
+    private bool _hasRain;
 
     // How long the elephant's trumpet still plays, in seconds.
     private float _elephantLeft;
@@ -260,14 +265,15 @@ public sealed class LudumDare60Game : IGame
     /// </summary>
     public float LoadProgress => (float)LoadedAssetCount / AssetCount;
 
-    // The room, the street, the phone, a sheet per customer look, orders.json, the scrub sound and the elephant.
-    private int AssetCount => 6 + _customerImages.Length;
+    // The room, the street, the phone, a sheet per customer look, orders.json, the scrub sound, the elephant and the
+    // rain.
+    private int AssetCount => 7 + _customerImages.Length;
 
     private int LoadedAssetCount
     {
         get
         {
-            var count = (HasBackground ? 1 : 0) + (HasStreet ? 1 : 0) + (HasPhone ? 1 : 0) + (_hasScrubSound ? 1 : 0) + (_hasElephantSound ? 1 : 0);
+            var count = (HasBackground ? 1 : 0) + (HasStreet ? 1 : 0) + (HasPhone ? 1 : 0) + (_hasScrubSound ? 1 : 0) + (_hasElephantSound ? 1 : 0) + (_hasRain ? 1 : 0);
             foreach (var loaded in _hasCustomerSheet)
             {
                 count += loaded ? 1 : 0;
@@ -337,6 +343,7 @@ public sealed class LudumDare60Game : IGame
         _ordersHandle = assets.Request<OrderBook>(AssetPaths.Orders);
         _scrubSound = assets.Request<byte[]>(AssetPaths.ScrubSound);
         _elephantFile = assets.Request<byte[]>(AssetPaths.ElephantSound);
+        _rainFile = assets.Request<byte[]>(AssetPaths.RainAmbience);
     }
 
     public void FixedUpdate(in FrameContext context)
@@ -823,6 +830,15 @@ public sealed class LudumDare60Game : IGame
             _assets.Release(_elephantFile);
             _hasElephantSound = true;
         }
+
+        if (!_hasRain && _assets!.TryGet(_rainFile, out var rainFile))
+        {
+            // It starts as soon as it is decoded, fading in, and loops for the rest of the run.
+            var rain = _audio!.CreateSound(rainFile);
+            _audio.PlayLoop(rain, AudioBus.Ambience, s_rain, fadeInSeconds: 2);
+            _assets.Release(_rainFile);
+            _hasRain = true;
+        }
     }
 
     /// <summary>
@@ -877,6 +893,11 @@ public sealed class LudumDare60Game : IGame
         if (!_hasElephantSound)
         {
             ThrowIfFailed(_elephantFile);
+        }
+
+        if (!_hasRain)
+        {
+            ThrowIfFailed(_rainFile);
         }
     }
 

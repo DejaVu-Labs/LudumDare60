@@ -34,6 +34,12 @@ public static class AssetPaths
     public const string ElephantSound = "sounds/elephant.wav";
 
     /// <summary>
+    /// Rain on a dark night, a seamless 12 s loop that plays very quietly under everything from the title screen on:
+    /// cut from a steady stretch between the thunder of "Dark Rainy Night (ambience)", mono, 22.05 kHz Vorbis.
+    /// </summary>
+    public const string RainAmbience = "sounds/rain.ogg";
+
+    /// <summary>
     /// Every customer's order, in the order they come in (see <see cref="Orders.OrderBook"/>).
     /// </summary>
     public const string Orders = "data/orders.json";

@@ -38,6 +38,7 @@ public sealed class LudumDare60GameTests
     private const int DoorBellSound = 1;
     private const int ScrubSound = 2;
     private const int ElephantSound = 3;
+    private const int RainSound = 4;
 
     // The shipped data without the background, which has its own tests; so the shop must not wait for it.
     private readonly ManualPlatform _platform = new() { Assets = new ShippedAssets(withBackground: false) };
@@ -396,7 +397,7 @@ public sealed class LudumDare60GameTests
 
         platform.Frame(0);
 
-        var assetCount = 6 + AssetPaths.CustomerSheets.Count;
+        var assetCount = 7 + AssetPaths.CustomerSheets.Count;
         Assert.True(game.IsLoading);
         Assert.Equal((float)(assetCount - 1) / assetCount, game.LoadProgress, 5);
         Assert.Null(game.Shop);
@@ -609,7 +610,7 @@ public sealed class LudumDare60GameTests
     {
         _platform.Frame(0);
 
-        Assert.Equal(4, _platform.AudioBackend.Sounds.Count);
+        Assert.Equal(5, _platform.AudioBackend.Sounds.Count);
         var click = _platform.AudioBackend.Sounds[0];
         Assert.Equal("RIFF"u8.ToArray(), click[..4]);
         Assert.Equal("WAVE"u8.ToArray(), click[8..12]);
@@ -625,7 +626,7 @@ public sealed class LudumDare60GameTests
 
         var recording = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "assets", AssetPaths.ScrubSound));
         Assert.Equal(recording, _platform.AudioBackend.Sounds[ScrubSound]);
-        Assert.Equal(4, _platform.AudioBackend.Sounds.Count);
+        Assert.Equal(5, _platform.AudioBackend.Sounds.Count);
     }
 
     [Fact]
@@ -645,6 +646,18 @@ public sealed class LudumDare60GameTests
         _platform.Frame(Step, PointerDown(elephant));
         Assert.Equal(2, trumpets());
         Assert.Equal(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "assets", AssetPaths.ElephantSound)), _platform.AudioBackend.Sounds[ElephantSound]);
+    }
+
+    [Fact]
+    public void RainLoaded_LoopsQuietlyOnTheAmbienceBusFromTheStart()
+    {
+        _platform.Frame(0);
+
+        var recording = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "assets", AssetPaths.RainAmbience));
+        Assert.Equal(recording, _platform.AudioBackend.Sounds[RainSound]);
+        var loop = Assert.Single(_platform.AudioBackend.AllCommands(), c => c.Kind == AudioCommandKind.PlayLoop && (int)c.Arguments[1] == RainSound);
+        Assert.Equal((int)AudioBus.Ambience, (int)loop.Arguments[2]);
+        Assert.InRange(loop.Arguments[3], 0.05, 0.3);
     }
 
     [Fact]
@@ -677,7 +690,7 @@ public sealed class LudumDare60GameTests
         _platform.Frame(0.01);
 
         Assert.Equal(s_startTextures, _platform.Backend.Textures.Count);
-        Assert.Equal(4, _platform.AudioBackend.Sounds.Count);
+        Assert.Equal(5, _platform.AudioBackend.Sounds.Count);
         Assert.Equal(2, _platform.Backend.Frames.Count);
     }
 
@@ -1112,7 +1125,7 @@ public sealed class LudumDare60GameTests
 
         Assert.True(Bench.Brush.IsHeld);
         Assert.Equal(new Vector2(400, 200), Drawn(LastFrame, PlaceholderParts.Brush).Position);
-        var loop = Assert.Single(_platform.AudioBackend.AllCommands(), c => c.Kind == AudioCommandKind.PlayLoop);
+        var loop = Assert.Single(_platform.AudioBackend.AllCommands(), c => c.Kind == AudioCommandKind.PlayLoop && (int)c.Arguments[1] == ScrubSound);
         Assert.Equal(ScrubSound, loop.Arguments[1]);
         Assert.All(VoiceVolumes(), volume => Assert.Equal(0, volume));
     }
