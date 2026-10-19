@@ -76,7 +76,7 @@ public sealed class OrderBench
         {
             BenchLayout.TryGetPart(_ids[i], out var layout);
             _layouts[i] = layout!;
-            parts[i] = new PartDrag(layout!.Path, layout.GrabRadius, layout.Feel, PartStop.Start, layout.Free, layout.Grab);
+            parts[i] = new PartDrag(layout!.Path, layout.GrabRadius, layout.Feel, PartStop.Start, layout.Free, layout.Grab, layout.Layer == PartLayer.UnderFrame ? BenchLayout.FrameCover : null);
         }
 
         Gun = new PartAssembly(parts);
@@ -321,12 +321,22 @@ public sealed class OrderBench
     /// and a press on one reports <see cref="BenchEvents.HammerFirst"/>. A part that is dirty, dry or broken does not
     /// stick to its rail: it reports <see cref="DragEvents.DockRefused"/> in <see cref="PartAssembly.Events"/>.</param>
     public void Step(in PointerSample input, float deltaTime, bool hammerOpen)
+        => Step(input, deltaTime, hammerOpen, hammerOpen ? ActionTest.HalfCock * ActionTest.CockAngle : 0);
+
+    /// <inheritdoc cref="Step(in PointerSample, float, bool)"/>
+    /// <param name="input">The pointer at the end of the step.</param>
+    /// <param name="deltaTime">The step's length in seconds.</param>
+    /// <param name="hammerOpen">Whether the hammer is at half cock or further.</param>
+    /// <param name="hammerAngle">How far the hammer is turned back from rest, in radians
+    /// (<see cref="ActionTest.GetHammerAngle"/>): the hammer in the gun is taken by its shape turned that far.</param>
+    public void Step(in PointerSample input, float deltaTime, bool hammerOpen, float hammerAngle)
     {
         Events = BenchEvents.None;
         EventPart = -1;
         var partHeld = false;
         for (var i = 0; i < Count; i++)
         {
+            Gun[i].Angle = PartAngle(_layouts[i], Gun[i].IsFree, Gun[i].Distance, hammerAngle);
             Gun.SetLocked(i, !hammerOpen);
             Gun.SetDockable(i, IsReady(i));
             partHeld |= Gun[i].IsHeld;
@@ -351,6 +361,22 @@ public sealed class OrderBench
 
         Scrub(deltaTime);
         Oil();
+    }
+
+    /// <summary>
+    /// How far a part is turned around its position as it is drawn, in radians: a screw turns as it goes in and out;
+    /// the hammer keeps its cock on its pivot, and straightens as it lifts off, so it lies flat on the mat.
+    /// </summary>
+    /// <param name="layout">The part's layout.</param>
+    /// <param name="isFree">Whether the part is loose on the work surface.</param>
+    /// <param name="distance">How far along its path the part is.</param>
+    /// <param name="hammerAngle">How far the hammer is turned back from rest, in radians.</param>
+    public static float PartAngle(PartLayout layout, bool isFree, float distance, float hammerAngle)
+    {
+        ArgumentNullException.ThrowIfNull(layout);
+        return layout.Layer != PartLayer.Hammer ? layout.Path.AngleAt(distance)
+            : isFree ? 0
+            : hammerAngle * (1 - (distance / layout.Path.Length));
     }
 
     private bool IsOutOnTheMat(int part) => Gun[part].Stop == PartStop.End && !Gun[part].IsHeld;

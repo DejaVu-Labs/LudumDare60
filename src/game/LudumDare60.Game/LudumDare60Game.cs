@@ -383,11 +383,7 @@ public sealed class LudumDare60Game : IGame
             var corner = position - layout.Origin;
             _drawPositions[i] = new Vector2(MathF.Round(corner.X), MathF.Round(corner.Y)) + layout.Origin;
 
-            // A screw turns as it goes in and out. The hammer keeps its cock on its pivot, and straightens as it lifts
-            // off, so it lies flat on the mat.
-            _rotations[i] = layout.Layer != PartLayer.Hammer ? layout.Path.AngleAt(distance)
-                : part.IsFree ? 0
-                : _hammerAngle * (1 - (distance / layout.Path.Length));
+            _rotations[i] = OrderBench.PartAngle(layout, part.IsFree, distance, _hammerAngle);
             var needsScrubbing = bench.NeedsScrubbing(i);
             var needsOiling = bench.NeedsOiling(i);
             var needsSpare = bench.NeedsSpare(i);

@@ -385,7 +385,7 @@ public sealed class Shop
 
         Test!.Step(input, deltaTime, canCock: false, canGrab: !busy);
         TestStepped = true;
-        bench.Step(Test.IsHammerHeld ? s_noPointer : input, deltaTime, Test.IsOpen);
+        bench.Step(Test.IsHammerHeld ? s_noPointer : input, deltaTime, Test.IsOpen, Test.GetHammerAngle(1));
         BenchStepped = true;
         if (bench.IsDone)
         {

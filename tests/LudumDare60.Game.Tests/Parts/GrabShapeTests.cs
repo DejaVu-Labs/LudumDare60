@@ -40,6 +40,15 @@ public sealed class GrabShapeTests
     }
 
     [Fact]
+    public void Contains_Turned_TurnsTheShapeAroundTheOrigin()
+    {
+        // A quarter turn clockwise on screen points the bar down from the grab point instead of right.
+        Assert.True(s_bar.Contains(new Vector2(0, 5.5f), MathF.PI / 2));
+        Assert.False(s_bar.Contains(new Vector2(5.5f, 0), MathF.PI / 2));
+        Assert.True(s_bar.Contains(new Vector2(5.5f, 0), 0));
+    }
+
+    [Fact]
     public void Constructor_NegativeMargin_Throws()
         => Assert.Throws<ArgumentOutOfRangeException>(() => new GrabShape(3, 3, Vector2.Zero, static (_, _) => true, margin: -1));
 }

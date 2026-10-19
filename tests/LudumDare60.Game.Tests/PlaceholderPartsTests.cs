@@ -34,6 +34,40 @@ public sealed class PlaceholderPartsTests
     }
 
     [Fact]
+    public void CreatePinGrab_CoversHeadAndRod()
+        => AssertCoversSprite(PlaceholderParts.CreatePinGrab(), PlaceholderParts.Pin, PlaceholderParts.PinOrigin);
+
+    [Fact]
+    public void CreateCylinderGrab_CoversTheCylinderInBothTurns()
+    {
+        AssertCoversSprite(PlaceholderParts.CreateCylinderGrab(), PlaceholderParts.Cylinder, PlaceholderParts.CylinderOrigin);
+        AssertCoversSprite(PlaceholderParts.CreateCylinderGrab(), PlaceholderParts.CylinderTurned, PlaceholderParts.CylinderOrigin);
+    }
+
+    [Fact]
+    public void CreateHammerGrab_CoversTheWholeHammer()
+        => AssertCoversSprite(PlaceholderParts.CreateHammerGrab(), PlaceholderParts.Hammer, PlaceholderParts.HammerOrigin);
+
+    [Fact]
+    public void CreateScrewGrab_CoversTheWholeHead()
+        => AssertCoversSprite(PlaceholderParts.CreateScrewGrab(), PlaceholderParts.Screw, PlaceholderParts.ScrewOrigin);
+
+    [Fact]
+    public void CreateBodyCover_CoversEveryDrawnPixelOfTheRevolverWhereItLies()
+    {
+        var at = new Vector2(170, 186);
+        var cover = PlaceholderParts.CreateBodyCover(at);
+
+        for (var y = 0; y < PlaceholderParts.Body.Height; y++)
+        {
+            for (var x = 0; x < PlaceholderParts.Body.Width; x++)
+            {
+                Assert.Equal(IsOpaque(PlaceholderParts.Body, x, y), cover.Contains(at + new Vector2(x + 0.5f, y + 0.5f)));
+            }
+        }
+    }
+
+    [Fact]
     public void CreateGripPanelGrab_CoversTheWholePanel()
         => AssertCoversSprite(PlaceholderParts.CreateGripPanelGrab(), PlaceholderParts.GripPanel, PlaceholderParts.GripPanelOrigin);
 

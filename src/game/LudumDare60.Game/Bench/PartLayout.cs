@@ -9,7 +9,8 @@ namespace LudumDare60.Game.Bench;
 /// order data.
 /// </summary>
 /// <param name="Path">Seated at its start, out at its end.</param>
-/// <param name="GrabRadius">How close to the part's grab point the pointer must be to take it.</param>
+/// <param name="GrabRadius">How close to the part's grab point the pointer must be to take it when it has no
+/// <paramref name="Grab"/> shape, and how far past the dock tolerance the hand pulls it off its rail sideways.</param>
 /// <param name="Feel">Breakaway, friction and snapping.</param>
 /// <param name="Sprite">The part in the parts sheet.</param>
 /// <param name="Glow">Its glow outline in the parts sheet, one pixel larger on every side.</param>
@@ -22,8 +23,8 @@ namespace LudumDare60.Game.Bench;
 /// to stick to it again; null for a part that stays on its rail.</param>
 /// <param name="BrokenSprite">How the part looks broken, for an order that has it swapped for a spare; null for a part
 /// the bench has no spare of.</param>
-/// <param name="Grab">The pixels the part is taken by, for a part a circle of <paramref name="GrabRadius"/> does not
-/// fit; null to take it within that circle.</param>
+/// <param name="Grab">The pixels the part is taken by; null to take it within <paramref name="GrabRadius"/> of its
+/// grab point. A part drawn under the frame is not taken where the frame hides it.</param>
 public sealed record PartLayout(
     PartPath Path,
     float GrabRadius,

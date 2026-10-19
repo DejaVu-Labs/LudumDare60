@@ -655,6 +655,58 @@ public sealed class OrderBenchTests
     }
 
     [Fact]
+    public void Step_PressOnThePinWhereTheFrameHidesIt_TakesNothing()
+    {
+        // The rod's tail, under the frame right of the cylinder window.
+        var hidden = BenchLayout.PinSeated + new Vector2(34, 0);
+        Assert.True(BenchLayout.FrameCover.Contains(hidden));
+
+        _bench.Step(Press(hidden), Dt);
+
+        Assert.False(_bench.Part(RevolverParts.BasePin).IsHeld);
+        Assert.False(_bench.Part(RevolverParts.Cylinder).IsHeld);
+    }
+
+    [Fact]
+    public void Step_PressOnTheTailOfTheLoosePin_TakesIt()
+    {
+        Drag(BenchLayout.PinSeated, BenchLayout.PinOut);
+        Assert.True(_bench.Part(RevolverParts.BasePin).IsFree);
+        var tail = _bench.Part(RevolverParts.BasePin).Position + new Vector2(PlaceholderParts.Pin.Width - PlaceholderParts.PinOrigin.X - 2, 0);
+
+        _bench.Step(Press(tail), Dt);
+
+        Assert.True(_bench.Part(RevolverParts.BasePin).IsHeld);
+    }
+
+    [Fact]
+    public void Step_HammerAtHalfCock_IsTakenByItsTurnedSpur()
+    {
+        var bench = new OrderBench(s_shipped.Orders[3]);
+        var spur = EdgePixel(PlaceholderParts.Hammer, PlaceholderParts.HammerOrigin, Vector2.Zero, fromTop: true);
+        var angle = ActionTest.HalfCock * ActionTest.CockAngle;
+        var turnedSpur = BenchLayout.HammerPivot + Vector2.Transform(spur, Matrix3x2.CreateRotation(angle));
+
+        bench.Step(Release(turnedSpur), Dt, hammerOpen: true, angle);
+
+        Assert.Equal(angle, bench.Part(RevolverParts.Hammer).Angle, 1e-6f);
+        Assert.True(bench.Part(RevolverParts.Hammer).IsUnder(turnedSpur));
+    }
+
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(0.5f)]
+    [InlineData(1f)]
+    public void PartAngle_Hammer_StraightensAsItLiftsOffAndLiesFlatOnTheMat(float share)
+    {
+        BenchLayout.TryGetPart(RevolverParts.Hammer, out var layout);
+        var distance = share * layout!.Path.Length;
+
+        Assert.Equal(0.3f * (1 - share), OrderBench.PartAngle(layout, isFree: false, distance, 0.3f), 1e-6f);
+        Assert.Equal(0f, OrderBench.PartAngle(layout, isFree: true, distance, 0.3f));
+    }
+
+    [Fact]
     public void Step_PressOnTheGripScrewOverThePanel_TakesTheScrew()
     {
         var bench = new OrderBench(s_shipped.Orders[1]);

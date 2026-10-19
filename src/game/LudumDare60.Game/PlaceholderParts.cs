@@ -330,6 +330,32 @@ internal static class PlaceholderParts
     public static Image CreateGripPanelGrime() => CreateDirt(PanelWidth, PanelHeight, IsGripPanel, s_grime, GrimeCutoff);
 
     /// <summary>
+    /// The revolver's opaque pixels with the revolver at <paramref name="at"/>, asked with work surface points: what
+    /// hides a part under the frame.
+    /// </summary>
+    public static GrabShape CreateBodyCover(Vector2 at) => new(BodyWidth, BodyHeight, -at, IsBody, margin: 0);
+
+    /// <summary>
+    /// The base pin's pixels, head and rod, and two around them: the rod is thin.
+    /// </summary>
+    public static GrabShape CreatePinGrab() => new(Pin.Width, Pin.Height, PinOrigin, IsPin, margin: 2);
+
+    /// <summary>
+    /// The cylinder's pixels and one around them. It keeps its outline as it turns.
+    /// </summary>
+    public static GrabShape CreateCylinderGrab() => new(CylinderWidth, CylinderHeight, CylinderOrigin, IsCylinder, margin: 1);
+
+    /// <summary>
+    /// The hammer's pixels at rest, hub, neck and spur, and one around them.
+    /// </summary>
+    public static GrabShape CreateHammerGrab() => new(HammerSize, HammerSize, HammerOrigin, IsHammer, margin: 1);
+
+    /// <summary>
+    /// A screw head's pixels and two around them: the head is small.
+    /// </summary>
+    public static GrabShape CreateScrewGrab() => new(ScrewSize, ScrewSize, ScrewOrigin, IsScrew, margin: 2);
+
+    /// <summary>
     /// The grip panel's pixels and one around them: the whole panel takes it, not only its grab point.
     /// </summary>
     public static GrabShape CreateGripPanelGrab() => new(PanelWidth, PanelHeight, GripPanelOrigin, IsGripPanel, margin: 1);

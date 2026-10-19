@@ -147,6 +147,29 @@ public sealed class PartDragTests
     }
 
     [Fact]
+    public void IsUnder_Turned_ChecksTheTurnedShape()
+    {
+        var shape = new GrabShape(30, 3, new Vector2(1, 1), static (_, _) => true, margin: 0);
+        var part = new PartDrag(s_path, 6, DragFeel.Default, shape: shape) { Angle = MathF.PI / 2 };
+
+        Assert.True(part.IsUnder(new Vector2(100, 70)));
+        Assert.False(part.IsUnder(new Vector2(120, 50)));
+    }
+
+    [Fact]
+    public void IsUnder_OnItsCoverInTheGun_IsFalse()
+    {
+        // Everything right of x = 104 hides the part.
+        var cover = new GrabShape(100, 100, new Vector2(-104, 0), static (_, _) => true, margin: 0);
+        var shape = new GrabShape(30, 3, new Vector2(1, 1), static (_, _) => true, margin: 0);
+        var part = new PartDrag(s_path, 6, DragFeel.Default, shape: shape, cover: cover);
+
+        Assert.True(part.IsUnder(new Vector2(101, 50)));
+        Assert.False(part.IsUnder(new Vector2(110, 50)));
+        Assert.Same(cover, part.Cover);
+    }
+
+    [Fact]
     public void Step_PressOnTheFarEndOfItsShape_GrabsIt()
     {
         var shape = new GrabShape(30, 3, new Vector2(1, 1), static (_, _) => true, margin: 0);

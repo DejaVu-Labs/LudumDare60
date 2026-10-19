@@ -160,6 +160,13 @@ public static class BenchLayout
     /// <inheritdoc cref="BrushGrabMin"/>
     public static readonly Vector2 BrushGrabMax = new(19, 4);
 
+    /// <summary>
+    /// The revolver's opaque pixels where it lies: what of a part under the frame they hide does not take it.
+    /// </summary>
+    public static readonly GrabShape FrameCover = PlaceholderParts.CreateBodyCover(GunPosition);
+
+    private static readonly GrabShape s_screwGrab = PlaceholderParts.CreateScrewGrab();
+
     private static readonly PartLayout s_basePin = new(
         new LinePath(PinSeated, PinOut),
         GrabRadius: 7,
@@ -169,7 +176,8 @@ public static class BenchLayout
         PlaceholderParts.PinOrigin,
         PartLayer.UnderFrame,
         ClickPitch: 1,
-        Free: new FreeMove(MatMin, MatMax, DockRadius: 4, DockSpan: 4));
+        Free: new FreeMove(MatMin, MatMax, DockRadius: 4, DockSpan: 4),
+        Grab: PlaceholderParts.CreatePinGrab());
 
     private static readonly PartLayout s_cylinder = new(
         new LinePath(CylinderSeated, CylinderSeated + new Vector2(0, CylinderPull)),
@@ -181,7 +189,8 @@ public static class BenchLayout
         PartLayer.OverFrame,
         ClickPitch: 0.8f,
         PlaceholderParts.CylinderTurned,
-        new FreeMove(MatMin, MatMax, DockRadius: 8, DockSpan: 0, SeatsOnDock: true));
+        new FreeMove(MatMin, MatMax, DockRadius: 8, DockSpan: 0, SeatsOnDock: true),
+        Grab: PlaceholderParts.CreateCylinderGrab());
 
     // A screw sticks a little before it turns, and once out it goes back into its hole when put down on it.
     private static readonly DragFeel s_screwFeel = new() { BreakawayAtStart = 6, SnapDistance = 4 };
@@ -195,7 +204,8 @@ public static class BenchLayout
         PlaceholderParts.ScrewOrigin,
         PartLayer.OverPanel,
         ClickPitch: 1.6f,
-        Free: new FreeMove(MatMin, MatMax, DockRadius: 5, DockSpan: 0));
+        Free: new FreeMove(MatMin, MatMax, DockRadius: 5, DockSpan: 0),
+        Grab: s_screwGrab);
 
     private static readonly PartLayout s_gripPanel = new(
         new LinePath(GripPanelSeated, GripPanelSeated + new Vector2(0, GripPanelPull)),
@@ -238,7 +248,8 @@ public static class BenchLayout
         PlaceholderParts.HammerOrigin,
         PartLayer.Hammer,
         ClickPitch: 0.9f,
-        Free: new FreeMove(MatMin, MatMax, DockRadius: 6, DockSpan: 0, SeatsOnDock: true));
+        Free: new FreeMove(MatMin, MatMax, DockRadius: 6, DockSpan: 0, SeatsOnDock: true),
+        Grab: PlaceholderParts.CreateHammerGrab());
 
     /// <summary>
     /// The layout of part <paramref name="id"/>, if it has one yet.

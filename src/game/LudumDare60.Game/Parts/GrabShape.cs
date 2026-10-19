@@ -66,9 +66,16 @@ public sealed class GrabShape
     /// <summary>
     /// Whether the point <paramref name="offset"/> away from the part's grab point lies on the shape.
     /// </summary>
-    public bool Contains(Vector2 offset)
+    public bool Contains(Vector2 offset) => Contains(offset, 0);
+
+    /// <summary>
+    /// Whether the point <paramref name="offset"/> away from the part's grab point lies on the shape, for the part
+    /// drawn turned by <paramref name="angle"/> radians around its grab point.
+    /// </summary>
+    public bool Contains(Vector2 offset, float angle)
     {
-        var local = offset + _origin;
+        var unturned = angle == 0 ? offset : Vector2.Transform(offset, Matrix3x2.CreateRotation(-angle));
+        var local = unturned + _origin;
         var x = (int)MathF.Floor(local.X);
         var y = (int)MathF.Floor(local.Y);
         return (uint)x < (uint)_width && (uint)y < (uint)_height && _pixels[(y * _width) + x];

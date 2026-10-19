@@ -36,15 +36,18 @@ public sealed class PartDrag
     private PartStop _leftStop;
 
     /// <param name="path">Where the part can go. Its position is the point of the part the player grabs.</param>
-    /// <param name="grabRadius">How close to <see cref="Position"/> the pointer must be to grab the part.</param>
+    /// <param name="grabRadius">How close to <see cref="Position"/> the pointer must be to grab a part without a
+    /// <paramref name="shape"/>, and how far past the dock tolerance the hand pulls a part off its rail sideways.</param>
     /// <param name="feel">Breakaway, friction and snapping.</param>
     /// <param name="stop">Where the part starts: <see cref="PartStop.Start"/> or <see cref="PartStop.End"/>.</param>
     /// <param name="free">How the part moves once it is out, or null to keep it on its rail.</param>
     /// <param name="shape">The pixels the part is taken by, or null to take it within <paramref name="grabRadius"/> of
     /// <see cref="Position"/>.</param>
+    /// <param name="cover">What hides the part while it is in the gun, in work surface pixels: a point on it does not
+    /// take the part. Null for a part nothing hides.</param>
     /// <exception cref="ArgumentOutOfRangeException">A distance, rate or speed is negative or not a number, the strain
     /// is outside [0, 1], the snap zones of the two ends touch, or <paramref name="stop"/> is not an end.</exception>
-    public PartDrag(PartPath path, float grabRadius, in DragFeel feel, PartStop stop = PartStop.Start, FreeMove? free = null, GrabShape? shape = null)
+    public PartDrag(PartPath path, float grabRadius, in DragFeel feel, PartStop stop = PartStop.Start, FreeMove? free = null, GrabShape? shape = null, GrabShape? cover = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(grabRadius);
         ArgumentOutOfRangeException.ThrowIfNegative(feel.BreakawayAtStart, nameof(feel));
@@ -73,6 +76,7 @@ public sealed class PartDrag
         Stop = stop;
         _free = free;
         Shape = shape;
+        Cover = cover;
         Distance = PreviousDistance = StopDistance(stop);
         PreviousPosition = Position;
     }
@@ -85,6 +89,17 @@ public sealed class PartDrag
     /// The pixels the part is taken by, or null for a part taken within <see cref="GrabRadius"/> of its position.
     /// </summary>
     public GrabShape? Shape { get; }
+
+    /// <summary>
+    /// What hides the part while it is in the gun, in work surface pixels, or null.
+    /// </summary>
+    public GrabShape? Cover { get; }
+
+    /// <summary>
+    /// How far the part is turned around its position as it is drawn, in radians: its <see cref="Shape"/> turns with
+    /// it. Set it before each step.
+    /// </summary>
+    public float Angle { get; set; }
 
     public DragFeel Feel { get; }
 
@@ -136,11 +151,19 @@ public sealed class PartDrag
     public Vector2 GetRenderPosition(float alpha) => Vector2.Lerp(PreviousPosition, Position, alpha);
 
     /// <summary>
-    /// Whether <paramref name="point"/> lies on the part's <see cref="Shape"/>, or within <see cref="GrabRadius"/> of
-    /// the part when it has none.
+    /// Whether <paramref name="point"/> lies on the part's <see cref="Shape"/> turned by <see cref="Angle"/>, or within
+    /// <see cref="GrabRadius"/> of the part when it has none, and is not on its <see cref="Cover"/> while it is in the
+    /// gun.
     /// </summary>
     public bool IsUnder(Vector2 point)
-        => Shape is { } shape ? shape.Contains(point - Position) : Vector2.DistanceSquared(point, Position) <= GrabRadius * GrabRadius;
+    {
+        if (!IsFree && Cover is { } cover && cover.Contains(point))
+        {
+            return false;
+        }
+
+        return Shape is { } shape ? shape.Contains(point - Position, Angle) : Vector2.DistanceSquared(point, Position) <= GrabRadius * GrabRadius;
+    }
 
     /// <summary>
     /// Advances the part by one fixed step.
