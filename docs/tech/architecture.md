@@ -222,7 +222,8 @@ failed import (a network error) is tried again by the next read (`LazyImport`).
 Reads download like the runtime's files (see [Browser startup](#browser-startup)): `createRetryingFetch` and
 `createWatchedFetch` from `boot.js` abort a read after 10 s without data and retry network errors and 408, 429 and 5xx
 responses six times. Only when every attempt fails does the asset become `Failed`. The engine reports that to Sentry
-(`IPlatform.ReportError`), and the game goes on without it unless it checks the asset's state.
+(`IPlatform.ReportError`). `LudumDare60Game` stops when any file it requested failed (`ThrowIfAnyAssetFailed`), so
+the page shows the error text instead of a scene with a missing layer.
 
 Release builds append `?v=<commit hash>` to every asset URL, and Debug builds fetch with `cache: 'no-cache'`. See
 [build-and-deploy.md](build-and-deploy.md#asset-caching) for why.

@@ -345,14 +345,50 @@ public sealed class LudumDare60GameTests
     }
 
     [Fact]
-    public void FirstFrame_NoOrdersFile_StopsTheGameNamingIt()
+    public void FirstFrame_NoAssetFiles_StopsTheGameNamingTheFirstRequested()
     {
         var platform = new ManualPlatform();
         _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(new LudumDare60Game(), platform);
 
         var error = Assert.Throws<InvalidOperationException>(() => platform.Frame(0));
 
-        Assert.Contains(AssetPaths.Orders, error.Message, StringComparison.Ordinal);
+        Assert.Equal($"{AssetPaths.Bench} did not load.", error.Message);
+        Assert.IsType<AssetLoadException>(error.InnerException);
+    }
+
+    [Theory]
+    [InlineData(AssetPaths.Orders)]
+    [InlineData(AssetPaths.Street)]
+    public void FirstFrame_OneAssetFails_StopsTheGameNamingIt(string path)
+    {
+        var platform = new ManualPlatform { Assets = new ShippedAssets(withBackground: true, failing: path) };
+        _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(new LudumDare60Game(), platform);
+
+        var error = Assert.Throws<InvalidOperationException>(() => platform.Frame(0));
+
+        Assert.Equal($"{path} did not load.", error.Message);
+    }
+
+    [Fact]
+    public void FirstFrame_CustomerSheetFails_StopsTheGameNamingIt()
+    {
+        var sheet = AssetPaths.CustomerSheets[0].Value;
+        var platform = new ManualPlatform { Assets = new ShippedAssets(withBackground: true, failing: sheet) };
+        _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(new LudumDare60Game(), platform);
+
+        var error = Assert.Throws<InvalidOperationException>(() => platform.Frame(0));
+
+        Assert.Equal($"{sheet} did not load.", error.Message);
+    }
+
+    [Fact]
+    public void Frames_BackgroundStillLoading_GameGoesOn()
+    {
+        _platform.Frame(0);
+        _platform.Frame(0.1);
+
+        Assert.False(_game.HasBackground);
+        Assert.False(_game.HasStreet);
     }
 
     [Fact]
@@ -1308,15 +1344,27 @@ public sealed class LudumDare60GameTests
     /// <summary>
     /// Reads the files of <c>wwwroot/assets/</c>, copied next to the test assembly.
     /// </summary>
-    /// <param name="withBackground">Whether the room and the street are there.</param>
+    /// <param name="withBackground">Whether the room and the street load. Without them, their reads never finish: a
+    /// failed read would stop the game.</param>
     /// <param name="firstLook">When set, the first order's customer has this look instead of hoodie.</param>
-    private sealed class ShippedAssets(bool withBackground, string? firstLook = null) : IAssetSource
+    /// <param name="failing">When set, the read of this file fails.</param>
+    private sealed class ShippedAssets(bool withBackground, string? firstLook = null, string? failing = null) : IAssetSource
     {
         // Reads finish at once, so a file requested in Initialize is loaded in the first frame.
         public Task<byte[]> ReadAsync(string path)
-            => !withBackground && (string.Equals(path, AssetPaths.Bench, StringComparison.Ordinal) || string.Equals(path, AssetPaths.Street, StringComparison.Ordinal))
-                ? Task.FromException<byte[]>(new FileNotFoundException(path))
-                : Task.FromResult(firstLook is not null && string.Equals(path, AssetPaths.Orders, StringComparison.Ordinal) ? FirstLookAs(firstLook) : Read(path));
+        {
+            if (string.Equals(path, failing, StringComparison.Ordinal))
+            {
+                return Task.FromException<byte[]>(new FileNotFoundException(path));
+            }
+
+            if (!withBackground && (string.Equals(path, AssetPaths.Bench, StringComparison.Ordinal) || string.Equals(path, AssetPaths.Street, StringComparison.Ordinal)))
+            {
+                return new TaskCompletionSource<byte[]>().Task;
+            }
+
+            return Task.FromResult(firstLook is not null && string.Equals(path, AssetPaths.Orders, StringComparison.Ordinal) ? FirstLookAs(firstLook) : Read(path));
+        }
 
         private static byte[] FirstLookAs(string look)
         {

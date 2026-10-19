@@ -284,6 +284,7 @@ public sealed class LudumDare60Game : IGame
             _hasSounds = true;
         }
 
+        ThrowIfAnyAssetFailed();
         if (!_hasOrders)
         {
             TakeOrders();
@@ -552,17 +553,53 @@ public sealed class LudumDare60Game : IGame
     private static byte Blink(float hint) => (int)(hint * HintBlinkRate) % 2 == 0 ? GlowActive : GlowHintLow;
 
     /// <summary>
-    /// Opens the shop once <c>orders.json</c> is loaded. A broken file stops the game with its problems, so they cannot
-    /// go unnoticed.
+    /// Stops the game when a file it requested failed to load, naming the first one in request order. The game needs every
+    /// file: the platform has already retried the download, so a failure means the player's network or the build is
+    /// broken, and stopping shows the error text and reports it, where going on would show a scene with a missing layer.
+    /// </summary>
+    private void ThrowIfAnyAssetFailed()
+    {
+        // Loaded images are released, so only the ones still waiting are checked.
+        if (!HasBackground)
+        {
+            ThrowIfFailed(_benchImage);
+        }
+
+        if (!HasStreet)
+        {
+            ThrowIfFailed(_streetImage);
+        }
+
+        for (var i = 0; i < _customerImages.Length; i++)
+        {
+            if (!_hasCustomerSheet[i])
+            {
+                ThrowIfFailed(_customerImages[i]);
+            }
+        }
+
+        if (!_hasOrders)
+        {
+            ThrowIfFailed(_ordersHandle);
+        }
+    }
+
+    private void ThrowIfFailed<T>(AssetHandle<T> handle)
+        where T : class
+    {
+        if (_assets!.GetError(handle) is { } error)
+        {
+            throw new InvalidOperationException($"{error.AssetPath} did not load.", error);
+        }
+    }
+
+    /// <summary>
+    /// Opens the shop once <c>orders.json</c> is loaded. A broken file fails to load, which stops the game in
+    /// <see cref="Update"/> with its problems, so they cannot go unnoticed.
     /// </summary>
     private void TakeOrders()
     {
-        if (_assets!.GetState(_ordersHandle) == AssetState.Failed)
-        {
-            throw new InvalidOperationException($"{AssetPaths.Orders} did not load.", _assets.GetError(_ordersHandle));
-        }
-
-        if (_assets.TryGet(_ordersHandle, out var orders))
+        if (_assets!.TryGet(_ordersHandle, out var orders))
         {
             Orders = orders;
             Shop = new Shop(orders);
