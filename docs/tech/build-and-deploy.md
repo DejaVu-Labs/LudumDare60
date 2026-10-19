@@ -77,8 +77,8 @@ It needs no workload beyond the SDK, and a Vulkan driver to run (see
 [Desktop renderer](architecture.md#desktop-renderer)). On ChromeOS (Crostini) run it with `SDL_VIDEO_DRIVER=wayland`. The native SDL3 libraries come from the `SDL3-CS.Windows`, `SDL3-CS.Linux` and
 `SDL3-CS.MacOS` packages and are copied to `runtimes/<rid>/native/`; the runtime picks the one for the current OS.
 The build copies the browser project's `wwwroot/assets/` to `assets/` next to the executable. `--debug` turns on the
-same debug keys as `?debug` in the browser. The game is silent until the desktop audio exists. Nothing deploys the
-desktop build yet.
+same debug keys as `?debug` in the browser. Without an audio device (no sound server), the game runs silent. Nothing
+deploys the desktop build yet.
 
 The sprite shaders are committed as GLSL and as compiled SPIR-V. After changing `Shaders/*.vert` or `*.frag` in the
 desktop platform, write the SPIR-V again:

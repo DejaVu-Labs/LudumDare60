@@ -19,6 +19,8 @@
     <PackageVersion Include="SDL3-CS.Linux" Version="3.4.18" />
     <PackageVersion Include="SDL3-CS.MacOS" Version="3.4.18" />
     <PackageVersion Include="SDL3-CS.Windows" Version="3.4.18" />
+    <!-- Managed Ogg Vorbis decoder for the desktop audio backend (SDL decodes only WAV). -->
+    <PackageVersion Include="NVorbis" Version="0.10.5" />
   </ItemGroup>
 
   <ItemGroup Label="Testing">

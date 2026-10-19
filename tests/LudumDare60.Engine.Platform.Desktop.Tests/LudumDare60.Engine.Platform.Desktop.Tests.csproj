@@ -17,6 +17,11 @@
   <ItemGroup>
     <!-- Shared with tests/js/webgl2.test.mjs and SpriteBatchTests. -->
     <None Include="..\fixtures\render-frame.json" Link="fixtures\render-frame.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Shared with tests/js/webaudio.test.mjs and AudioTests. -->
+    <None Include="..\fixtures\audio-frame.json" Link="fixtures\audio-frame.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Real files for the decoder, from the SoundBoard sample. -->
+    <None Include="..\..\samples\SoundBoard\LudumDare60.Samples.SoundBoard.Browser\wwwroot\assets\ambience\rain.ogg" Link="fixtures\rain.ogg" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\SoundBoard\LudumDare60.Samples.SoundBoard.Browser\wwwroot\assets\sfx\click.wav" Link="fixtures\click.wav" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

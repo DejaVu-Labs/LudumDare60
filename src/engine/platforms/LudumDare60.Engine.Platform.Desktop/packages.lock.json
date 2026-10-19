@@ -14,6 +14,12 @@
         "resolved": "10.0.13",
         "contentHash": "40yrBMsLEcjixBR4G+FiUaBPvxXIPSKJ2OgSrbOZcmSDBda4Sb0k7BWrfDpIvn3IvvDzwOL/tEPa6gDQfh6aRw=="
       },
+      "NVorbis": {
+        "type": "Direct",
+        "requested": "[0.10.5, )",
+        "resolved": "0.10.5",
+        "contentHash": "o+IptCG4Avze39HrGeztC+xIp6fOOwGVAwkoa1J++4Ji1WmZ+KIKlFl5wsgxsXqBkmdpfs/vFSUproiLKYa2bw=="
+      },
       "SDL3-CS": {
         "type": "Direct",
         "requested": "[3.4.18, )",

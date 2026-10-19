@@ -1,12 +1,13 @@
 using LudumDare60.Engine.Platform.Desktop.Rendering;
+using LudumDare60.Engine.Platform.Desktop.Sounds;
 using SDL3;
 
 namespace LudumDare60.Engine.Platform.Desktop;
 
 /// <summary>
 /// <see cref="IPlatform"/> for Windows, Linux and macOS on SDL3: one window drawn with Vulkan through SDL_GPU, frames
-/// from a loop on the calling thread, keyboard, mouse, touch and gamepad input and real asset files. It plays no sound
-/// yet (<see cref="Audio"/>).
+/// from a loop on the calling thread, sound mixed in managed code and played through SDL audio, keyboard, mouse, touch
+/// and gamepad input, and real asset files.
 /// </summary>
 /// <param name="title">Window title.</param>
 /// <param name="width">Initial window width in logical pixels.</param>
@@ -32,6 +33,8 @@ public sealed class DesktopPlatform(string title, int width, int height, string?
 
     private readonly GpuGraphics _graphics = new();
 
+    private readonly SdlAudio _audio = new();
+
     /// <inheritdoc />
     /// <remarks>Files under the asset root, read on the thread pool.</remarks>
     public IAssetSource Assets => _assets;
@@ -42,8 +45,10 @@ public sealed class DesktopPlatform(string title, int width, int height, string?
     public IGraphicsBackend Graphics => _graphics;
 
     /// <inheritdoc />
-    /// <remarks>Plays nothing yet: every sound reports ready and stays silent.</remarks>
-    public IAudioBackend Audio { get; } = new SilentAudio();
+    /// <remarks>WAV and Ogg Vorbis, mixed in managed code (see <see cref="Mixer"/>) and played on the default device.
+    /// <see cref="RunAsync"/> opens the device before the first frame; without one the game runs silent. Unlike the
+    /// browser, nothing has to unlock audio first.</remarks>
+    public IAudioBackend Audio => _audio;
 
     /// <inheritdoc />
     /// <remarks>Runs the frame loop on the calling thread, which must be the process's main thread (macOS needs that
@@ -59,7 +64,7 @@ public sealed class DesktopPlatform(string title, int width, int height, string?
 
         // Touches arrive as finger events; SDL's mouse copies of them would report each touch twice.
         SDL.SetHint(SDL.Hints.TouchMouseEvents, "0");
-        if (!SDL.Init(SDL.InitFlags.Video | SDL.InitFlags.Gamepad))
+        if (!SDL.Init(SDL.InitFlags.Video | SDL.InitFlags.Audio | SDL.InitFlags.Gamepad))
         {
             throw new InvalidOperationException($"SDL_Init failed: {SDL.GetError()}");
         }
@@ -75,10 +80,16 @@ public sealed class DesktopPlatform(string title, int width, int height, string?
             try
             {
                 _graphics.Initialize(window);
+                if (_audio.Initialize() is { } audioError)
+                {
+                    ReportError(new InvalidOperationException($"No sound: opening the audio device failed: {audioError}"), handled: true);
+                }
+
                 Run(window, frameSink);
             }
             finally
             {
+                _audio.Shutdown();
                 _graphics.Shutdown();
                 foreach (var gamepad in _gamepads.Values)
                 {

@@ -17,7 +17,7 @@ desktop one.
 | `src/engine/LudumDare60.Engine.Platform` | `Microsoft.NET.Sdk` | Platform contracts: `IPlatform` (with `ReportError`, a no-op by default), `IFrameSink`, raw input (`RawInputEvent`, `RawInputEventKind`, `Key`, `PointerType`), asset reads (`IAssetSource`, `AssetLoadException`), the GPU (`IGraphicsBackend`, `RenderCommandKind`, `SpriteInstance`, `Color`), sound output (`IAudioBackend`, `AudioCommandKind`, `AudioBus`, `AudioEvent`, `AudioEventKind`, `AudioLimits`), product analytics (`IAnalytics`, `ProgressionStatus`, `NullAnalytics`). No dependencies. |
 | `src/engine/LudumDare60.Engine` | `Microsoft.NET.Sdk` | `GameEngine`, `IGame`, `FrameContext`, `Input/` (`InputState`, `PointerButton`), `Assets/` (`AssetManager` and loaders), `Rendering/` (`PixelViewport`, `Graphics`, `Texture`, `SpriteBatch`, `SpriteOptions`, `IntRect`), `Sounds/` (`Audio`, `Sound`, `SoundState`, `Voice`, `SoundOptions`). Depends only on the platform contracts and the managed `StbImageSharp` package (image decoding). |
 | `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `Microsoft.NET.Sdk.StaticWebAssets` | `BrowserPlatform : IPlatform` and its JS: `wwwroot/boot.js` (runtime start), `wwwroot/load-log.js` (load timing), `wwwroot/reporting.js` (errors and load timing to Sentry), `wwwroot/frame-loop.js`, `wwwroot/input.js`, `wwwroot/assets.js`, `wwwroot/webgl2.js` (renderer, shaders in `wwwroot/shaders/`), `wwwroot/webaudio.js` (sound) and `wwwroot/analytics.js` (product analytics, on the GameAnalytics SDK in `wwwroot/vendor/gameanalytics.js`). Its `wwwroot/` ships with the app under `_content/LudumDare60.Engine.Platform.Browser/`. |
-| `src/engine/platforms/LudumDare60.Engine.Platform.Desktop` | `Microsoft.NET.Sdk` | `DesktopPlatform : IPlatform` on SDL3 (the `SDL3-CS` wrapper and its native packages for Windows, Linux and macOS): window, frame loop, input, asset files, and a Vulkan renderer on SDL_GPU (`Rendering/`, shaders in `Shaders/`). No sound yet. See [Desktop platform](#desktop-platform) and [Desktop renderer](#desktop-renderer). |
+| `src/engine/platforms/LudumDare60.Engine.Platform.Desktop` | `Microsoft.NET.Sdk` | `DesktopPlatform : IPlatform` on SDL3 (the `SDL3-CS` wrapper and its native packages for Windows, Linux and macOS): window, frame loop, input, asset files, and a Vulkan renderer on SDL_GPU (`Rendering/`, shaders in `Shaders/`). Sound in `Sounds/` (`SdlAudio`, a managed `Mixer`, WAV and Ogg decoding). See [Desktop platform](#desktop-platform), [Desktop renderer](#desktop-renderer) and [Desktop audio](#desktop-audio). |
 | `src/game/LudumDare60.Game` | `Microsoft.NET.Sdk` | `LudumDare60Game : IGame`, `Parts/` (the touch loop: `PartDrag` moves a part along a `PartPath` (a `LinePath`, or a screw turned by circling it) with the `DragFeel` it is given, fed one `PointerSample` per fixed step, and with a `FreeMove` lets it lie anywhere on the work surface once out and stick back to its rail, or drop straight into its seat; `PartAssembly` steps the parts of a gun and enforces which part blocks which), `Cleaning/` (`DirtLayer`: dirt pixels scrubbed off a part and counted; `BrushTool`: a tool the player picks up and puts down anywhere, the brush that scrubs and the oil can that oils), `Orders/` (the order data of `orders.json`, its loader and validation, and `RevolverParts`), `Bench/` (`OrderBench`: one order on the bench with its parts, dirt, oil, spares and tools; `ActionTest`: the hammer at half cock to take the revolver apart, then full cock and the trigger to test it; `BenchLayout`: where the revolver, its parts, the tools and the tray of spares lie), `Customers/` (`Shop`: customers coming in, the repair, the hand-back, the next customer), `Analytics/` (`ShopAnalytics`: the shop's moments as analytics events), the parts sheet (`PlaceholderParts`: the revolver from `RevolverSheet`, its sprites embedded in the assembly, and the pieces still generated in code) and placeholder sounds generated in code. No platform dependency. |
 | `src/game/LudumDare60.Game.Browser` | `Microsoft.NET.Sdk.WebAssembly` | Entry point, host page and `main.js`. Only wires the game and the browser platform together. |
 | `src/game/LudumDare60.Game.Desktop` | `Microsoft.NET.Sdk` | Desktop entry point: wires the game and the desktop platform together, and copies the browser project's `wwwroot/assets/` to `assets/` next to the executable. |
@@ -150,7 +150,7 @@ to Sentry when reporting is configured (see
 
 `DesktopPlatform` runs the same game in a native window, for faster iteration (a Debug build starts in seconds, and
 a native debugger and profiler work) and as the base of a later desktop release. It implements the same contracts as
-the browser platform, so the engine and the game cannot tell them apart, except that it plays no sound yet.
+the browser platform, so the engine and the game cannot tell them apart.
 
 - `RunAsync(sink)` sets the `SDL_HINT_TOUCH_MOUSE_EVENTS` hint to `0`, initializes SDL (video and gamepads), creates
   a resizable high-density window and runs the frame loop on the calling thread, which must be the main thread
@@ -164,8 +164,8 @@ the browser platform, so the engine and the game cannot tell them apart, except 
   (`SDL_GetCurrentDisplayMode`, 60 Hz when unknown) after the frame started instead.
 - `Graphics` is `GpuGraphics`, Vulkan through SDL_GPU (see [Desktop renderer](#desktop-renderer)). `RunAsync`
   creates its device on the window before the first frame and releases it before the window is destroyed.
-- `Audio` is `SilentAudio` (reports every sound `SoundReady` on the next `Submit`, plays nothing). See the
-  [backlog](../backlog.md#desktop-platform-follow-ups).
+- `Audio` is `SdlAudio` (see [Desktop audio](#desktop-audio)). `RunAsync` opens the default playback device before
+  the first frame and closes it before the GPU; without a device the game runs silent and says so on standard error.
 - `Assets` is `FileAssetSource` on `assets/` next to the executable (`AppContext.BaseDirectory`). Reads use
   `File.ReadAllBytesAsync` and finish on the thread pool, which is safe because `AssetManager` only checks the
   task in `Update`. I/O errors become `AssetLoadException` with status 0. Windows and macOS file systems ignore
@@ -658,6 +658,30 @@ Web Audio the module stays silent: every sound reports `SoundFailed`, and comman
 - **Hidden page.** `visibilitychange` to hidden calls `suspend()`, because frames stop in a background tab and loops
   would play on without the game. Back to visible calls `resume()`, but only after the unlock. Losing focus alone does
   not suspend anything.
+
+### Desktop audio
+
+`DesktopPlatform.Audio` is an `SdlAudio`: a managed `Mixer` that does what the `webaudio.js` graph does, played
+through an SDL audio stream on the default device (32-bit float stereo at 48 kHz; SDL converts to the device).
+
+- **Threads.** SDL asks for samples on its audio thread, through the stream's callback, which runs `Mixer.Mix` while
+  SDL holds the stream's lock. The game thread takes the same lock (`SDL_LockAudioStream`) for every call that
+  changes the mixer: `CreateSound`, `DestroySound` and each `Submit`. `Mix` does not allocate: voices come from a
+  pool, and the mix buffers grow once to the device's request size.
+- **Decoding.** `CreateSound` copies the file and decodes it with `SoundDecoder` in `Task.Run`. Each `Submit` takes
+  the decodes that finished, gives the samples to the mixer and queues `SoundReady`, or writes the reason to standard
+  error and queues `SoundFailed`. A sound destroyed in the meantime reports nothing. `SoundDecoder` reads WAV (PCM 8,
+  16, 24 or 32-bit, 32-bit float, also as `WAVE_FORMAT_EXTENSIBLE`) and Ogg Vorbis (`NVorbis`), mono or stereo, and
+  tells them apart by their first bytes. Sounds are kept as 32-bit floats, like a Web Audio buffer.
+- **Mixer.** Each voice reads its sound with linear interpolation at `pitch x sound rate / 48000`, then applies its
+  gain and the `StereoPannerNode` equal-power pan law, and adds into its bus; the Sfx, Ambience and Music buses are
+  summed through their gains, then the master gain, and clamped to [-1, 1]. Gains, pitch and pan are
+  `SmoothParam`s, advanced per sample: changes glide with the 10 ms time constant of `setTargetAtTime`, fades ramp
+  linearly like `linearRampToValueAtTime`, and a stop fades over at least 10 ms. Commands are checked like
+  `webaudio.js` and throw the same messages. One-shots are dropped while their sound decodes and above
+  `AudioLimits.MaxVoices`; loops wait for their sound and are never dropped.
+- **Unlike the browser.** Nothing has to unlock audio: one-shots play from the first frame. A minimized window keeps
+  playing, because frames go on.
 
 ## Analytics
 
