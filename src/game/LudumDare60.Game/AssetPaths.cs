@@ -23,6 +23,12 @@ public static class AssetPaths
     public const string ScrubSound = "sounds/scrub.wav";
 
     /// <summary>
+    /// An elephant's trumpet, played when the player clicks the elephant statuette on the shelf
+    /// (<see cref="ShopDecor"/>). Freesound 442879 (a fake elephant scream, CC0), mixed down to mono.
+    /// </summary>
+    public const string ElephantSound = "sounds/elephant.wav";
+
+    /// <summary>
     /// Every customer's order, in the order they come in (see <see cref="Orders.OrderBook"/>).
     /// </summary>
     public const string Orders = "data/orders.json";

@@ -116,6 +116,7 @@ public sealed class LudumDare60Game : IGame
     private static readonly SoundOptions s_repaired = new() { Pitch = 1.5f, Volume = 0.5f };
     private static readonly SoundOptions s_handedBack = new() { Pitch = 0.9f, Volume = 0.6f };
     private static readonly SoundOptions s_doorBell = new() { Volume = 0.5f };
+    private static readonly SoundOptions s_elephant = new() { Volume = 0.6f };
     private static readonly SoundOptions s_halfCock = new() { Pitch = 1.1f, Volume = 0.5f };
     private static readonly SoundOptions s_cocked = new() { Pitch = 0.9f, Volume = 0.9f };
     private static readonly SoundOptions s_cylinderTurn = new() { Pitch = 1.3f, Volume = 0.45f };
@@ -154,6 +155,12 @@ public sealed class LudumDare60Game : IGame
     private Sound _scrubLoop;
     private AssetHandle<byte[]> _scrubSound;
     private bool _hasScrubSound;
+    private AssetHandle<byte[]> _elephantFile;
+    private Sound _elephantSound;
+    private bool _hasElephantSound;
+
+    // How long the elephant's trumpet still plays, in seconds.
+    private float _elephantLeft;
     private Sound _doorBell;
     private bool _hasSounds;
     private Voice _scrubVoice;
@@ -246,14 +253,14 @@ public sealed class LudumDare60Game : IGame
     /// </summary>
     public float LoadProgress => (float)LoadedAssetCount / AssetCount;
 
-    // The room, the street, a sheet per customer look, orders.json and the scrub sound.
-    private int AssetCount => 4 + _customerImages.Length;
+    // The room, the street, a sheet per customer look, orders.json, the scrub sound and the elephant.
+    private int AssetCount => 5 + _customerImages.Length;
 
     private int LoadedAssetCount
     {
         get
         {
-            var count = (HasBackground ? 1 : 0) + (HasStreet ? 1 : 0) + (_hasScrubSound ? 1 : 0);
+            var count = (HasBackground ? 1 : 0) + (HasStreet ? 1 : 0) + (_hasScrubSound ? 1 : 0) + (_hasElephantSound ? 1 : 0);
             foreach (var loaded in _hasCustomerSheet)
             {
                 count += loaded ? 1 : 0;
@@ -321,6 +328,7 @@ public sealed class LudumDare60Game : IGame
 
         _ordersHandle = assets.Request<OrderBook>(AssetPaths.Orders);
         _scrubSound = assets.Request<byte[]>(AssetPaths.ScrubSound);
+        _elephantFile = assets.Request<byte[]>(AssetPaths.ElephantSound);
     }
 
     public void FixedUpdate(in FrameContext context)
@@ -343,6 +351,7 @@ public sealed class LudumDare60Game : IGame
         shop.Step(PointerSample.From(context.Input), deltaTime);
         _shopAnalytics!.Observe(shop, deltaTime);
         PlayShopSounds(shop.Events);
+        TrumpetIfElephantPressed(PointerSample.From(context.Input), deltaTime);
         _bodyHint = MathF.Max(0, _bodyHint - deltaTime);
         _hammerHint = MathF.Max(0, _hammerHint - deltaTime);
         if ((shop.Events & ShopEvents.Repaired) != ShopEvents.None)
@@ -787,6 +796,26 @@ public sealed class LudumDare60Game : IGame
             _assets.Release(_scrubSound);
             _hasScrubSound = true;
         }
+
+        if (!_hasElephantSound && _assets!.TryGet(_elephantFile, out var elephant))
+        {
+            _elephantSound = _audio!.CreateSound(elephant);
+            _assets.Release(_elephantFile);
+            _hasElephantSound = true;
+        }
+    }
+
+    /// <summary>
+    /// Plays the elephant's trumpet when the pointer is pressed on the statuette on the shelf, unless it still plays.
+    /// </summary>
+    private void TrumpetIfElephantPressed(in PointerSample pointer, float deltaTime)
+    {
+        _elephantLeft = MathF.Max(0, _elephantLeft - deltaTime);
+        if (_hasElephantSound && pointer.IsPressed && _elephantLeft <= 0 && ShopDecor.IsOnElephant(pointer.Position))
+        {
+            _audio!.Play(_elephantSound, AudioBus.Sfx, s_elephant);
+            _elephantLeft = ShopDecor.ElephantSeconds;
+        }
     }
 
     private void ThrowIfAnyAssetFailed()
@@ -818,6 +847,11 @@ public sealed class LudumDare60Game : IGame
         if (!_hasScrubSound)
         {
             ThrowIfFailed(_scrubSound);
+        }
+
+        if (!_hasElephantSound)
+        {
+            ThrowIfFailed(_elephantFile);
         }
     }
 

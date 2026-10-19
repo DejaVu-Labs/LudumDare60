@@ -36,6 +36,7 @@ public sealed class LudumDare60GameTests
     // Sound ids in creation order: the click and the door bell on the first frame, then the scrub loop from its file.
     private const int DoorBellSound = 1;
     private const int ScrubSound = 2;
+    private const int ElephantSound = 3;
 
     // The shipped data without the background, which has its own tests; so the shop must not wait for it.
     private readonly ManualPlatform _platform = new() { Assets = new ShippedAssets(withBackground: false) };
@@ -172,7 +173,7 @@ public sealed class LudumDare60GameTests
     private void ComeToTheCounterWithSound()
     {
         _platform.Frame(0, Resize(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight, 1));
-        _platform.AudioBackend.ReportReady(0, 1, 2);
+        _platform.AudioBackend.ReportReady(0, 1, 2, 3);
         _platform.Frame(Step);
         for (var i = 0; i < 600 && Shop.Phase != ShopPhase.Offering; i++)
         {
@@ -394,7 +395,7 @@ public sealed class LudumDare60GameTests
 
         platform.Frame(0);
 
-        var assetCount = 4 + AssetPaths.CustomerSheets.Count;
+        var assetCount = 5 + AssetPaths.CustomerSheets.Count;
         Assert.True(game.IsLoading);
         Assert.Equal((float)(assetCount - 1) / assetCount, game.LoadProgress, 5);
         Assert.Null(game.Shop);
@@ -607,7 +608,7 @@ public sealed class LudumDare60GameTests
     {
         _platform.Frame(0);
 
-        Assert.Equal(3, _platform.AudioBackend.Sounds.Count);
+        Assert.Equal(4, _platform.AudioBackend.Sounds.Count);
         var click = _platform.AudioBackend.Sounds[0];
         Assert.Equal("RIFF"u8.ToArray(), click[..4]);
         Assert.Equal("WAVE"u8.ToArray(), click[8..12]);
@@ -623,7 +624,38 @@ public sealed class LudumDare60GameTests
 
         var recording = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "assets", AssetPaths.ScrubSound));
         Assert.Equal(recording, _platform.AudioBackend.Sounds[ScrubSound]);
-        Assert.Equal(3, _platform.AudioBackend.Sounds.Count);
+        Assert.Equal(4, _platform.AudioBackend.Sounds.Count);
+    }
+
+    [Fact]
+    public void ElephantPressed_TrumpetsOnceUntilItIsOver()
+    {
+        StartWithSound();
+        var elephant = (ShopDecor.ElephantMin + ShopDecor.ElephantMax) / 2;
+        int Trumpets() => _platform.AudioBackend.AllCommands().Count(c => c.Kind == AudioCommandKind.Play && (int)c.Arguments[0] == ElephantSound);
+
+        _platform.Frame(Step, PointerDown(elephant));
+        _platform.Frame(Step, PointerUp(elephant));
+        _platform.Frame(Step, PointerDown(elephant));
+        _platform.Frame(Step, PointerUp(elephant));
+        Assert.Equal(1, Trumpets());
+
+        Idle((int)(ShopDecor.ElephantSeconds * 60) + 1);
+        _platform.Frame(Step, PointerDown(elephant));
+        Assert.Equal(2, Trumpets());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "assets", AssetPaths.ElephantSound)), _platform.AudioBackend.Sounds[ElephantSound]);
+    }
+
+    [Fact]
+    public void PressBesideTheElephant_PlaysNoTrumpet()
+    {
+        StartWithSound();
+        var beside = new Vector2(ShopDecor.ElephantMax.X + 5, ShopDecor.ElephantMin.Y + 10);
+
+        _platform.Frame(Step, PointerDown(beside));
+        _platform.Frame(Step, PointerUp(beside));
+
+        Assert.DoesNotContain(_platform.AudioBackend.AllCommands(), c => c.Kind == AudioCommandKind.Play && (int)c.Arguments[0] == ElephantSound);
     }
 
     [Fact]
@@ -644,7 +676,7 @@ public sealed class LudumDare60GameTests
         _platform.Frame(0.01);
 
         Assert.Equal(s_startTextures, _platform.Backend.Textures.Count);
-        Assert.Equal(3, _platform.AudioBackend.Sounds.Count);
+        Assert.Equal(4, _platform.AudioBackend.Sounds.Count);
         Assert.Equal(2, _platform.Backend.Frames.Count);
     }
 
@@ -781,7 +813,7 @@ public sealed class LudumDare60GameTests
     public void FirstCustomer_ComesInWithTheDoorBellAndWalksToTheCounter()
     {
         _platform.Frame(0);
-        _platform.AudioBackend.ReportReady(0, 1, 2);
+        _platform.AudioBackend.ReportReady(0, 1, 2, 3);
 
         HoldAt(new Vector2(600, 40), (int)(Shop.WaitSeconds * 60) + 2);
         var entering = DrawnOn(LastFrame, CustomerTexture, CustomerSheet.Frame(CustomerPose.Presenting));
