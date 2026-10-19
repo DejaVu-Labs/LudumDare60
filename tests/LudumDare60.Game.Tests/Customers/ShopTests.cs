@@ -628,4 +628,27 @@ public sealed class ShopTests
         Assert.Equal(CustomerPose.Waiting, ready);
         Assert.Equal(CustomerPose.Pleased, shop.Pose);
     }
+
+    [Fact]
+    public void Tools_BelongToTheShopAndGoToEveryCustomersBench()
+    {
+        var shop = new Shop(TwoPlayableOrders());
+        var brush = shop.Brush;
+        var oilCan = shop.OilCan;
+        Assert.Equal(BenchLayout.BrushRest, brush.Position);
+
+        Repair(shop);
+        Assert.Same(brush, shop.Bench!.Brush);
+        Assert.Same(oilCan, shop.Bench.OilCan);
+        FireTest(shop);
+        HandBack(shop);
+        var brushLeftAt = brush.Position;
+        Wait(shop, Shop.ThankSeconds + Shop.WalkSeconds + Shop.WaitSeconds + 0.2f);
+
+        Assert.Equal("hoodie-again", shop.Bench!.Order.Id);
+        Assert.Same(brush, shop.Bench.Brush);
+        Assert.Same(oilCan, shop.Bench.OilCan);
+        Assert.Equal(brushLeftAt, shop.Bench.Brush.Position);
+        Assert.False(brush.IsHeld);
+    }
 }

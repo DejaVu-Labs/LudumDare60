@@ -116,6 +116,9 @@ yet (see [backlog](../backlog.md#shop-loop-follow-ups)).
   and the broken one lies in the tray instead.
 - **Dry parts:** a part that needs oil does not fit either, and flashes with the oil can, which pulses while such a
   part is off. The oil can is carried like the brush; the tip of its spout oils the part it touches, with a drip.
+- **The tools stay.** The brush and the oil can belong to the shop, not to an order (`Shop.Brush`, `Shop.OilCan`):
+  they lie where the player left them from one customer to the next, and with the tray of spares they stay on the
+  bench while the counter is empty. A tool still in the hand when an order ends is put down where it is.
 - **One find per order** (two at most), attached to a part. The find is part of the order, not a random drop.
 - **One new verb per order.** Orders 1-4 each teach one verb and reuse the earlier ones; order 5 adds nothing
   new and combines everything.

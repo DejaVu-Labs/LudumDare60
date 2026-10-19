@@ -44,8 +44,20 @@ public sealed class OrderBench
 
     /// <exception cref="NotSupportedException">The bench cannot play the order yet (see <see cref="CanSetUp"/>).</exception>
     public OrderBench(Order order)
+        : this(order, CreateBrush(), CreateOilCan())
+    {
+    }
+
+    /// <summary>
+    /// Sets up <paramref name="order"/> with tools that stay on the bench from one order to the next: they lie where
+    /// the last order left them, dropped if they were in the hand.
+    /// </summary>
+    /// <exception cref="NotSupportedException">The bench cannot play the order yet (see <see cref="CanSetUp"/>).</exception>
+    public OrderBench(Order order, BrushTool brush, BrushTool oilCan)
     {
         ArgumentNullException.ThrowIfNull(order);
+        ArgumentNullException.ThrowIfNull(brush);
+        ArgumentNullException.ThrowIfNull(oilCan);
         if (!CanSetUp(order, out var reason))
         {
             throw new NotSupportedException(reason);
@@ -95,11 +107,25 @@ public sealed class OrderBench
 
         _hammer = IndexOf(RevolverParts.Hammer);
         SparePart = Array.IndexOf(_broken, true);
-        Brush = new BrushTool(BenchLayout.BrushRest, BenchLayout.BrushGrabMin, BenchLayout.BrushGrabMax, BenchLayout.MatMin, BenchLayout.MatMax);
-        OilCan = new BrushTool(BenchLayout.OilCanRest, BenchLayout.OilCanGrabMin, BenchLayout.OilCanGrabMax, BenchLayout.MatMin, BenchLayout.MatMax);
+        brush.Drop();
+        oilCan.Drop();
+        Brush = brush;
+        OilCan = oilCan;
     }
 
     public Order Order { get; }
+
+    /// <summary>
+    /// The scrubbing brush at its place on the bench.
+    /// </summary>
+    public static BrushTool CreateBrush()
+        => new(BenchLayout.BrushRest, BenchLayout.BrushGrabMin, BenchLayout.BrushGrabMax, BenchLayout.MatMin, BenchLayout.MatMax);
+
+    /// <summary>
+    /// The oil can at its place on the bench.
+    /// </summary>
+    public static BrushTool CreateOilCan()
+        => new(BenchLayout.OilCanRest, BenchLayout.OilCanGrabMin, BenchLayout.OilCanGrabMax, BenchLayout.MatMin, BenchLayout.MatMax);
 
     /// <summary>
     /// The order's parts, in the order the order lists them.

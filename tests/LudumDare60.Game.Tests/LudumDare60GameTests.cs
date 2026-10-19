@@ -325,7 +325,13 @@ public sealed class LudumDare60GameTests
         var commands = frame.Decode();
         Assert.Equal(RenderCommandKind.Clear, commands[1].Kind);
         Assert.Equal(BitConverter.ToInt32([0x0b, 0x4f, 0x45, 0xff]), commands[1].Arguments[0]);
-        Assert.Empty(frame.Instances);
+
+        // No customer and no revolver yet; the tray and the tools already lie on the bench, unlit.
+        Assert.Null(Sprite(frame, PlaceholderParts.Body));
+        Assert.Equal(BenchLayout.TrayMin, Drawn(frame, PlaceholderParts.Tray).Position);
+        Assert.Equal(BenchLayout.BrushRest, Drawn(frame, PlaceholderParts.Brush).Position);
+        Assert.Equal(BenchLayout.OilCanRest, Drawn(frame, PlaceholderParts.OilCan).Position);
+        Assert.Equal(0, Drawn(frame, PlaceholderParts.BrushGlow).Tint.A);
     }
 
     [Fact]
@@ -1005,7 +1011,51 @@ public sealed class LudumDare60GameTests
         Assert.Equal(CustomerTexture, TextureOf(LastFrame, CustomerSheet.Frame(CustomerPose.Pleased)));
         Assert.Null(Sprite(LastFrame, PlaceholderParts.Body));
         Assert.Null(Sprite(LastFrame, PlaceholderParts.Hammer));
-        Assert.Null(Sprite(LastFrame, PlaceholderParts.Brush));
+
+        // The tools stay on the bench where the player left them.
+        Assert.Equal(Shop.Brush.Position, Drawn(LastFrame, PlaceholderParts.Brush).Position);
+        Assert.Equal(BenchLayout.TrayMin, Drawn(LastFrame, PlaceholderParts.Tray).Position);
+    }
+
+    [Fact]
+    public void Tools_BetweenCustomers_StayWhereTheyWereLeft()
+    {
+        StartWithSound();
+
+        // Out of the way of every repair step: the bottom-left corner of the mat.
+        var spot = new Vector2(100, 300);
+        _platform.Frame(Step, PointerDown(BenchLayout.OilCanRest + new Vector2(5, 3)));
+        HoldAt(spot, 2);
+        _platform.Frame(Step, PointerUp(spot));
+        var oilCan = Shop.OilCan;
+        Assert.Equal(spot, oilCan.Position);
+        RepairAndTest();
+        HandBack();
+        var brushLeftAt = Shop.Brush.Position;
+
+        // The counter is empty: no revolver, but the tools and the tray are still there.
+        for (var i = 0; i < 600 && Shop.Phase != ShopPhase.Waiting; i++)
+        {
+            Idle(1);
+        }
+
+        Assert.Equal(ShopPhase.Waiting, Shop.Phase);
+        Assert.Null(Sprite(LastFrame, PlaceholderParts.Body));
+        Assert.Equal(spot, Drawn(LastFrame, PlaceholderParts.OilCan).Position);
+        Assert.Equal(brushLeftAt, Drawn(LastFrame, PlaceholderParts.Brush).Position);
+        Assert.Equal(BenchLayout.TrayMin, Drawn(LastFrame, PlaceholderParts.Tray).Position);
+        Assert.Equal(0, Drawn(LastFrame, PlaceholderParts.OilCanGlow).Tint.A);
+
+        // The next customer's bench gets the same tools where they lie.
+        for (var i = 0; i < 600 && Shop.Phase != ShopPhase.Arriving; i++)
+        {
+            Idle(1);
+        }
+
+        Assert.Equal("robe", Bench.Order.Id);
+        Assert.Same(oilCan, Bench.OilCan);
+        Assert.Equal(spot, Bench.OilCan.Position);
+        Assert.Equal(brushLeftAt, Bench.Brush.Position);
     }
 
     [Fact]
@@ -1223,7 +1273,6 @@ public sealed class LudumDare60GameTests
         platform.Frame(0);
 
         var frame = Assert.Single(platform.Backend.Frames);
-        Assert.Equal(2, frame.Instances.Length);
         Assert.Equal(LudumDare60Game.StreetOffset, frame.Instances[0].Position);
         var room = frame.Instances[1];
         Assert.Equal(Vector2.Zero, room.Position);
@@ -1243,7 +1292,9 @@ public sealed class LudumDare60GameTests
         platform.Frame(0.01);
 
         Assert.Equal(s_startTextures + 2, platform.Backend.Textures.Count);
-        Assert.Equal(2, platform.Backend.Frames[1].Instances.Length);
+
+        // The street and the room, once each per frame.
+        Assert.Equal(2, platform.Backend.Frames[1].Instances.Count(i => i.SourceWidth == LudumDare60Game.VirtualWidth));
     }
 
     private static (ManualPlatform Platform, LudumDare60Game Game) StartWithShippedAssets()

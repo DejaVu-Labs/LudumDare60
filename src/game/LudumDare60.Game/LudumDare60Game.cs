@@ -347,12 +347,22 @@ public sealed class LudumDare60Game : IGame
         _customerGlow = shop.Phase != ShopPhase.Offering ? (byte)0
             : shop.IsCustomerHovered ? GlowActive
             : idleGlow;
+
+        // The tools stay on the bench between customers. Only a bench that is still being stepped moves them between
+        // steps; afterwards the last step's motion is stale.
+        var working = shop.Phase == ShopPhase.Working;
+        var brushPosition = working ? shop.Brush.GetRenderPosition((float)alpha) : shop.Brush.Position;
+        _brushDrawPosition = new Vector2(MathF.Round(brushPosition.X), MathF.Round(brushPosition.Y));
+        var oilCanPosition = working ? shop.OilCan.GetRenderPosition((float)alpha) : shop.OilCan.Position;
+        _oilCanDrawPosition = new Vector2(MathF.Round(oilCanPosition.X), MathF.Round(oilCanPosition.Y));
         if (!shop.HasGun || _shownBench is not { } bench)
         {
+            _brushGlow = 0;
+            _oilCanGlow = 0;
+            _trayGlow = 0;
             return;
         }
 
-        var working = shop.Phase == ShopPhase.Working;
         var gunOffset = shop.GetGunOffset((float)alpha);
         _gunOffset = new Vector2(MathF.Round(gunOffset.X), MathF.Round(gunOffset.Y));
         var test = shop.Test!;
@@ -413,8 +423,6 @@ public sealed class LudumDare60Game : IGame
             : idleGlow;
 
         var brush = bench.Brush;
-        var brushPosition = brush.GetRenderPosition((float)alpha);
-        _brushDrawPosition = new Vector2(MathF.Round(brushPosition.X), MathF.Round(brushPosition.Y));
         _brushGlow = brush.IsHeld ? (byte)0
             : _brushHint > 0 ? Blink(_brushHint)
             : brush.IsHovered ? GlowActive
@@ -422,8 +430,6 @@ public sealed class LudumDare60Game : IGame
             : (byte)0;
 
         var oilCan = bench.OilCan;
-        var oilCanPosition = oilCan.GetRenderPosition((float)alpha);
-        _oilCanDrawPosition = new Vector2(MathF.Round(oilCanPosition.X), MathF.Round(oilCanPosition.Y));
         _oilCanGlow = oilCan.IsHeld ? (byte)0
             : _oilCanHint > 0 ? Blink(_oilCanHint)
             : oilCan.IsHovered ? GlowActive
@@ -465,15 +471,32 @@ public sealed class LudumDare60Game : IGame
             DrawCustomer(batch, shop, visitor.Order, outsidePass: false);
         }
 
-        if (!shop.HasGun || _shownBench is not { } bench)
-        {
-            return;
-        }
-
-        // The tray of spares lies on the mat with the spare in it, or, once swapped, the broken part.
+        // The tray of spares stays on the mat between customers; while a revolver is on the bench it holds the spare, or,
+        // once swapped, the broken part.
         var trayGlow = new SpriteOptions { Origin = Vector2.One, Tint = Color.White.WithAlpha(_trayGlow) };
         batch.Draw(_parts, PlaceholderParts.TrayGlow, BenchLayout.TrayMin, trayGlow);
         batch.Draw(_parts, PlaceholderParts.Tray, BenchLayout.TrayMin);
+        if (shop.HasGun && _shownBench is { } bench)
+        {
+            DrawRevolver(batch, bench);
+        }
+
+        // The tools lie on top of everything, and in the hand they are above the parts they work on. They stay on the
+        // bench between customers, where the player left them.
+        var oilCanGlow = new SpriteOptions { Origin = PlaceholderParts.OilCanOrigin + Vector2.One, Tint = Color.White.WithAlpha(_oilCanGlow) };
+        batch.Draw(_parts, PlaceholderParts.OilCanGlow, _oilCanDrawPosition, oilCanGlow);
+        batch.Draw(_parts, PlaceholderParts.OilCan, _oilCanDrawPosition, new SpriteOptions { Origin = PlaceholderParts.OilCanOrigin });
+        var brushGlow = new SpriteOptions { Origin = PlaceholderParts.BrushOrigin + Vector2.One, Tint = Color.White.WithAlpha(_brushGlow) };
+        batch.Draw(_parts, PlaceholderParts.BrushGlow, _brushDrawPosition, brushGlow);
+        batch.Draw(_parts, PlaceholderParts.Brush, _brushDrawPosition, new SpriteOptions { Origin = PlaceholderParts.BrushOrigin });
+    }
+
+    /// <summary>
+    /// Draws what of the revolver lies on the bench: the spare in the tray, the parts in the gun and the ones loose on
+    /// the mat.
+    /// </summary>
+    private void DrawRevolver(SpriteBatch batch, OrderBench bench)
+    {
         if (bench.SparePart >= 0)
         {
             var spare = bench.LayoutAt(bench.SparePart);
@@ -500,14 +523,6 @@ public sealed class LudumDare60Game : IGame
                 DrawPart(batch, bench, i);
             }
         }
-
-        // The tools lie on top of everything, and in the hand they are above the parts they work on.
-        var oilCanGlow = new SpriteOptions { Origin = PlaceholderParts.OilCanOrigin + Vector2.One, Tint = Color.White.WithAlpha(_oilCanGlow) };
-        batch.Draw(_parts, PlaceholderParts.OilCanGlow, _oilCanDrawPosition, oilCanGlow);
-        batch.Draw(_parts, PlaceholderParts.OilCan, _oilCanDrawPosition, new SpriteOptions { Origin = PlaceholderParts.OilCanOrigin });
-        var brushGlow = new SpriteOptions { Origin = PlaceholderParts.BrushOrigin + Vector2.One, Tint = Color.White.WithAlpha(_brushGlow) };
-        batch.Draw(_parts, PlaceholderParts.BrushGlow, _brushDrawPosition, brushGlow);
-        batch.Draw(_parts, PlaceholderParts.Brush, _brushDrawPosition, new SpriteOptions { Origin = PlaceholderParts.BrushOrigin });
     }
 
     /// <summary>

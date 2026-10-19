@@ -600,4 +600,31 @@ public sealed class OrderBenchTests
         bench.Step(Hold(BenchLayout.BrushRest), Dt);
         bench.Step(Release(BenchLayout.BrushRest), Dt);
     }
+
+    [Fact]
+    public void Constructor_ToolsFromTheLastOrder_KeepsThemWhereTheyLieAndDropsAHeldOne()
+    {
+        var brush = OrderBench.CreateBrush();
+        var oilCan = OrderBench.CreateOilCan();
+        var spot = new Vector2(300, 250);
+        brush.Step(new PointerSample(BenchLayout.BrushRest, IsDown: true, IsPressed: true), canGrab: true);
+        brush.Step(new PointerSample(spot, IsDown: true, IsPressed: false), canGrab: true);
+        Assert.True(brush.IsHeld);
+
+        var bench = new OrderBench(s_shipped.Orders[1], brush, oilCan);
+
+        Assert.Same(brush, bench.Brush);
+        Assert.Same(oilCan, bench.OilCan);
+        Assert.False(brush.IsHeld);
+        Assert.Equal(spot, brush.Position);
+        Assert.Equal(spot, brush.PreviousPosition);
+        Assert.Equal(BenchLayout.OilCanRest, oilCan.Position);
+    }
+
+    [Fact]
+    public void Constructor_WithoutTools_PutsThemAtTheirRest()
+    {
+        Assert.Equal(BenchLayout.BrushRest, _bench.Brush.Position);
+        Assert.Equal(BenchLayout.OilCanRest, _bench.OilCan.Position);
+    }
 }

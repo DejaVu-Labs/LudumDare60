@@ -64,6 +64,17 @@ public sealed class BrushTool
     public Vector2 GetRenderPosition(float alpha) => Vector2.Lerp(PreviousPosition, Position, alpha);
 
     /// <summary>
+    /// Lets go of the tool where it is, without a <see cref="BrushEvents.PutDown"/>: a new order starts with the tools
+    /// lying where the last one left them, and none of them in the hand.
+    /// </summary>
+    public void Drop()
+    {
+        IsHeld = false;
+        IsHovered = false;
+        PreviousPosition = Position;
+    }
+
+    /// <summary>
     /// Advances the brush by one fixed step.
     /// </summary>
     /// <param name="input">The pointer at the end of the step.</param>

@@ -1,5 +1,6 @@
 using System.Numerics;
 using LudumDare60.Game.Bench;
+using LudumDare60.Game.Cleaning;
 using LudumDare60.Game.Orders;
 using LudumDare60.Game.Parts;
 
@@ -98,6 +99,17 @@ public sealed class Shop
     }
 
     public ShopPhase Phase { get; private set; } = ShopPhase.Waiting;
+
+    /// <summary>
+    /// The scrubbing brush. It belongs to the shop, not to an order: it stays where the player left it from one
+    /// customer to the next, and lies on the bench while the counter is empty.
+    /// </summary>
+    public BrushTool Brush { get; } = OrderBench.CreateBrush();
+
+    /// <summary>
+    /// The oil can, kept like <see cref="Brush"/>.
+    /// </summary>
+    public BrushTool OilCan { get; } = OrderBench.CreateOilCan();
 
     /// <summary>
     /// Seconds since the current phase began.
@@ -341,7 +353,7 @@ public sealed class Shop
             return;
         }
 
-        Bench = new OrderBench(_book.Orders[OrderIndex]);
+        Bench = new OrderBench(_book.Orders[OrderIndex], Brush, OilCan);
         HandBack = new PartDrag(new LinePath(GunGrip, GunGrip + HandBackOffset), grabRadius: 24, s_handBackFeel);
         Test = new ActionTest();
         Events |= ShopEvents.CustomerEntered;
