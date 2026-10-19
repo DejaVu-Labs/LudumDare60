@@ -8,17 +8,18 @@ namespace LudumDare60.Game;
 
 /// <summary>
 /// The parts sheet: the revolver from its sprites (<c>art/sprites/revolver.png</c>, embedded in the assembly, see
-/// <see cref="RevolverSheet"/>), a Nagant in profile, muzzle to the left, and the parts that move on their own: the
+/// <see cref="EmbeddedSheet.Revolver"/>), a Nagant in profile, muzzle to the left, and the parts that move on their own: the
 /// body without them (barrel, frame with the cylinder window, trigger guard, grip frame), the base pin (head on the
 /// left), the cylinder in two positions of its turn, the hammer and the trigger, the walnut grip panel and a screw (the
-/// grip screw and the hammer screw). Next to them the pieces still generated in code: the mainspring whole and broken,
-/// the brush, the oil can and the parts tray. Every piece has a glow outline. Colors come from the palette
+/// grip screw and the hammer screw). The oil can and the brush come from <c>art/sprites/tools.png</c>
+/// (<see cref="EmbeddedSheet.Tools"/>). Next to them the pieces still generated in code: the mainspring whole and
+/// broken, and the parts tray. Every piece has a glow outline. Colors come from the palette
 /// (docs/gamedesign/art-direction.md).
 /// </summary>
 internal static class PlaceholderParts
 {
     public const int Width = 256;
-    public const int Height = 354;
+    public const int Height = 395;
 
     /// <summary>
     /// The revolver without the parts that move: the cylinder window, the slot of the hammer and the gap in front of the
@@ -40,12 +41,12 @@ internal static class PlaceholderParts
     public static readonly IntRect PinGlow = Around(Pin, PinWidth, RowA);
 
     /// <summary>
-    /// The scrubbing brush lying flat: wire bristles on the left, a brass ferrule, a walnut handle to the right.
+    /// The scrubbing brush lying at a slant: the bristles down on the left, the walnut handle up to the right.
     /// </summary>
-    public static readonly IntRect Brush = new(84, RowA, BrushWidth, 7);
+    public static readonly IntRect Brush = new(0, RowE, BrushWidth, BrushHeight);
 
     /// <inheritdoc cref="PinGlow"/>
-    public static readonly IntRect BrushGlow = Around(Brush, 106, RowA);
+    public static readonly IntRect BrushGlow = Around(Brush, BrushWidth, RowE);
 
     /// <summary>
     /// The trigger, what of it shows below the frame: its top goes on under the frame.
@@ -106,10 +107,10 @@ internal static class PlaceholderParts
     /// <summary>
     /// The oil can lying on the mat, its spout up and to the left.
     /// </summary>
-    public static readonly IntRect OilCan = new(165, RowB, OilCanWidth, OilCanHeight);
+    public static readonly IntRect OilCan = new(88, RowE, OilCanWidth, OilCanHeight);
 
     /// <inheritdoc cref="PinGlow"/>
-    public static readonly IntRect OilCanGlow = Around(OilCan, 181, RowB);
+    public static readonly IntRect OilCanGlow = Around(OilCan, 88 + OilCanWidth, RowE);
 
     /// <summary>
     /// The wooden tray of spare parts, seen from above.
@@ -138,7 +139,7 @@ internal static class PlaceholderParts
     /// <summary>
     /// The middle of the bristles, in brush pixels: the point that scrubs.
     /// </summary>
-    public static readonly Vector2 BrushOrigin = new(3, 3);
+    public static readonly Vector2 BrushOrigin = new(10, 30);
 
     /// <summary>
     /// The pin's grab point, the middle of its head, in pin pixels.
@@ -237,11 +238,13 @@ internal static class PlaceholderParts
     private const int RowB = 246;
     private const int RowC = 281;
     private const int RowD = 348;
+    private const int RowE = 354;
     private const int PinWidth = 41;
     private const int PinHeight = 8;
     private const int CylinderWidth = 31;
     private const int CylinderHeight = 33;
-    private const int BrushWidth = 22;
+    private const int BrushWidth = 43;
+    private const int BrushHeight = 38;
     private const int HammerWidth = 21;
     private const int HammerHeight = 30;
     private const int TriggerWidth = 22;
@@ -249,8 +252,8 @@ internal static class PlaceholderParts
     private const int ScrewSize = 12;
     private const int MainspringWidth = 18;
     private const int MainspringHeight = 40;
-    private const int OilCanWidth = 16;
-    private const int OilCanHeight = 14;
+    private const int OilCanWidth = 49;
+    private const int OilCanHeight = 39;
     private const int TrayWidth = 52;
     private const int TrayHeight = 36;
 
@@ -273,6 +276,10 @@ internal static class PlaceholderParts
     private static readonly IntRect s_gripPanelSource = new(109, 110, PanelWidth, PanelHeight);
     private static readonly IntRect s_pinSource = new(148, 110, PinWidth, PinHeight);
     private static readonly IntRect s_screwSource = new(148, 119, ScrewSize, ScrewSize);
+
+    // Where each tool lies in the tools sheet.
+    private static readonly IntRect s_oilCanSource = new(0, 0, OilCanWidth, OilCanHeight);
+    private static readonly IntRect s_brushSource = new(51, 0, BrushWidth, BrushHeight);
 
     private const string PressAnyKeyText = "PRESS ANY KEY TO PLAY";
     private const string ToBeContinuedText = "TO BE CONTINUED";
@@ -304,11 +311,8 @@ internal static class PlaceholderParts
     private static readonly Color s_steelMid = Color.FromRgb(0x5f5247);
     private static readonly Color s_steelLight = Color.FromRgb(0xb3a99b);
     private static readonly Color s_glow = SpriteOutline.Color;
-    private static readonly Color s_brass = Color.FromRgb(0xe2ad5f);
-    private static readonly Color s_brassDark = Color.FromRgb(0xd2834a);
     private static readonly Color s_walnutLight = Color.FromRgb(0xa1603b);
     private static readonly Color s_walnut = Color.FromRgb(0x823d1e);
-    private static readonly Color s_walnutDark = Color.FromRgb(0x622a14);
 
     // Old oil and dirt, dark to light.
     private static readonly Color[] s_grime =
@@ -344,14 +348,14 @@ internal static class PlaceholderParts
         Fill(pixels, Pin, static (x, y) => SheetColor(s_pinSource, x, y));
         Fill(pixels, Cylinder, static (x, y) => SheetColor(s_cylinderSource, x, y));
         Fill(pixels, CylinderTurned, static (x, y) => SheetColor(s_cylinderTurnedSource, x, y));
-        Fill(pixels, Brush, BrushColor);
+        Fill(pixels, Brush, static (x, y) => SheetColor(EmbeddedSheet.Tools, s_brushSource, x, y));
         Fill(pixels, Hammer, static (x, y) => SheetColor(s_hammerSource, x, y));
         Fill(pixels, Trigger, static (x, y) => SheetColor(s_triggerSource, x, y));
         Fill(pixels, GripPanel, static (x, y) => SheetColor(s_gripPanelSource, x, y));
         Fill(pixels, Screw, static (x, y) => SheetColor(s_screwSource, x, y));
         Fill(pixels, Mainspring, (x, y) => MainspringColor(x, y, broken: false));
         Fill(pixels, MainspringBroken, (x, y) => MainspringColor(x, y, broken: true));
-        Fill(pixels, OilCan, OilCanColor);
+        Fill(pixels, OilCan, static (x, y) => SheetColor(EmbeddedSheet.Tools, s_oilCanSource, x, y));
         Fill(pixels, Tray, TrayColor);
         Fill(pixels, Pixel, static (_, _) => Color.White);
         Fill(pixels, PressAnyKey, static (x, y) => TextColor(PressAnyKeyText, x, y));
@@ -483,11 +487,15 @@ internal static class PlaceholderParts
     /// Whether part pixel (<paramref name="x"/>, <paramref name="y"/>) of <paramref name="part"/>, a place in the
     /// revolver sheet, is opaque.
     /// </summary>
-    private static bool IsOpaque(IntRect part, int x, int y)
-        => (uint)x < (uint)part.Width && (uint)y < (uint)part.Height && RevolverSheet.Get(part.X + x, part.Y + y).A != 0;
+    private static bool IsOpaque(IntRect part, int x, int y) => IsOpaque(EmbeddedSheet.Revolver, part, x, y);
 
-    private static Color SheetColor(IntRect part, int x, int y)
-        => (uint)x < (uint)part.Width && (uint)y < (uint)part.Height ? RevolverSheet.Get(part.X + x, part.Y + y) : Color.Transparent;
+    private static bool IsOpaque(EmbeddedSheet sheet, IntRect part, int x, int y)
+        => (uint)x < (uint)part.Width && (uint)y < (uint)part.Height && sheet.Get(part.X + x, part.Y + y).A != 0;
+
+    private static Color SheetColor(IntRect part, int x, int y) => SheetColor(EmbeddedSheet.Revolver, part, x, y);
+
+    private static Color SheetColor(EmbeddedSheet sheet, IntRect part, int x, int y)
+        => (uint)x < (uint)part.Width && (uint)y < (uint)part.Height ? sheet.Get(part.X + x, part.Y + y) : Color.Transparent;
 
     private static bool IsBody(int x, int y) => IsOpaque(s_bodySource, x, y);
 
@@ -532,45 +540,6 @@ internal static class PlaceholderParts
         return x < middle ? s_steelLight : s_steelMid;
     }
 
-    private static bool IsOilCan(int x, int y)
-    {
-        if ((uint)x >= OilCanWidth || (uint)y >= OilCanHeight)
-        {
-            return false;
-        }
-
-        // The spout runs from its tip down to the body; the pump's knob sits on top of the body.
-        var spout = x <= 7 && y >= (x * 6 / 7) && y <= (x * 6 / 7) + 1;
-        var body = InEllipse(x, y, 11, 9.5f, 4.5f, 4.2f);
-        var knob = x is >= 10 and <= 12 && y is >= 3 and <= 5;
-        return spout || body || knob;
-    }
-
-    private static Color OilCanColor(int x, int y)
-    {
-        if (!IsOilCan(x, y))
-        {
-            return Color.Transparent;
-        }
-
-        if (x <= 7 && !InEllipse(x, y, 11, 9.5f, 4.5f, 4.2f))
-        {
-            return s_steelMid;
-        }
-
-        if (y <= 5)
-        {
-            return s_steelLight;
-        }
-
-        return y switch
-        {
-            <= 8 => s_brass,
-            9 => s_steelDark,
-            _ => s_brassDark,
-        };
-    }
-
     private static bool IsTray(int x, int y)
     {
         if ((uint)x >= TrayWidth || (uint)y >= TrayHeight)
@@ -601,13 +570,6 @@ internal static class PlaceholderParts
         return y == 2 ? s_ink : s_steelDark;
     }
 
-    private static bool InEllipse(float x, float y, float centerX, float centerY, float radiusX, float radiusY)
-    {
-        var dx = (x + 0.5f - centerX) / radiusX;
-        var dy = (y + 0.5f - centerY) / radiusY;
-        return (dx * dx) + (dy * dy) <= 1;
-    }
-
     private static bool IsPin(int x, int y) => IsOpaque(s_pinSource, x, y);
 
     private static bool IsCylinder(int x, int y) => IsOpaque(s_cylinderSource, x, y);
@@ -616,49 +578,9 @@ internal static class PlaceholderParts
 
     private static bool IsTrigger(int x, int y) => IsOpaque(s_triggerSource, x, y);
 
-    private static bool IsBrush(int x, int y)
-    {
-        if ((uint)x >= (uint)Brush.Width || (uint)y >= (uint)Brush.Height)
-        {
-            return false;
-        }
+    private static bool IsBrush(int x, int y) => IsOpaque(EmbeddedSheet.Tools, s_brushSource, x, y);
 
-        return x switch
-        {
-            // Ragged bristle tips at the left end.
-            0 => y is > 0 and < 6,
-            <= 5 => true,
-            <= 7 => y is > 0 and < 6,
-            BrushWidth - 1 => y == 3,
-            _ => y is > 1 and < 5,
-        };
-    }
-
-    private static Color BrushColor(int x, int y)
-    {
-        if (!IsBrush(x, y))
-        {
-            return Color.Transparent;
-        }
-
-        if (x <= 5)
-        {
-            // Wire bristles: light and dark strands.
-            return y % 2 == 0 ? s_steelLight : s_steelMid;
-        }
-
-        if (x <= 7)
-        {
-            return y <= 2 ? s_brass : s_brassDark;
-        }
-
-        return y switch
-        {
-            2 => s_walnutLight,
-            3 => s_walnut,
-            _ => s_walnutDark,
-        };
-    }
+    private static bool IsOilCan(int x, int y) => IsOpaque(EmbeddedSheet.Tools, s_oilCanSource, x, y);
 
     private static Color TextColor(string text, int x, int y)
     {

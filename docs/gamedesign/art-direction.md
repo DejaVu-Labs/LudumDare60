@@ -100,7 +100,7 @@ false`.
 `art/sprites/revolver.png` (preview `revolver-x4.png`), made from the Figma frame of the revolver (a Nagant in profile,
 muzzle to the left) and its separate parts (hammer, screw, base pin). It is embedded in the game assembly rather than
 shipped under `wwwroot/assets/`, because the parts' shapes (grab areas, glows, dirt) are built before the first frame
-(`RevolverSheet`, read by `PlaceholderParts`). One sheet, 189x175:
+(`EmbeddedSheet.Revolver`, read by `PlaceholderParts`). One sheet, 189x175:
 
 - top: the body, 185x108, without the parts that move: the cylinder window, the hammer's slot and the gap in front of
   the ejector housing where the base pin's head shows are transparent; the grip frame under the panel is a flat dark
@@ -112,6 +112,16 @@ shipped under `wwwroot/assets/`, because the parts' shapes (grab areas, glows, d
 The layers are composited at the Figma frame's 1x size, so every part shares the body's pixel grid, then reduced like
 the customer sheets: box filter down to 184 px across, nearest palette color in OKLab, alpha 0 or 255, single stray
 pixels repainted, a 1-pixel ink outline. Where each part lies in the body is in `PlaceholderParts` (`*InBody`).
+
+## Tool sprites
+
+`art/sprites/tools.png` (preview `tools-x4.png`), embedded like the revolver (`EmbeddedSheet.Tools`), 94x39: the
+brass oil can at (0, 0), 49x39, its spout up to the left, the tip (where it oils) at (1, 1); and the wire brush at
+(51, 0), 43x38, lying at a slant, bristles down on the left (the scrubbing point, (10, 30)) and the walnut handle up
+to the right. Both come from one concept on white, cut at 0.054 of its size, so they share a scale: about one and a
+half times the revolver's, so they read at a glance. Their grab areas are the boxes around the sprites, and they lie on
+the left of the mat, under the lamp, clear of the revolver and of the parts taken out of it (`BenchLayout.BrushRest`,
+`OilCanRest`).
 
 ## Concept art prompts
 

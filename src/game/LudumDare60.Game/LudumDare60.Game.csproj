@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="..\..\..\art\sprites\revolver.png" LogicalName="revolver.png" />
+    <EmbeddedResource Include="..\..\..\art\sprites\tools.png" LogicalName="tools.png" />
   </ItemGroup>
 
   <ItemGroup>

@@ -136,30 +136,31 @@ public static class BenchLayout
     public static readonly Vector2 TraySpare = TrayMin + new Vector2(16, 18);
 
     /// <summary>
-    /// Where the tip of the oil can's spout is while it lies at its place, right of the brush.
+    /// Where the tip of the oil can's spout is while it lies at its place, on the left of the mat next to the brush.
     /// </summary>
-    public static readonly Vector2 OilCanRest = new(440, 290);
+    public static readonly Vector2 OilCanRest = new(102, 228);
 
     /// <summary>
-    /// The oil can's grab area around the tip of its spout: the spout and the can.
+    /// The oil can's grab area around the tip of its spout: the box around the spout, the can and its pump lever.
     /// </summary>
-    public static readonly Vector2 OilCanGrabMin = new(-2, -2);
+    public static readonly Vector2 OilCanGrabMin = -PlaceholderParts.OilCanOrigin;
 
     /// <inheritdoc cref="OilCanGrabMin"/>
-    public static readonly Vector2 OilCanGrabMax = new(15, 12);
+    public static readonly Vector2 OilCanGrabMax = new Vector2(PlaceholderParts.OilCan.Width, PlaceholderParts.OilCan.Height) - PlaceholderParts.OilCanOrigin;
 
     /// <summary>
-    /// Where the brush's bristles are while it lies at its place, right of the cylinder's spot on the mat.
+    /// Where the brush's bristles are while it lies at its place, on the left of the mat, clear of the revolver and of
+    /// the parts taken out of it.
     /// </summary>
-    public static readonly Vector2 BrushRest = new(390, 296);
+    public static readonly Vector2 BrushRest = new(65, 255);
 
     /// <summary>
-    /// The brush's grab area around its bristles: the bristles and the handle to the right.
+    /// The brush's grab area around its bristles: the box around the bristles and the handle up to the right.
     /// </summary>
-    public static readonly Vector2 BrushGrabMin = new(-4, -4);
+    public static readonly Vector2 BrushGrabMin = -PlaceholderParts.BrushOrigin;
 
     /// <inheritdoc cref="BrushGrabMin"/>
-    public static readonly Vector2 BrushGrabMax = new(19, 4);
+    public static readonly Vector2 BrushGrabMax = new Vector2(PlaceholderParts.Brush.Width, PlaceholderParts.Brush.Height) - PlaceholderParts.BrushOrigin;
 
     /// <summary>
     /// The revolver's opaque pixels where it lies: what of a part under the frame they hide does not take it.
