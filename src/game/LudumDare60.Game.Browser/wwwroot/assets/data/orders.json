@@ -49,8 +49,8 @@
       "targetSeconds": 150
     },
     {
-      "id": "raincoat",
-      "customer": { "look": "raincoat", "description": "Woman in a raincoat" },
+      "id": "parcel",
+      "customer": { "look": "parcel", "description": "A parcel with no sender" },
       "symptom": "everything",
       "parts": ["base-pin", "cylinder", "grip-screw", "grip-panels", "mainspring", "hammer-screw", "hammer"],
       "dirty": [

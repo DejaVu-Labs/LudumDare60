@@ -163,14 +163,22 @@ public sealed class Shop
     public bool IsHandOut => Phase == ShopPhase.Ready;
 
     /// <summary>
-    /// The horizontal middle of the customer, in virtual pixels.
+    /// The horizontal middle of the customer, in virtual pixels. A customer with a fixed place (a parcel) does not
+    /// walk: it stays at its place from coming in until it is gone.
     /// </summary>
-    public float CustomerX => Phase switch
+    public float CustomerX => FixedPlace is { } place ? place.Bottom.X : Phase switch
     {
         ShopPhase.Arriving => float.Lerp(DoorX, CounterX, Ease(PhaseTime / WalkSeconds)),
         ShopPhase.Leaving => float.Lerp(CounterX, DoorX, Ease(PhaseTime / WalkSeconds)),
         _ => CounterX,
     };
+
+    /// <summary>
+    /// The place the current customer stays at in every phase (see <see cref="CustomerSeats.TryGetFixedPlace"/>), or
+    /// null for a customer who walks in to the counter.
+    /// </summary>
+    public CustomerSeat? FixedPlace
+        => Bench is { } bench && CustomerSeats.TryGetFixedPlace(bench.Order.Customer.Look, out var place) ? place : null;
 
     /// <summary>
     /// How long the customer keeps presenting the revolver at the counter before waiting on the phone, in seconds.
@@ -180,11 +188,14 @@ public sealed class Shop
     /// <summary>
     /// How the customer stands: presenting the revolver as they come in and for a moment after putting it down, on the
     /// phone while the player works, presenting again with a hand out to take it back, and pleased once they have it.
+    /// A parcel (a customer with a <see cref="FixedPlace"/>) comes in closed and is open from the moment the revolver
+    /// comes out of it until it goes back in, then taped shut.
     /// </summary>
     public CustomerPose Pose => Phase switch
     {
-        ShopPhase.Working when PhaseTime < PresentSeconds => CustomerPose.Presenting,
+        ShopPhase.Working when PhaseTime < PresentSeconds && FixedPlace is null => CustomerPose.Presenting,
         ShopPhase.Working or ShopPhase.Testing => CustomerPose.Waiting,
+        ShopPhase.Ready when FixedPlace is not null => CustomerPose.Waiting,
         ShopPhase.Thanking or ShopPhase.Leaving => CustomerPose.Pleased,
         _ => CustomerPose.Presenting,
     };
@@ -198,9 +209,10 @@ public sealed class Shop
     {
         if (Phase == ShopPhase.Working && PhaseTime < ThrowSeconds)
         {
-            // Straight from the hands to the mat, lifted on an arc that peaks halfway.
+            // Straight from the hands (or out of the parcel) to the mat, lifted on an arc that peaks halfway.
             var t = PhaseTime / ThrowSeconds;
-            return (ThrowFrom * (1 - t)) + new Vector2(0, -ThrowHeight * 4 * t * (1 - t));
+            var from = FixedPlace is { } place ? new Vector2(place.Bottom.X, place.Bottom.Y - 24) - BenchLayout.CylinderSeated : ThrowFrom;
+            return (from * (1 - t)) + new Vector2(0, -ThrowHeight * 4 * t * (1 - t));
         }
 
         return Phase == ShopPhase.Ready ? HandBack!.GetRenderPosition(alpha) - GunGrip : Vector2.Zero;
@@ -295,8 +307,22 @@ public sealed class Shop
     /// Whether <paramref name="point"/>, in virtual pixels, is on the customer.
     /// </summary>
     public bool IsOverCustomer(Vector2 point)
-        => HasCustomer && MathF.Abs(point.X - CustomerX) <= CustomerHalfWidth
-            && point.Y <= CustomerBottom && point.Y >= CustomerBottom - CustomerHeight;
+    {
+        if (!HasCustomer)
+        {
+            return false;
+        }
+
+        if (FixedPlace is { } place)
+        {
+            // A parcel fills the lower half of its frame.
+            var halfWidth = place.Scale * CustomerSheet.FrameWidth / 2;
+            var height = place.Scale * CustomerSheet.FrameHeight / 2;
+            return MathF.Abs(point.X - place.Bottom.X) <= halfWidth && point.Y <= place.Bottom.Y && point.Y >= place.Bottom.Y - height;
+        }
+
+        return MathF.Abs(point.X - CustomerX) <= CustomerHalfWidth && point.Y <= CustomerBottom && point.Y >= CustomerBottom - CustomerHeight;
+    }
 
     /// <summary>
     /// A smooth start and stop for walking: 0 at 0, 1 at 1 and later.

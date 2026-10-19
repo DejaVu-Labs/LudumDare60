@@ -22,7 +22,7 @@ public sealed class CustomerSeatsTests
     [Theory]
     [InlineData("hoodie")]
     [InlineData("headphones")]
-    [InlineData("raincoat")]
+    [InlineData("parcel")]
     [InlineData("unknown")]
     public void TryGetWaitingSeat_LookThatStands_ReturnsFalse(string look)
         => Assert.False(CustomerSeats.TryGetWaitingSeat(look, out _));
@@ -35,6 +35,31 @@ public sealed class CustomerSeatsTests
         Assert.True(CustomerSeats.UnderThePainting.Bottom.X < Shop.CounterX - Shop.CustomerHalfWidth);
         Assert.InRange(CustomerSeats.UnderThePainting.Scale, 0.5f, LudumDare60Game.CustomerScale - 0.1f);
         Assert.False(CustomerSeats.UnderThePainting.IsOutside);
+    }
+
+    [Fact]
+    public void TryGetFixedPlace_Parcel_LiesOnTheCounter()
+    {
+        Assert.True(CustomerSeats.TryGetFixedPlace("parcel", out var place));
+        Assert.Equal(CustomerSeats.OnTheCounter, place);
+        Assert.False(place.IsOutside);
+    }
+
+    [Theory]
+    [InlineData("hoodie")]
+    [InlineData("robe")]
+    [InlineData("dog-walker")]
+    [InlineData("headphones")]
+    public void TryGetFixedPlace_CustomerWhoWalksIn_ReturnsFalse(string look)
+        => Assert.False(CustomerSeats.TryGetFixedPlace(look, out _));
+
+    [Fact]
+    public void OnTheCounter_IsRightOfTheCounterMiddleOnTheCounterTop()
+    {
+        // The counter's top runs from about y = 140 to 157 and ends on the right at about x = 478, next to the door.
+        var place = CustomerSeats.OnTheCounter;
+        Assert.InRange(place.Bottom.X, Shop.CounterX + Shop.CustomerHalfWidth, 478 - (place.Scale * CustomerSheet.FrameWidth / 2) + 10);
+        Assert.InRange(place.Bottom.Y, 140, 157);
     }
 
     [Fact]

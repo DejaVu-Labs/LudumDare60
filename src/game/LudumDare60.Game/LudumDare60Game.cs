@@ -315,7 +315,9 @@ public sealed class LudumDare60Game : IGame
             if (!_hasCustomerSheet[i] && _assets!.TryGet(_customerImages[i], out var sheet))
             {
                 _customerSheets[i] = _graphics!.CreateTexture(sheet);
-                _customerGlows[i] = _graphics.CreateTexture(CustomerSheet.CreateGlow(sheet));
+                // A bust is cut off at the bottom, so its glow is open there; a parcel is whole and glows all around.
+                var openBottom = !CustomerSeats.TryGetFixedPlace(AssetPaths.CustomerSheets[i].Key, out _);
+                _customerGlows[i] = _graphics.CreateTexture(CustomerSheet.CreateGlow(sheet, openBottom));
                 _assets.Release(_customerImages[i]);
                 _hasCustomerSheet[i] = true;
             }
@@ -663,7 +665,15 @@ public sealed class LudumDare60Game : IGame
         var hasSheet = sheet >= 0 && _hasCustomerSheet[sheet];
         var customerScale = CustomerScale;
         var isOutside = false;
-        if (hasSheet && shop.Pose == CustomerPose.Waiting && CustomerSeats.TryGetWaitingSeat(look, out var seat))
+        var isFixed = false;
+        if (hasSheet && CustomerSeats.TryGetFixedPlace(look, out var place))
+        {
+            // A parcel: it lies at its place in every pose.
+            bottom = place.Bottom;
+            customerScale = place.Scale;
+            isFixed = true;
+        }
+        else if (hasSheet && shop.Pose == CustomerPose.Waiting && CustomerSeats.TryGetWaitingSeat(look, out var seat))
         {
             // Their waiting frame sits down or stands in the street: they wait there, not at the counter.
             bottom = seat.Bottom;
@@ -711,7 +721,7 @@ public sealed class LudumDare60Game : IGame
             batch.Draw(_customers, PlaceholderCustomers.Face(shop.Expression), face, new SpriteOptions { Scale = new Vector2(CustomerScale) });
         }
 
-        if (shop.IsHandOut)
+        if (shop.IsHandOut && !isFixed)
         {
             batch.Draw(_customers, PlaceholderCustomers.Hand, bottom + s_handOffset, new SpriteOptions { Tint = PlaceholderCustomers.Skin(look) });
         }

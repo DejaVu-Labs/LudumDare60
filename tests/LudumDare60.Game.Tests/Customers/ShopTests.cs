@@ -27,6 +27,16 @@ public sealed class ShopTests
         return new OrderBook([first, again]);
     }
 
+    /// <summary>
+    /// The first shipped order with a parcel coming in instead of the customer.
+    /// </summary>
+    private static OrderBook ParcelOrder()
+    {
+        var first = s_shipped.Orders[0];
+        var parcel = new Order("parcel-test", new Customer("parcel", "A parcel"), first.Symptom, first.Parts, first.Find, first.Message, first.TargetSeconds, first.Dirty);
+        return new OrderBook([parcel]);
+    }
+
     private static PointerSample Press(Vector2 at) => new(at, IsDown: true, IsPressed: true);
 
     private static PointerSample Hold(Vector2 at) => new(at, IsDown: true, IsPressed: false);
@@ -534,4 +544,88 @@ public sealed class ShopTests
     [InlineData(5)]
     public void Restart_OutsideTheBook_Throws(int orderIndex)
         => Assert.Throws<ArgumentOutOfRangeException>(() => _shop.Restart(orderIndex));
+
+    [Fact]
+    public void Parcel_ComingIn_LiesOnTheCounterWithoutWalking()
+    {
+        var shop = new Shop(ParcelOrder());
+        var place = CustomerSeats.OnTheCounter;
+
+        Wait(shop, Shop.WaitSeconds + Dt);
+
+        Assert.Equal(ShopPhase.Arriving, shop.Phase);
+        Assert.Equal(place, shop.FixedPlace);
+        Assert.Equal(place.Bottom.X, shop.CustomerX);
+        Wait(shop, Shop.WalkSeconds);
+        Assert.Equal(ShopPhase.Offering, shop.Phase);
+        Assert.Equal(place.Bottom.X, shop.CustomerX);
+    }
+
+    [Fact]
+    public void Parcel_IsClickedWhereItLiesNotAtTheCounterMiddle()
+    {
+        var shop = new Shop(ParcelOrder());
+        var place = CustomerSeats.OnTheCounter;
+        Wait(shop, Shop.WaitSeconds + Shop.WalkSeconds + Dt);
+
+        Assert.True(shop.IsOverCustomer(place.Bottom - new Vector2(0, 10)));
+        Assert.False(shop.IsOverCustomer(CustomerMiddle));
+
+        var onTheParcel = place.Bottom - new Vector2(0, 10);
+        shop.Step(Press(onTheParcel), Dt);
+        shop.Step(Release(onTheParcel), Dt);
+        Assert.Equal(ShopPhase.Working, shop.Phase);
+    }
+
+    [Fact]
+    public void Parcel_TheRevolverFliesOutOfIt()
+    {
+        var shop = new Shop(ParcelOrder());
+        var place = CustomerSeats.OnTheCounter;
+        Wait(shop, Shop.WaitSeconds + Shop.WalkSeconds + Dt);
+        var onTheParcel = place.Bottom - new Vector2(0, 10);
+        shop.Step(Press(onTheParcel), Dt);
+
+        // Right after the click the revolver is still about where it left the parcel, far right of the counter middle.
+        var start = new Vector2(place.Bottom.X, place.Bottom.Y - 24) - BenchLayout.CylinderSeated;
+        Assert.Equal(ShopPhase.Working, shop.Phase);
+        Assert.True(Vector2.Distance(start, shop.GetGunOffset(0)) < 10, $"The revolver starts at {shop.GetGunOffset(0)}.");
+        Assert.True(Vector2.Distance(Shop.ThrowFrom, shop.GetGunOffset(0)) > 50);
+    }
+
+    [Fact]
+    public void Customer_WhoWalksIn_HasNoFixedPlace()
+    {
+        Wait(_shop, Shop.WaitSeconds + Dt);
+
+        Assert.Null(_shop.FixedPlace);
+        Assert.NotEqual(Shop.CounterX, _shop.CustomerX);
+    }
+
+    [Fact]
+    public void Pose_ParcelThroughAVisit_ComesInClosedOpensAtOnceAndIsTapedShut()
+    {
+        var shop = new Shop(ParcelOrder());
+        var onTheParcel = CustomerSeats.OnTheCounter.Bottom - new Vector2(0, 10);
+        Wait(shop, Shop.WaitSeconds + Dt);
+        var arriving = shop.Pose;
+        Wait(shop, Shop.WalkSeconds + 0.5f);
+        var waitingToHandOver = shop.Pose;
+        shop.Step(Press(onTheParcel), Dt);
+        shop.Step(Release(onTheParcel), Dt);
+        var justHandedOver = shop.Pose;
+        Wait(shop, Shop.ThrowSeconds + 0.1f);
+        RepairWithoutWaiting(shop);
+        var testing = shop.Pose;
+        FireTest(shop);
+        var ready = shop.Pose;
+        HandBack(shop);
+
+        Assert.Equal(CustomerPose.Presenting, arriving);
+        Assert.Equal(CustomerPose.Presenting, waitingToHandOver);
+        Assert.Equal(CustomerPose.Waiting, justHandedOver);
+        Assert.Equal(CustomerPose.Waiting, testing);
+        Assert.Equal(CustomerPose.Waiting, ready);
+        Assert.Equal(CustomerPose.Pleased, shop.Pose);
+    }
 }

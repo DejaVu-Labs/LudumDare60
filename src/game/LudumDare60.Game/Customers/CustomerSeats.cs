@@ -22,6 +22,12 @@ public static class CustomerSeats
     public static readonly CustomerSeat OutsideTheWindow = new(new Vector2(370, 150), 1.1f, IsOutside: true);
 
     /// <summary>
+    /// The right end of the counter, next to the door: where a parcel lies, from the moment it comes in until it is
+    /// gone again.
+    /// </summary>
+    public static readonly CustomerSeat OnTheCounter = new(new Vector2(440, 152), 1f);
+
+    /// <summary>
     /// The place where <paramref name="look"/> waits, if that customer does not wait at the counter.
     /// </summary>
     public static bool TryGetWaitingSeat(string look, out CustomerSeat seat)
@@ -39,6 +45,22 @@ public static class CustomerSeats
         }
 
         seat = default;
+        return false;
+    }
+
+    /// <summary>
+    /// The place where <paramref name="look"/> stays in every phase and pose, if that customer is a thing that does
+    /// not walk in and out: a parcel lies on the counter all along.
+    /// </summary>
+    public static bool TryGetFixedPlace(string look, out CustomerSeat place)
+    {
+        if (string.Equals(look, "parcel", StringComparison.Ordinal))
+        {
+            place = OnTheCounter;
+            return true;
+        }
+
+        place = default;
         return false;
     }
 }

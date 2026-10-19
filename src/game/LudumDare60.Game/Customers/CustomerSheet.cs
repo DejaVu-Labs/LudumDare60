@@ -29,9 +29,10 @@ public static class CustomerSheet
     public static IntRect Glow(CustomerPose pose) => new((int)pose * (FrameWidth + 2), 0, FrameWidth + 2, FrameHeight + 2);
 
     /// <summary>
-    /// The glow sheet of a customer sheet: an outline around each pose, open at the bottom where the bust is cut off.
+    /// The glow sheet of a customer sheet: an outline around each pose, open at the bottom where a bust is cut off
+    /// (<paramref name="openBottom"/>), or closed all around a whole thing such as a parcel.
     /// </summary>
-    public static Image CreateGlow(Image sheet)
+    public static Image CreateGlow(Image sheet, bool openBottom = true)
     {
         ArgumentNullException.ThrowIfNull(sheet);
         var width = PoseCount * (FrameWidth + 2);
@@ -40,7 +41,7 @@ public static class CustomerSheet
         for (var pose = 0; pose < PoseCount; pose++)
         {
             var glow = Glow((CustomerPose)pose);
-            SpriteOutline.Draw(sheet.Pixels, sheet.Width, Frame((CustomerPose)pose), pixels, width, glow.X, glow.Y, openBottom: true);
+            SpriteOutline.Draw(sheet.Pixels, sheet.Width, Frame((CustomerPose)pose), pixels, width, glow.X, glow.Y, openBottom);
         }
 
         return new Image(width, height, pixels);

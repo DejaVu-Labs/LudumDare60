@@ -16,17 +16,18 @@ public sealed class LudumDare60GameTests
 {
     private const double Step = 1.0 / 60;
 
-    // Texture ids in creation order: the two placeholder sheets, the hoodie, robe and dog-walker customers' sheets with
-    // their glows on the first frame, the rust when the first customer comes in. With the background, the room and the
-    // street come right after the placeholder sheets.
+    // Texture ids in creation order: the two placeholder sheets, the hoodie, robe, dog-walker and parcel customers'
+    // sheets with their glows on the first frame, the rust when the first customer comes in. With the background, the
+    // room and the street come right after the placeholder sheets.
     private const int CustomersTexture = 1;
     private const int CustomerTexture = 2;
     private const int CustomerGlowTexture = 3;
     private const int RobeCustomerTexture = 4;
-    private const int RustTexture = 8;
+    private const int RustTexture = 10;
     private const int RoomTexture = 2;
     private const int StreetTexture = 3;
     private const int DogWalkerTextureWithBackground = 8;
+    private const int ParcelTextureWithBackground = 10;
 
     // Textures the first frame creates without the background: the two placeholder sheets, and a sheet and its glow per
     // drawn customer.
@@ -441,6 +442,20 @@ public sealed class LudumDare60GameTests
             Assert.Equal(255, AlphaAt(pixels, PlaceholderCustomers.Width, glow.X + first, glow.Y + 1 + row));
             Assert.Equal(0, AlphaAt(pixels, PlaceholderCustomers.Width, glow.X + 1 + first, glow.Y + 1 + row));
         }
+    }
+
+    [Fact]
+    public void ParcelGlow_IsClosedUnderTheBoxWhileABustsGlowIsOpen()
+    {
+        _platform.Frame(0);
+
+        // Glow ids: a customer sheet's glow comes right after it; the parcel is the fourth sheet.
+        var glowWidth = CustomerSheet.PoseCount * (CustomerSheet.FrameWidth + 2);
+        var lastRow = CustomerSheet.FrameHeight + 1;
+        var parcelGlow = _platform.Backend.Textures[CustomerTexture + 7];
+        var hoodieGlow = _platform.Backend.Textures[CustomerGlowTexture];
+        Assert.Contains(Enumerable.Range(0, glowWidth), x => AlphaAt(parcelGlow, glowWidth, x, lastRow) == 255);
+        Assert.DoesNotContain(Enumerable.Range(0, glowWidth), x => AlphaAt(hoodieGlow, glowWidth, x, lastRow) == 255);
     }
 
     [Fact]
@@ -1077,6 +1092,32 @@ public sealed class LudumDare60GameTests
         Assert.Equal([StreetTexture, DogWalkerTextureWithBackground, RoomTexture], textures.Take(3));
         Assert.Contains(CustomersTexture, textures.Skip(3));
         Assert.NotNull(Sprite(frame, PlaceholderCustomers.Bubble));
+    }
+
+    [Fact]
+    public void Parcel_ComingIn_IsDrawnOnTheCounterAndNotAtTheDoor()
+    {
+        // The first order with a parcel coming in instead of hoodie, with the room and the street.
+        var platform = new ManualPlatform { Assets = new ShippedAssets(withBackground: true, firstLook: "parcel") };
+        var game = new LudumDare60Game();
+        _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(game, platform);
+        var away = PointerMove(new Vector2(600, 40));
+        platform.Frame(0, Resize(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight, 1));
+        platform.AudioBackend.ReportReady(0, 1, 2);
+        for (var i = 0; i < 600 && game.Shop?.Phase != ShopPhase.Arriving; i++)
+        {
+            platform.Frame(Step, away);
+        }
+
+        platform.Frame(Step, away);
+
+        // Already at its place while a customer would still be walking in from the door.
+        Assert.Equal(ShopPhase.Arriving, game.Shop!.Phase);
+        var place = CustomerSeats.OnTheCounter;
+        var parcel = DrawnOn(platform.Backend.Frames[^1], ParcelTextureWithBackground, CustomerSheet.Frame(CustomerPose.Presenting));
+        Assert.Equal(place.Bottom, parcel.Position);
+        Assert.Equal(new Vector2(place.Scale), parcel.Scale);
+        Assert.Equal(Color.White, parcel.Tint);
     }
 
     [Fact]

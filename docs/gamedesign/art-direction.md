@@ -75,10 +75,20 @@ times larger, with the bottom middle on the far edge of the bench (y = 140):
    scales with them and stays over the room. They switch places at once, without a walk.
 3. **Pleased:** with the revolver back, until they are out of the door.
 
-Sheets so far: `hoodie`, `robe` and `dog-walker`. Looks without a sheet are drawn as code placeholders. A sheet made
-from a concept may leave out palette colors the character does not have (`robe` and `dog-walker` use no cool or mat
-colors, so the concept's blue rim light turns gray instead of blue). A frame may be drawn at another scale than its
-neighbors: the `dog-walker` waiting frame holds the whole figure and the dog, the other two frames a bust.
+Sheets so far: `hoodie`, `robe`, `dog-walker` and `parcel`. Looks without a sheet are drawn as code placeholders. A
+sheet made from a concept may leave out palette colors the character does not have (`robe`, `dog-walker` and `parcel`
+use no cool or mat colors, so the concept's blue rim light turns gray instead of blue). A frame may be drawn at another
+scale than its neighbors: the `dog-walker` waiting frame holds the whole figure and the dog, the other two frames a
+bust. A frame stands on the bottom of its figure, so an object that is not cut off (a box) rests on the frame's bottom
+edge.
+
+The fifth customer is not a person: `parcel` is a box that comes with no sender (closed when it comes in, open from the
+moment the revolver comes out of it until it goes back in, taped shut again when pleased). It has a fixed place
+(`CustomerSeats.TryGetFixedPlace`): it lies on the right end of the counter next to the door, bottom middle at
+(440, 152), at its own size, in every phase and pose. It does not walk in or out, the player clicks it where it lies,
+the revolver flies out of it, and no hand comes out to take the revolver back. Being whole, it has its ink outline and
+its glow all around, under the box too: the sheet leaves a pixel under each box, and its glow is made with `openBottom:
+false`.
 
 ## Concept art prompts
 
@@ -109,5 +119,5 @@ Pixel art sprite sheet on a flat dark green background, top-down view, each item
 **Customer busts (modular check):**
 
 ```text
-Pixel art character sheet, front view, five modern customers from the chest up, about 96x128 pixels each, all built on the same base body shape with different hair, clothes and skin tones: a young person in a hoodie, an old man in a robe, a woman walking a dog, a teenager with headphones, a woman in a raincoat. Each customer in three expressions: neutral, surprised, thankful. Flat dark background, same strict pixel grid and limited palette.
+Pixel art character sheet, front view, five modern customers from the chest up, about 96x128 pixels each, all built on the same base body shape with different hair, clothes and skin tones: a young person in a hoodie, an old man in a robe, a woman walking a dog, a teenager with headphones, and a parcel with no sender. Each customer in three expressions: neutral, surprised, thankful. Flat dark background, same strict pixel grid and limited palette.
 ```

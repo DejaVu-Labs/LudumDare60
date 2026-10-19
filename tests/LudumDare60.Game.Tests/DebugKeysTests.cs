@@ -33,7 +33,7 @@ public sealed class DebugKeysTests
     [Theory]
     [InlineData(Key.Digit1, "hoodie")]
     [InlineData(Key.Digit3, "dog-walker")]
-    [InlineData(Key.Digit5, "raincoat")]
+    [InlineData(Key.Digit5, "parcel")]
     [InlineData(Key.Numpad2, "robe")]
     public void DigitKey_WithDebugKeys_ThatOrdersCustomerComesInAtOnce(Key key, string orderId)
     {
