@@ -531,6 +531,56 @@ public sealed class LudumDare60GameTests
         Assert.Null(game.Shop);
     }
 
+    private void Frames(int count)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            _platform.Frame(Step);
+        }
+    }
+
+    [Fact]
+    public void Ending_ShopOpen_NoFade()
+    {
+        _platform.Frame(0);
+        _platform.Frame(Step);
+
+        Assert.Equal(0, _game.EndingDarkness);
+        Assert.Null(Sprite(LastFrame, PlaceholderParts.ToBeContinued));
+    }
+
+    [Fact]
+    public void Ending_ShopClosed_FadesToBlackOverEverythingThenShowsToBeContinued()
+    {
+        _platform.Frame(0);
+        Shop.Close();
+
+        // Half a second in: the shop is still in full view.
+        Frames(24);
+        Assert.Equal(0, _game.EndingDarkness);
+
+        // Halfway through the fade: the black is drawn last, over the room, half see-through, and no text yet.
+        Frames(66);
+        Assert.InRange(_game.EndingDarkness, 0.4f, 0.6f);
+        var veil = LastFrame.Instances[^1];
+        Assert.Equal(PlaceholderParts.Pixel.X, veil.SourceX);
+        Assert.Equal(PlaceholderParts.Pixel.Y, veil.SourceY);
+        Assert.Equal(new Vector2(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight), veil.Scale * new Vector2(PlaceholderParts.Pixel.Width, PlaceholderParts.Pixel.Height));
+        Assert.InRange(veil.Tint.A, 100, 155);
+        Assert.Null(Sprite(LastFrame, PlaceholderParts.ToBeContinued));
+
+        // Long after: black all over, and the text in the middle, fully shown.
+        Frames(300);
+        Assert.Equal(1, _game.EndingDarkness);
+        Assert.Equal(1, _game.EndingTextShown);
+        Assert.Equal(255, LastFrame.Instances[^2].Tint.A);
+        var text = Sprite(LastFrame, PlaceholderParts.ToBeContinued)!.Value;
+        Assert.Equal(255, text.Tint.A);
+        var size = text.Scale * new Vector2(PlaceholderParts.ToBeContinued.Width, PlaceholderParts.ToBeContinued.Height);
+        Assert.Equal(LudumDare60Game.VirtualWidth / 2f, text.Position.X + (size.X / 2), 1f);
+        Assert.Equal(LudumDare60Game.VirtualHeight / 2f, text.Position.Y + (size.Y / 2), 1f);
+    }
+
     [Fact]
     public void Frame_NotWaitingForAssets_OpensShopWithoutBackground()
     {

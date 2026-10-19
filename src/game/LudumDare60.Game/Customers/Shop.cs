@@ -316,6 +316,20 @@ public sealed class Shop
     }
 
     /// <summary>
+    /// Sends the current customer away, with whatever is on the bench, and closes the shop at once, as after the last
+    /// order: a debug shortcut to the ending.
+    /// </summary>
+    public void Close()
+    {
+        Bench = null;
+        HandBack = null;
+        Test = null;
+        IsCustomerHovered = false;
+        OrderIndex = _book.Orders.Count;
+        Enter(ShopPhase.Closed);
+    }
+
+    /// <summary>
     /// Whether <paramref name="point"/>, in virtual pixels, is on the customer.
     /// </summary>
     public bool IsOverCustomer(Vector2 point)

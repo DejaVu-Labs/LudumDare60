@@ -59,6 +59,14 @@ public sealed class LudumDare60Game : IGame
     private const float TitlePulseRate = 3;
     private static readonly Color s_titleBandColor = Color.FromRgb(0x000000).WithAlpha(0xa0);
 
+    // The ending: a moment after the shop closes the room fades to black, then "TO BE CONTINUED" fades in, three times
+    // its sheet size, in the middle of the screen.
+    private const float EndingDelaySeconds = 0.5f;
+    private const float EndingFadeSeconds = 2;
+    private const float EndingTextSeconds = 1.5f;
+    private const float EndingTextScale = 3;
+    private static readonly Color s_endingColor = Color.FromRgb(0x000000);
+
     /// <summary>
     /// Where the top-left corner of the street is drawn, in virtual pixels: raised so that the embankment with its
     /// lamps, railing and reflections fills the window panes and the door glass of the room.
@@ -254,8 +262,22 @@ public sealed class LudumDare60Game : IGame
     }
 
     /// <summary>
+    /// How dark the ending has made the screen, from 0 to 1: the room fades to black once the shop has closed.
+    /// </summary>
+    public float EndingDarkness => Shop is { Phase: ShopPhase.Closed } shop
+        ? Math.Clamp((shop.PhaseTime - EndingDelaySeconds) / EndingFadeSeconds, 0, 1)
+        : 0;
+
+    /// <summary>
+    /// How far "TO BE CONTINUED" has faded in, from 0 to 1: it starts once the screen is black.
+    /// </summary>
+    public float EndingTextShown => Shop is { Phase: ShopPhase.Closed } shop
+        ? Math.Clamp((shop.PhaseTime - EndingDelaySeconds - EndingFadeSeconds) / EndingTextSeconds, 0, 1)
+        : 0;
+
+    /// <summary>
     /// Whether the debug keys work: 1 to 9 bring in the customer of that order at once, 0 brings the current one in
-    /// again. The page turns them on with <c>?debug</c> in its address.
+    /// again, E closes the shop and plays the ending. The page turns them on with <c>?debug</c> in its address.
     /// </summary>
     public bool HasDebugKeys { get; init; }
 
@@ -308,6 +330,10 @@ public sealed class LudumDare60Game : IGame
         if (HasDebugKeys && DebugOrder(context.Input, shop, Orders!.Orders.Count) is var order and >= 0)
         {
             shop.Restart(order);
+        }
+        else if (HasDebugKeys && context.Input.IsPressed(Key.E) && shop.Phase != ShopPhase.Closed)
+        {
+            shop.Close();
         }
 
         var deltaTime = (float)context.DeltaTime;
@@ -571,6 +597,7 @@ public sealed class LudumDare60Game : IGame
         var brushGlow = new SpriteOptions { Origin = PlaceholderParts.BrushOrigin + Vector2.One, Tint = Color.White.WithAlpha(_brushGlow) };
         batch.Draw(_parts, PlaceholderParts.BrushGlow, _brushDrawPosition, brushGlow);
         batch.Draw(_parts, PlaceholderParts.Brush, _brushDrawPosition, new SpriteOptions { Origin = PlaceholderParts.BrushOrigin });
+        DrawEnding(batch);
     }
 
     /// <summary>
@@ -606,6 +633,32 @@ public sealed class LudumDare60Game : IGame
                 DrawPart(batch, bench, i);
             }
         }
+    }
+
+    /// <summary>
+    /// The ending over everything: black that thickens until the room is gone, then "TO BE CONTINUED" in the middle.
+    /// </summary>
+    private void DrawEnding(SpriteBatch batch)
+    {
+        var darkness = EndingDarkness;
+        if (darkness <= 0)
+        {
+            return;
+        }
+
+        DrawBar(batch, Vector2.Zero, VirtualWidth, VirtualHeight, s_endingColor.WithAlpha((byte)MathF.Round(darkness * 255)));
+        var shown = EndingTextShown;
+        if (shown <= 0)
+        {
+            return;
+        }
+
+        var text = PlaceholderParts.ToBeContinued;
+        var at = new Vector2(
+            MathF.Round((VirtualWidth - (text.Width * EndingTextScale)) / 2),
+            MathF.Round((VirtualHeight - (text.Height * EndingTextScale)) / 2));
+        var tint = Color.White.WithAlpha((byte)MathF.Round(shown * 255));
+        batch.Draw(_parts, text, at, new SpriteOptions { Scale = new Vector2(EndingTextScale), Tint = tint });
     }
 
     /// <summary>

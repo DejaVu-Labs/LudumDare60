@@ -131,6 +131,11 @@ internal static class PlaceholderParts
     public static readonly IntRect PressAnyKey = new(0, RowD, (PressAnyKeyText.Length * 4) - 1, 5);
 
     /// <summary>
+    /// "TO BE CONTINUED" in white, in the same letters as <see cref="PressAnyKey"/>, for the ending.
+    /// </summary>
+    public static readonly IntRect ToBeContinued = new(88, RowD, (ToBeContinuedText.Length * 4) - 1, 5);
+
+    /// <summary>
     /// The middle of the bristles, in brush pixels: the point that scrubs.
     /// </summary>
     public static readonly Vector2 BrushOrigin = new(3, 3);
@@ -270,12 +275,17 @@ internal static class PlaceholderParts
     private static readonly IntRect s_screwSource = new(148, 119, ScrewSize, ScrewSize);
 
     private const string PressAnyKeyText = "PRESS ANY KEY TO PLAY";
+    private const string ToBeContinuedText = "TO BE CONTINUED";
 
-    // Three by five letters, row by row from the top: the ones PressAnyKeyText needs.
+    // Three by five letters, row by row from the top: the ones PressAnyKeyText and ToBeContinuedText need.
     private static readonly Dictionary<char, string[]> s_letters = new()
     {
         ['A'] = [".#.", "#.#", "###", "#.#", "#.#"],
+        ['B'] = ["##.", "#.#", "##.", "#.#", "##."],
+        ['C'] = [".##", "#..", "#..", "#..", ".##"],
+        ['D'] = ["##.", "#.#", "#.#", "#.#", "##."],
         ['E'] = ["###", "#..", "##.", "#..", "###"],
+        ['I'] = ["###", ".#.", ".#.", ".#.", "###"],
         ['K'] = ["#.#", "#.#", "##.", "#.#", "#.#"],
         ['L'] = ["#..", "#..", "#..", "#..", "###"],
         ['N'] = ["##.", "#.#", "#.#", "#.#", "#.#"],
@@ -284,6 +294,7 @@ internal static class PlaceholderParts
         ['R'] = ["##.", "#.#", "##.", "#.#", "#.#"],
         ['S'] = [".##", "#..", ".#.", "..#", "##."],
         ['T'] = ["###", ".#.", ".#.", ".#.", ".#."],
+        ['U'] = ["#.#", "#.#", "#.#", "#.#", "###"],
         ['Y'] = ["#.#", "#.#", ".#.", ".#.", ".#."],
         [' '] = ["...", "...", "...", "...", "..."],
     };
@@ -338,7 +349,8 @@ internal static class PlaceholderParts
         Fill(pixels, OilCan, OilCanColor);
         Fill(pixels, Tray, TrayColor);
         Fill(pixels, Pixel, static (_, _) => Color.White);
-        Fill(pixels, PressAnyKey, PressAnyKeyColor);
+        Fill(pixels, PressAnyKey, static (x, y) => TextColor(PressAnyKeyText, x, y));
+        Fill(pixels, ToBeContinued, static (x, y) => TextColor(ToBeContinuedText, x, y));
         FillGlow(pixels, BodyGlow, IsBody);
         FillGlow(pixels, PinGlow, IsPin);
         FillGlow(pixels, CylinderGlow, IsCylinder);
@@ -643,11 +655,11 @@ internal static class PlaceholderParts
         };
     }
 
-    private static Color PressAnyKeyColor(int x, int y)
+    private static Color TextColor(string text, int x, int y)
     {
         // A column of space between letters.
         var column = x % 4;
-        return column < 3 && s_letters[PressAnyKeyText[x / 4]][y][column] == '#' ? Color.White : Color.Transparent;
+        return column < 3 && s_letters[text[x / 4]][y][column] == '#' ? Color.White : Color.Transparent;
     }
 
     private static void Fill(byte[] pixels, IntRect rect, Func<int, int, Color> color)

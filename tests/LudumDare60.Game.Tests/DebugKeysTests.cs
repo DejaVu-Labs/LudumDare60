@@ -77,6 +77,28 @@ public sealed class DebugKeysTests
     }
 
     [Fact]
+    public void EKey_WithDebugKeys_SendsTheCustomerAwayAndClosesTheShop()
+    {
+        var game = Start(debug: true);
+        Press(Key.Digit2);
+
+        Press(Key.E);
+
+        Assert.Equal(ShopPhase.Closed, game.Shop!.Phase);
+        Assert.Null(game.Bench);
+    }
+
+    [Fact]
+    public void EKey_WithoutDebugKeys_DoesNothing()
+    {
+        var game = Start(debug: false);
+
+        Press(Key.E);
+
+        Assert.Equal(ShopPhase.Waiting, game.Shop!.Phase);
+    }
+
+    [Fact]
     public void DigitKey_WithoutDebugKeys_DoesNothing()
     {
         var game = Start(debug: false);

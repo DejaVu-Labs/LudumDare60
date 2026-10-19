@@ -61,8 +61,8 @@ about 4 minutes. The build ran fine when served from a subdirectory and did not 
 
 Add `?debug` to the page address (`index.html?debug`, or `?debug=1` next to other parameters) to turn on the debug
 keys, in every build: **1** to **9** (top row or numpad) send the current customer away and bring in the customer of
-that order at once, **0** brings the current one in again with a fresh bench. Keys beyond the number of orders do
-nothing. `Program.cs` reads the address with `PageAddress.HasQueryParameter` and sets
+that order at once, **0** brings the current one in again with a fresh bench, **E** sends the customer away and
+closes the shop, which plays the ending. Keys beyond the number of orders do nothing. `Program.cs` reads the address with `PageAddress.HasQueryParameter` and sets
 `LudumDare60Game.HasDebugKeys`.
 
 ## Desktop build
