@@ -23,15 +23,16 @@ public sealed class LudumDare60GameTests
     private const int CustomerTexture = 2;
     private const int CustomerGlowTexture = 3;
     private const int RobeCustomerTexture = 4;
-    private const int RustTexture = 12;
+    private const int RustTexture = 13;
     private const int RoomTexture = 2;
     private const int StreetTexture = 3;
     private const int DogWalkerTextureWithBackground = 8;
     private const int ParcelTextureWithBackground = 12;
+    private const int PhoneTextureWithBackground = 14;
 
-    // Textures the first frame creates without the background: the two placeholder sheets, and a sheet and its glow per
-    // drawn customer.
-    private static readonly int s_startTextures = 2 + (2 * AssetPaths.CustomerSheets.Count);
+    // Textures the first frame creates without the background: the two placeholder sheets, a sheet and its glow per
+    // drawn customer, and the phone.
+    private static readonly int s_startTextures = 3 + (2 * AssetPaths.CustomerSheets.Count);
 
     // Sound ids in creation order: the click and the door bell on the first frame, then the scrub loop from its file.
     private const int DoorBellSound = 1;
@@ -395,7 +396,7 @@ public sealed class LudumDare60GameTests
 
         platform.Frame(0);
 
-        var assetCount = 5 + AssetPaths.CustomerSheets.Count;
+        var assetCount = 6 + AssetPaths.CustomerSheets.Count;
         Assert.True(game.IsLoading);
         Assert.Equal((float)(assetCount - 1) / assetCount, game.LoadProgress, 5);
         Assert.Null(game.Shop);
@@ -1582,6 +1583,20 @@ public sealed class LudumDare60GameTests
         var commands = frame.Decode();
         Assert.Equal(new RenderCommand(RenderCommandKind.DrawSprites, [3, 0, 1]), commands[2]);
         Assert.Equal(new RenderCommand(RenderCommandKind.DrawSprites, [2, 1, 1]), commands[3]);
+    }
+
+    [Fact]
+    public void Render_PhoneLoaded_DrawsItRightAfterTheRoomOnTheBench()
+    {
+        var (platform, _) = StartWithShippedAssets();
+
+        platform.Frame(0);
+
+        var frame = Assert.Single(platform.Backend.Frames);
+        var phone = frame.Instances[2];
+        Assert.Equal(ShopDecor.PhoneAt, phone.Position);
+        var commands = frame.Decode();
+        Assert.Equal(new RenderCommand(RenderCommandKind.DrawSprites, [PhoneTextureWithBackground, 2, 1]), commands[4]);
     }
 
     [Fact]

@@ -24,6 +24,12 @@ public static class ShopDecor
     public const float ElephantSeconds = 2.4f;
 
     /// <summary>
+    /// The top-left corner of the phone (<see cref="AssetPaths.Phone"/>) lying on the bench right of the mat, near its
+    /// front corner: on the wood, clear of the mat's edge and of the bench's slanted right edge.
+    /// </summary>
+    public static readonly Vector2 PhoneAt = new(509, 287);
+
+    /// <summary>
     /// Whether <paramref name="point"/>, in virtual pixels, lies on the elephant statuette.
     /// </summary>
     public static bool IsOnElephant(Vector2 point)

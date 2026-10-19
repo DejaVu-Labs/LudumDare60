@@ -123,6 +123,13 @@ half times the revolver's, so they read at a glance. Their grab areas are the bo
 the left of the mat, under the lamp, clear of the revolver and of the parts taken out of it (`BenchLayout.BrushRest`,
 `OilCanRest`).
 
+## Props
+
+`assets/props/phone.png` (source `art/sprites/phone.png`), 42x39: the player's phone lying on the bench, screen up,
+showing a music player, cut from a concept on white and reduced like the tools. It lies on the wood right of the mat,
+near the bench's front corner (`ShopDecor.PhoneAt`, top-left (509, 287)), drawn right over the room, under everything
+else.
+
 ## Concept art prompts
 
 For external image generators. These images are mood references only: in the Compo every asset is drawn by

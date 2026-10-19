@@ -143,6 +143,8 @@ public sealed class LudumDare60Game : IGame
     private Graphics? _graphics;
     private Audio? _audio;
     private AssetHandle<Image> _benchImage;
+    private AssetHandle<Image> _phoneImage;
+    private Texture _phone;
     private AssetHandle<Image> _streetImage;
     private AssetHandle<OrderBook> _ordersHandle;
     private bool _hasOrders;
@@ -217,6 +219,11 @@ public sealed class LudumDare60Game : IGame
     public bool HasBackground { get; private set; }
 
     /// <summary>
+    /// Whether the phone on the bench is loaded and drawn.
+    /// </summary>
+    public bool HasPhone { get; private set; }
+
+    /// <summary>
     /// Whether the street seen through the windows is loaded and drawn.
     /// </summary>
     public bool HasStreet { get; private set; }
@@ -253,14 +260,14 @@ public sealed class LudumDare60Game : IGame
     /// </summary>
     public float LoadProgress => (float)LoadedAssetCount / AssetCount;
 
-    // The room, the street, a sheet per customer look, orders.json, the scrub sound and the elephant.
-    private int AssetCount => 5 + _customerImages.Length;
+    // The room, the street, the phone, a sheet per customer look, orders.json, the scrub sound and the elephant.
+    private int AssetCount => 6 + _customerImages.Length;
 
     private int LoadedAssetCount
     {
         get
         {
-            var count = (HasBackground ? 1 : 0) + (HasStreet ? 1 : 0) + (_hasScrubSound ? 1 : 0) + (_hasElephantSound ? 1 : 0);
+            var count = (HasBackground ? 1 : 0) + (HasStreet ? 1 : 0) + (HasPhone ? 1 : 0) + (_hasScrubSound ? 1 : 0) + (_hasElephantSound ? 1 : 0);
             foreach (var loaded in _hasCustomerSheet)
             {
                 count += loaded ? 1 : 0;
@@ -321,6 +328,7 @@ public sealed class LudumDare60Game : IGame
         assets.Register(new OrderBookLoader());
         _benchImage = assets.Request<Image>(AssetPaths.Bench);
         _streetImage = assets.Request<Image>(AssetPaths.Street);
+        _phoneImage = assets.Request<Image>(AssetPaths.Phone);
         for (var i = 0; i < _customerImages.Length; i++)
         {
             _customerImages[i] = assets.Request<Image>(AssetPaths.CustomerSheets[i].Value);
@@ -577,6 +585,11 @@ public sealed class LudumDare60Game : IGame
             batch.Draw(_bench, Vector2.Zero);
         }
 
+        if (HasPhone)
+        {
+            batch.Draw(_phone, ShopDecor.PhoneAt);
+        }
+
         if (!_hasSheets || Shop is not { } shop)
         {
             if (_hasSheets && IsOnTitle)
@@ -776,6 +789,13 @@ public sealed class LudumDare60Game : IGame
                 _hasCustomerSheet[i] = true;
             }
         }
+
+        if (!HasPhone && _assets!.TryGet(_phoneImage, out var phone))
+        {
+            _phone = _graphics!.CreateTexture(phone);
+            _assets.Release(_phoneImage);
+            HasPhone = true;
+        }
     }
 
     /// <summary>
@@ -829,6 +849,11 @@ public sealed class LudumDare60Game : IGame
         if (!HasStreet)
         {
             ThrowIfFailed(_streetImage);
+        }
+
+        if (!HasPhone)
+        {
+            ThrowIfFailed(_phoneImage);
         }
 
         for (var i = 0; i < _customerImages.Length; i++)

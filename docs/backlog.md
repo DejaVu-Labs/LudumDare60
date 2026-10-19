@@ -100,7 +100,7 @@ Customers come in, hand over the revolver and take it back (`Customers/Shop`, se
   follow-ups) once it exists, and tune how hard the mainspring holds the hammer down.
 - Finds: the find pops out of its part, opens over the bench, flies into the finds box; the customer's surprised
   face (`Expression.Surprised` exists, nothing sets it yet).
-- The phone message after the customer leaves, and the counter bell that calls the next customer at once.
+- The phone message after the customer leaves (the phone lies on the bench already, `assets/props/phone.png`), and the counter bell that calls the next customer at once.
 - The shop's end once the orders run out; today it just stays empty (`ShopPhase.Closed`).
 - A blink, a walk instead of a slide, the door opening. A walk to and from a waiting place: `robe` jumps between the
   counter and the bench under the painting, `dog-walker` and `clown` between the counter and the street

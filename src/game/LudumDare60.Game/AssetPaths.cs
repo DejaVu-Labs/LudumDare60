@@ -12,6 +12,11 @@ public static class AssetPaths
     public const string Bench = "backgrounds/bench.png";
 
     /// <summary>
+    /// The player's phone lying on the bench, right of the mat (<see cref="ShopDecor.PhoneAt"/>), drawn over the room.
+    /// </summary>
+    public const string Phone = "props/phone.png";
+
+    /// <summary>
     /// The rainy street outside, drawn under <see cref="Bench"/> (see <see cref="LudumDare60Game.StreetOffset"/>).
     /// </summary>
     public const string Street = "backgrounds/street.png";
