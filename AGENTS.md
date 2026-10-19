@@ -48,6 +48,8 @@ rm -rf artifacts/publish/LudumDare60.Game.Browser   # publish never cleans; hash
 dotnet publish src/game/LudumDare60.Game.Browser -c Release
 # AOT + trimmed browser build -> artifacts/publish/LudumDare60.Game.Browser/release/wwwroot
 butler push artifacts/publish/LudumDare60.Game.Browser/release/wwwroot <user>/<game>:html5 --userversion <ver>
+dotnet publish src/game/LudumDare60.Game.Desktop -c Release -p:DesktopRuntime=win-x64   # or linux-x64; never -r
+# self-contained desktop build -> artifacts/publish/LudumDare60.Game.Desktop/release_<rid>, butler channels windows/linux
 ```
 
 Release AOT publishing is slow (several minutes for an empty app). Use Debug for iteration and publish Release
@@ -112,5 +114,5 @@ code. The short version:
 
 See [docs/tech/build-and-deploy.md](docs/tech/build-and-deploy.md) for the itch.io HTML5 limits and the `butler`
 workflow. GitHub Actions deploys automatically: a push to `main` goes to the dev project on itch.io, a `v*` tag goes
-to the public page (`.github/workflows/deploy.yml`). Key constraints: `index.html` at the zip root, relative paths only, case-sensitive file names, at most
+to the public page (`.github/workflows/deploy.yml`), each as three channels: `html5`, `windows` and `linux`. Key constraints: `index.html` at the zip root, relative paths only, case-sensitive file names, at most
 1000 files, and no `SharedArrayBuffer`.

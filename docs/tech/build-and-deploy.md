@@ -67,7 +67,8 @@ nothing. `Program.cs` reads the address with `PageAddress.HasQueryParameter` and
 
 ## Desktop build
 
-`src/game/LudumDare60.Game.Desktop` is a plain console app on `DesktopPlatform` (SDL3):
+`src/game/LudumDare60.Game.Desktop` is a plain .NET app on `DesktopPlatform` (SDL3). It is a `WinExe`, so Windows
+opens no console window next to it; run it from a terminal to see its standard error.
 
 ```bash
 dotnet run --project src/game/LudumDare60.Game.Desktop             # add -- --debug for the debug keys
@@ -77,8 +78,26 @@ It needs no workload beyond the SDK, and a Vulkan driver to run (see
 [Desktop renderer](architecture.md#desktop-renderer)). On ChromeOS (Crostini) run it with `SDL_VIDEO_DRIVER=wayland`. The native SDL3 libraries come from the `SDL3-CS.Windows`, `SDL3-CS.Linux` and
 `SDL3-CS.MacOS` packages and are copied to `runtimes/<rid>/native/`; the runtime picks the one for the current OS.
 The build copies the browser project's `wwwroot/assets/` to `assets/` next to the executable. `--debug` turns on the
-same debug keys as `?debug` in the browser. Without an audio device (no sound server), the game runs silent. Nothing
-deploys the desktop build yet.
+same debug keys as `?debug` in the browser. Without an audio device (no sound server), the game runs silent.
+
+Release builds for players are self-contained, so they need no .NET install:
+
+```bash
+dotnet publish src/game/LudumDare60.Game.Desktop -c Release -p:DesktopRuntime=win-x64     # or linux-x64
+# -> artifacts/publish/LudumDare60.Game.Desktop/release_<rid>/
+```
+
+- Pass the RID as `-p:DesktopRuntime=<rid>`, not `-r <rid>`. `-r` sets `RuntimeIdentifier` on every project of the
+  graph, the libraries' lock files have no RID, and locked restore (CI) fails with NU1004. `DesktopRuntime` sets it on
+  the executable only; its lock file covers `win-x64` and `linux-x64` (`RuntimeIdentifiers`). To add a RID, add it
+  there and run `dotnet restore --force-evaluate`.
+- The output is one executable (`LudumDare60.Game.Desktop.exe` or `LudumDare60.Game.Desktop`, single-file and
+  compressed) with SDL3 (`SDL3.dll` or `libSDL3.so`), the symbol files (for line numbers in stack traces) and
+  `assets/`: about 40 MB. The Linux SDL package ships `libSDL3.so` three times under its soname names; the copies are
+  left out (`DropSdlSonameCopies`). Nothing is trimmed: SDL3-CS and NVorbis are not checked for trimming.
+- Both are cross-published on Linux. The Windows build is not run in CI: start it on Windows before a release (see
+  the [pre-release checklist](#pre-release-checklist)).
+- Players need a Vulkan driver. Say so on the itch.io page.
 
 The sprite shaders are committed as GLSL and as compiled SPIR-V. After changing `Shaders/*.vert` or `*.frag` in the
 desktop platform, write the SPIR-V again:
@@ -166,11 +185,13 @@ Source: <https://itch.io/docs/butler/pushing.html>.
 
 ```bash
 butler push artifacts/publish/LudumDare60.Game.Browser/release/wwwroot <user>/<game>:html5 --userversion 0.1.0 --if-changed
-butler status <user>/<game>:html5
+butler push artifacts/publish/LudumDare60.Game.Desktop/release_win-x64 <user>/<game>:windows --userversion 0.1.0 --if-changed
+butler push artifacts/publish/LudumDare60.Game.Desktop/release_linux-x64 <user>/<game>:linux --userversion 0.1.0 --if-changed
+butler status <user>/<game>
 ```
 
-- Channel name: `html5`. Channel names only auto-tag desktop and Android platforms. Browser play is enabled in
-  the itch.io UI.
+- Channels: `html5`, `windows` and `linux`. Channel names tag desktop platforms by themselves (`windows`, `linux`),
+  but not browser play, which is enabled in the itch.io UI.
 - `--dry-run` lists the files without pushing. `butler push-preview` diffs against the last build.
 - Push an exact release folder. Do not rely on `--ignore` patterns.
 - `BUTLER_API_KEY` is a secret. If it ever appears in a log, revoke it on the itch.io API keys page.
@@ -182,7 +203,7 @@ Two GitHub Actions workflows live in `.github/workflows/`:
 | Workflow | Runs on | Does |
 | --- | --- | --- |
 | `ci.yml` | pull requests, manual runs, and as the first job of `deploy.yml` | Installs `wasm-tools` (the pinned workload set is required for any build), then locked restore (`CI=true`), Debug build, `dotnet test`, `npm test`, `dotnet format --verify-no-changes`. |
-| `deploy.yml` | push to `main`, tags `v*`, manual runs | Runs `ci.yml`, publishes Release AOT, checks the itch.io limits, uploads the build as the `html5` workflow artifact, then pushes it with butler. |
+| `deploy.yml` | push to `main`, tags `v*`, manual runs | Runs `ci.yml`, then in parallel publishes Release AOT for the browser (checks the itch.io limits) and the self-contained Windows and Linux builds. Each build becomes a workflow artifact (`html5`, `windows`, `linux`) and is pushed by its own job to the channel of that name. |
 
 Where a build goes:
 
@@ -199,8 +220,11 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-Pushing a commit and a tag at once starts two deploys, one per target. Deploys to the same target are queued, never
-run in parallel.
+Pushing a commit and a tag at once starts two deploys, one per target. Deploys to the same target and channel are
+queued, never run in parallel. The three builds are pushed independently: a broken desktop build does not hold back
+the browser one, and the run fails so it gets noticed. The push jobs use the local action
+`.github/actions/butler-push`, which downloads the artifact, marks the Linux executable executable again (workflow
+artifacts drop file permissions) and pushes with butler.
 
 ### One-time setup
 
@@ -212,7 +236,8 @@ run in parallel.
    both. Only the push job of `deploy.yml` uses these environments, so pull requests never see the key. Optionally
    add required reviewers to `itch` to approve each release by hand.
 4. After the first push to each project, open its *Edit game* page and mark the `html5` upload as *This file will
-   be played in the browser*. Set the embed viewport to 1280x720.
+   be played in the browser*. Set the embed viewport to 1280x720. The `windows` and `linux` uploads are tagged by
+   their channel names; check that each shows its platform.
 5. Optional, for [error and load reports](#error-and-load-reports): create a Sentry project (platform
    *Browser JavaScript*), turn on *Settings > Security & Privacy > Prevent Storing of IP Addresses*, and add its DSN
    as the `SENTRY_DSN` repository variable. One project serves both targets; events carry `environment` `dev` or
@@ -306,9 +331,10 @@ GameAnalytics, so expect events from only part of the players.
 
 ### Updating butler
 
-`deploy.yml` downloads butler from `broth.itch.zone` at a pinned version and checks its SHA-256. To update, read the
-latest version from <https://broth.itch.zone/butler/linux-amd64/LATEST>, then set `BUTLER_VERSION` and
-`BUTLER_SHA256` (`curl -fsSL https://broth.itch.zone/butler/linux-amd64/<version>/archive/default | sha256sum`).
+`.github/actions/butler-push/action.yml` downloads butler from `broth.itch.zone` at a pinned version and checks its
+SHA-256. To update, read the latest version from <https://broth.itch.zone/butler/linux-amd64/LATEST>, then set
+`BUTLER_VERSION` and `BUTLER_SHA256` there
+(`curl -fsSL https://broth.itch.zone/butler/linux-amd64/<version>/archive/default | sha256sum`).
 
 ## Pre-release checklist
 
@@ -324,3 +350,5 @@ latest version from <https://broth.itch.zone/butler/linux-amd64/LATEST>, then se
 - [ ] With `SENTRY_DSN` set, the published `reporting.json` has the DSN, and a `load` transaction shows up in Sentry.
 - [ ] With the `GAMEANALYTICS_*` variables set, the published `analytics.json` has both keys, and `Game:Ready` shows up
   in GameAnalytics' *Realtime* view.
+- [ ] The `windows` and `linux` builds from the dev project start on a real Windows and Linux machine, draw, play
+  sound and take input, also when launched from the itch.io app.

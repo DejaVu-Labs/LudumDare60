@@ -1,4 +1,5 @@
-# Publishes the Release (AOT) browser build to itch.io with butler.
+# Publishes the game to itch.io with butler: the Release (AOT) browser build to the html5 channel, and self-contained
+# desktop builds to the windows and linux channels.
 #
 #   tag v*            -> release: vars.ITCH_GAME      (the public game page), environment "itch"
 #   push to main      -> dev:     vars.ITCH_DEV_GAME  (a restricted test page), environment "itch-dev"
@@ -30,6 +31,7 @@ permissions:
 
 env:
   PUBLISH_DIR: artifacts/publish/LudumDare60.Game.Browser/release/wwwroot
+  DESKTOP_PROJECT: src/game/LudumDare60.Game.Desktop
 
 jobs:
   plan:
@@ -39,7 +41,7 @@ jobs:
     outputs:
       target: ${{ steps.plan.outputs.target }}
       environment: ${{ steps.plan.outputs.environment }}
-      channel: ${{ steps.plan.outputs.channel }}
+      project: ${{ steps.plan.outputs.project }}
       version: ${{ steps.plan.outputs.version }}
     steps:
       # Fails here, before the long AOT build, when the itch.io settings are missing.
@@ -66,14 +68,14 @@ jobs:
             echo "::error::Set the repository variables ITCH_USER, ITCH_GAME and ITCH_DEV_GAME (Settings > Secrets and variables > Actions > Variables)."
             exit 1
           fi
-          channel="$ITCH_USER/$game:html5"
+          project="$ITCH_USER/$game"
           {
             echo "target=$target"
             echo "environment=$environment"
-            echo "channel=$channel"
+            echo "project=$project"
             echo "version=$version"
           } >> "$GITHUB_OUTPUT"
-          echo "Deploying $version to $channel ($target)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Deploying $version to $project, channels html5, windows and linux ($target)" >> "$GITHUB_STEP_SUMMARY"
 
   ci:
     name: CI
@@ -143,42 +145,108 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  # Self-contained desktop builds, cross-published from Linux: one executable plus SDL3 and the assets, no .NET
+  # install needed. See docs/tech/build-and-deploy.md#desktop-build.
+  publish-desktop:
+    name: Publish (${{ matrix.channel }})
+    needs: [plan, ci]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - channel: windows
+            runtime: win-x64
+            executable: LudumDare60.Game.Desktop.exe
+          - channel: linux
+            runtime: linux-x64
+            executable: LudumDare60.Game.Desktop
+    env:
+      DESKTOP_PUBLISH_DIR: artifacts/publish/LudumDare60.Game.Desktop/release_${{ matrix.runtime }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      # The SDK refuses to evaluate any project of the repository until the workload set pinned in global.json is
+      # installed, desktop ones included.
+      - name: Install wasm-tools workload
+        run: dotnet workload install wasm-tools
+
+      # DesktopRuntime, not -r: -r would give the RID to the libraries too, and their lock files have none.
+      - name: Publish
+        run: dotnet publish "$DESKTOP_PROJECT" -c Release -p:DesktopRuntime=${{ matrix.runtime }}
+
+      - name: Check output
+        env:
+          EXECUTABLE: ${{ matrix.executable }}
+        run: |
+          test -f "$DESKTOP_PUBLISH_DIR/$EXECUTABLE" || { echo "::error::$EXECUTABLE is missing from $DESKTOP_PUBLISH_DIR"; exit 1; }
+          test -d "$DESKTOP_PUBLISH_DIR/assets" || { echo "::error::assets/ is missing from $DESKTOP_PUBLISH_DIR"; exit 1; }
+          files=$(find "$DESKTOP_PUBLISH_DIR" -type f | wc -l)
+          size=$(du -sh "$DESKTOP_PUBLISH_DIR" | cut -f1)
+          echo "${{ matrix.channel }}: $files files, $size" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.channel }}
+          path: ${{ env.DESKTOP_PUBLISH_DIR }}
+          if-no-files-found: error
+          retention-days: 14
+
+  # One push job per build, so a broken desktop build never holds back the browser one. The environment holds
+  # BUTLER_API_KEY, so only these jobs see it. Add required reviewers to "itch" to approve each release by hand.
   push:
-    name: Push to itch.io (${{ needs.plan.outputs.target }})
+    name: Push to itch.io (${{ needs.plan.outputs.target }}, html5)
     needs: [plan, publish]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    # The environment holds BUTLER_API_KEY, so only this job sees it. Add required reviewers to "itch" to approve
-    # each release by hand.
     environment: ${{ needs.plan.outputs.environment }}
     concurrency:
-      group: itch-${{ needs.plan.outputs.target }}
+      group: itch-${{ needs.plan.outputs.target }}-html5
       cancel-in-progress: false
-    env:
-      BUTLER_VERSION: 15.32.0
-      BUTLER_SHA256: 2335971394ef6596f95ded0833e85ee28755e13761716ef4c91d6b11f69162f5
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@v7
         with:
-          name: html5
-          path: html5
+          sparse-checkout: .github/actions
 
-      - name: Install butler
-        run: |
-          archive="$RUNNER_TEMP/butler.zip"
-          curl -fsSL -o "$archive" "https://broth.itch.zone/butler/linux-amd64/$BUTLER_VERSION/archive/default"
-          echo "$BUTLER_SHA256  $archive" | sha256sum --check --strict
-          unzip -q "$archive" -d "$RUNNER_TEMP/butler"
-          chmod +x "$RUNNER_TEMP/butler/butler"
-          echo "$RUNNER_TEMP/butler" >> "$GITHUB_PATH"
+      - uses: ./.github/actions/butler-push
+        with:
+          artifact: html5
+          target: ${{ needs.plan.outputs.project }}:html5
+          version: ${{ needs.plan.outputs.version }}
+          api-key: ${{ secrets.BUTLER_API_KEY }}
 
-      - name: Push
-        env:
-          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
-          CHANNEL: ${{ needs.plan.outputs.channel }}
-          VERSION: ${{ needs.plan.outputs.version }}
-        run: |
-          if [ -z "$BUTLER_API_KEY" ]; then echo "::error::BUTLER_API_KEY is not set in the environment."; exit 1; fi
-          butler -V
-          butler push html5 "$CHANNEL" --userversion "$VERSION" --if-changed
-          butler status "$CHANNEL"
+  push-desktop:
+    name: Push to itch.io (${{ needs.plan.outputs.target }}, ${{ matrix.channel }})
+    needs: [plan, publish-desktop]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: ${{ needs.plan.outputs.environment }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - channel: windows
+          - channel: linux
+            executable: LudumDare60.Game.Desktop
+    concurrency:
+      group: itch-${{ needs.plan.outputs.target }}-${{ matrix.channel }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/actions
+
+      - uses: ./.github/actions/butler-push
+        with:
+          artifact: ${{ matrix.channel }}
+          target: ${{ needs.plan.outputs.project }}:${{ matrix.channel }}
+          version: ${{ needs.plan.outputs.version }}
+          api-key: ${{ secrets.BUTLER_API_KEY }}
+          executable: ${{ matrix.executable }}

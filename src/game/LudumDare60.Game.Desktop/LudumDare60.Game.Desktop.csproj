@@ -1,8 +1,36 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <!-- WinExe: no console window next to the game on Windows. The same as Exe elsewhere. -->
+    <OutputType>WinExe</OutputType>
+    <!--
+      The RIDs deploy.yml publishes, so the lock file covers them. Publish with -p:DesktopRuntime=<rid>, not -r <rid>:
+      -r would hand the RID to the libraries too, whose lock files have none, and locked restore would fail.
+    -->
+    <RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
+    <RuntimeIdentifier Condition="'$(DesktopRuntime)' != ''">$(DesktopRuntime)</RuntimeIdentifier>
   </PropertyGroup>
+
+  <!--
+    Publishing for a RID (-p:DesktopRuntime=win-x64) makes one self-contained executable that needs no .NET install.
+    Native libraries (SDL3) stay next to it, so nothing is extracted at startup, and so do the symbol files, so error
+    stack traces keep their line numbers. No trimming: SDL3-CS and NVorbis are not checked for it.
+  -->
+  <PropertyGroup Label="Publish" Condition="'$(RuntimeIdentifier)' != ''">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <PublishDocumentationFile>false</PublishDocumentationFile>
+    <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
+  </PropertyGroup>
+
+  <!-- SDL3-CS.Linux ships libSDL3.so three times (the soname links as copies); SDL3-CS loads only libSDL3.so. -->
+  <Target Name="DropSdlSonameCopies" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="$([System.String]::Copy('%(Filename)%(Extension)').StartsWith('libSDL3.so.'))" />
+    </ItemGroup>
+  </Target>
 
   <ItemGroup>
     <ProjectReference Include="..\LudumDare60.Game\LudumDare60.Game.csproj" />
