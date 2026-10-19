@@ -65,6 +65,20 @@ that order at once, **0** brings the current one in again with a fresh bench. Ke
 nothing. `Program.cs` reads the address with `PageAddress.HasQueryParameter` and sets
 `LudumDare60Game.HasDebugKeys`.
 
+## Desktop build
+
+`src/game/LudumDare60.Game.Desktop` is a plain console app on `DesktopPlatform` (SDL3):
+
+```bash
+dotnet run --project src/game/LudumDare60.Game.Desktop             # add -- --debug for the debug keys
+```
+
+It needs no workload beyond the SDK. The native SDL3 libraries come from the `SDL3-CS.Windows`, `SDL3-CS.Linux` and
+`SDL3-CS.MacOS` packages and are copied to `runtimes/<rid>/native/`; the runtime picks the one for the current OS.
+The build copies the browser project's `wwwroot/assets/` to `assets/` next to the executable. `--debug` turns on the
+same debug keys as `?debug` in the browser. The window stays empty until the desktop renderer exists, and the game
+is silent; input, assets and the game loop are real. Nothing deploys the desktop build yet.
+
 ## itch.io HTML5 requirements
 
 Source: <https://itch.io/docs/creators/html5> (checked 2026-10-17).

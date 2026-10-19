@@ -24,8 +24,10 @@ stream. It ships to itch.io as an HTML5 build and is pushed with `butler`.
 | `src/engine/LudumDare60.Engine.Platform` | Platform contracts (`IPlatform`, `IFrameSink`, `RawInputEvent`, `IAssetSource`, `IGraphicsBackend`, `SpriteInstance`, `IAudioBackend`, `AudioCommandKind`, `IAnalytics`). No dependencies. |
 | `src/engine/LudumDare60.Engine` | Engine: `GameEngine` (fixed-step frame loop), `IGame`, `FrameContext`, `AssetManager`, asset loaders, `Rendering/` (`Graphics`, `SpriteBatch`, `PixelViewport`), `Sounds/` (`Audio`, `Sound`, `Voice`). Depends only on the platform contracts and managed decoder packages (StbImageSharp). Never references the game or a concrete platform. |
 | `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `BrowserPlatform : IPlatform` and its JS: `boot.js` starts the .NET runtime, `load-log.js` logs load timing, `reporting.js` sends errors and load timing to Sentry, `frame-loop.js` drives frames, `input.js` queues raw input, `assets.js` fetches asset files, `webgl2.js` renders, `webaudio.js` plays sound, `analytics.js` sends product analytics through the vendored GameAnalytics SDK (`vendor/gameanalytics.js`) (StaticWebAssets SDK, shipped under `_content/`). |
+| `src/engine/platforms/LudumDare60.Engine.Platform.Desktop` | `DesktopPlatform : IPlatform` on SDL3 (`SDL3-CS` and its native packages): window, frame loop, input (`SdlInput`), asset files. Draws nothing and plays nothing yet. |
 | `src/game/LudumDare60.Game` | Game class library: `LudumDare60Game : IGame`, rules, content, state, and `Analytics/` (the product analytics events, see `docs/gamedesign/analytics.md`). No platform dependency. |
 | `src/game/LudumDare60.Game.Browser` | `wasmbrowser` entry point and host page. Wires the game to `BrowserPlatform` and nothing else. |
+| `src/game/LudumDare60.Game.Desktop` | Desktop entry point. Wires the game to `DesktopPlatform`; copies the browser project's `wwwroot/assets/`. |
 | `tests/` | C# test projects (`*.Tests`, xUnit v3 on Microsoft.Testing.Platform), `tests/Shared/` (fakes linked into several test projects: `FakeGraphicsBackend`, `FakeAudioBackend`, `ManualPlatform`), `tests/fixtures/` (byte fixtures shared by C# and JS tests) and `tests/js/` (Node test runner). |
 | `samples/` | Small runnable experiments (renderer backends, interop spikes). Same rules as `src/`. |
 | `docs/tech/` | Technical docs: architecture, build and deploy, guidelines. |
@@ -40,6 +42,7 @@ dotnet build                                   # Debug build of the whole soluti
 dotnet test                                    # all C# tests (Microsoft.Testing.Platform runner, see global.json)
 npm test                                       # JS tests: node --test "tests/js/**/*.test.mjs" (Node 22+)
 dotnet format --verify-no-changes              # formatting check, as CI runs it
+dotnet run --project src/game/LudumDare60.Game.Desktop   # desktop build in an SDL3 window (no rendering yet)
 rm -rf artifacts/publish/LudumDare60.Game.Browser   # publish never cleans; hashed names pile up
 dotnet publish src/game/LudumDare60.Game.Browser -c Release
 # AOT + trimmed browser build -> artifacts/publish/LudumDare60.Game.Browser/release/wwwroot

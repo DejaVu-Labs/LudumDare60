@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LudumDare60.Game\LudumDare60.Game.csproj" />
+    <ProjectReference Include="..\..\engine\platforms\LudumDare60.Engine.Platform.Desktop\LudumDare60.Engine.Platform.Desktop.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The browser project owns the asset files; the desktop build copies them to assets/ next to the executable. -->
+    <Content Include="..\LudumDare60.Game.Browser\wwwroot\assets\**\*" LinkBase="assets" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

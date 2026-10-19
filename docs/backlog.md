@@ -126,6 +126,18 @@ Still to do:
 equal frames) and frame and tag tables from the Aseprite parser (see [Asset parsers](#asset-parsers)), so the game
 draws "frame 3 of `cylinder-spin`" instead of rectangles.
 
+## Desktop platform follow-ups
+
+`DesktopPlatform` (see [architecture.md](tech/architecture.md#desktop-platform)) runs the game without output yet.
+
+- Renderer: an `IGraphicsBackend` on SDL_GPU (Vulkan, Metal, D3D12) or OpenGL, on the same command stream and
+  instance layout as `webgl2.js`, with vsync replacing the loop's `SDL_DelayPrecise` pacing.
+- Audio: an `IAudioBackend` on an `SDL_AudioStream` with a managed mixer for the voices, buses, pitch, pan and
+  fades of `AudioCommandKind`, plus WAV and OGG decoding (SDL decodes only WAV).
+- Gamepads: send the pad's current buttons and axes after `GamepadConnected`, as the browser does.
+- Reporting: send errors to Sentry, not only to standard error.
+- Packaging: self-contained publish per RID and an itch.io channel per OS.
+
 ## WebGPU backend
 
 A second `IGraphicsBackend` in the browser platform on the same command stream, instance layout and shaders

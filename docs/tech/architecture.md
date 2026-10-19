@@ -3,18 +3,24 @@
 ## Projects
 
 ```text
-LudumDare60.Game.Browser ──► LudumDare60.Game ──► LudumDare60.Engine ──► LudumDare60.Engine.Platform
-          │                                                                        ▲
-          └──────────────► LudumDare60.Engine.Platform.Browser ────────────────────┘
+LudumDare60.Game.Browser ──┬──► LudumDare60.Game ──► LudumDare60.Engine ──► LudumDare60.Engine.Platform
+LudumDare60.Game.Desktop ──┤                                                          ▲
+                           ├──► LudumDare60.Engine.Platform.Browser ──────────────────┤
+                           └──► LudumDare60.Engine.Platform.Desktop ──────────────────┘
 ```
+
+Each entry point references the game and its own platform only: `.Browser` the browser platform, `.Desktop` the
+desktop one.
 
 | Project | SDK | Role |
 | --- | --- | --- |
 | `src/engine/LudumDare60.Engine.Platform` | `Microsoft.NET.Sdk` | Platform contracts: `IPlatform` (with `ReportError`, a no-op by default), `IFrameSink`, raw input (`RawInputEvent`, `RawInputEventKind`, `Key`, `PointerType`), asset reads (`IAssetSource`, `AssetLoadException`), the GPU (`IGraphicsBackend`, `RenderCommandKind`, `SpriteInstance`, `Color`), sound output (`IAudioBackend`, `AudioCommandKind`, `AudioBus`, `AudioEvent`, `AudioEventKind`, `AudioLimits`), product analytics (`IAnalytics`, `ProgressionStatus`, `NullAnalytics`). No dependencies. |
 | `src/engine/LudumDare60.Engine` | `Microsoft.NET.Sdk` | `GameEngine`, `IGame`, `FrameContext`, `Input/` (`InputState`, `PointerButton`), `Assets/` (`AssetManager` and loaders), `Rendering/` (`PixelViewport`, `Graphics`, `Texture`, `SpriteBatch`, `SpriteOptions`, `IntRect`), `Sounds/` (`Audio`, `Sound`, `SoundState`, `Voice`, `SoundOptions`). Depends only on the platform contracts and the managed `StbImageSharp` package (image decoding). |
 | `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `Microsoft.NET.Sdk.StaticWebAssets` | `BrowserPlatform : IPlatform` and its JS: `wwwroot/boot.js` (runtime start), `wwwroot/load-log.js` (load timing), `wwwroot/reporting.js` (errors and load timing to Sentry), `wwwroot/frame-loop.js`, `wwwroot/input.js`, `wwwroot/assets.js`, `wwwroot/webgl2.js` (renderer, shaders in `wwwroot/shaders/`), `wwwroot/webaudio.js` (sound) and `wwwroot/analytics.js` (product analytics, on the GameAnalytics SDK in `wwwroot/vendor/gameanalytics.js`). Its `wwwroot/` ships with the app under `_content/LudumDare60.Engine.Platform.Browser/`. |
+| `src/engine/platforms/LudumDare60.Engine.Platform.Desktop` | `Microsoft.NET.Sdk` | `DesktopPlatform : IPlatform` on SDL3 (the `SDL3-CS` wrapper and its native packages for Windows, Linux and macOS): window, frame loop, input, asset files. No renderer and no sound yet. See [Desktop platform](#desktop-platform). |
 | `src/game/LudumDare60.Game` | `Microsoft.NET.Sdk` | `LudumDare60Game : IGame`, `Parts/` (the touch loop: `PartDrag` moves a part along a `PartPath` (a `LinePath`, or a screw turned by circling it) with the `DragFeel` it is given, fed one `PointerSample` per fixed step, and with a `FreeMove` lets it lie anywhere on the work surface once out and stick back to its rail, or drop straight into its seat; `PartAssembly` steps the parts of a gun and enforces which part blocks which), `Cleaning/` (`DirtLayer`: dirt pixels scrubbed off a part and counted; `BrushTool`: a tool the player picks up and puts down anywhere, the brush that scrubs and the oil can that oils), `Orders/` (the order data of `orders.json`, its loader and validation, and `RevolverParts`), `Bench/` (`OrderBench`: one order on the bench with its parts, dirt, oil, spares and tools; `ActionTest`: the hammer at half cock to take the revolver apart, then full cock and the trigger to test it; `BenchLayout`: where the revolver, its parts, the tools and the tray of spares lie), `Customers/` (`Shop`: customers coming in, the repair, the hand-back, the next customer), `Analytics/` (`ShopAnalytics`: the shop's moments as analytics events), the parts sheet (`PlaceholderParts`: the revolver from `RevolverSheet`, its sprites embedded in the assembly, and the pieces still generated in code) and placeholder sounds generated in code. No platform dependency. |
 | `src/game/LudumDare60.Game.Browser` | `Microsoft.NET.Sdk.WebAssembly` | Entry point, host page and `main.js`. Only wires the game and the browser platform together. |
+| `src/game/LudumDare60.Game.Desktop` | `Microsoft.NET.Sdk` | Desktop entry point: wires the game and the desktop platform together, and copies the browser project's `wwwroot/assets/` to `assets/` next to the executable. |
 
 The engine and the game never reference a concrete platform. Only the entry-point project chooses one:
 
@@ -139,6 +145,56 @@ to Sentry when reporting is configured (see
   `_framework/dotnet.runtime.js` (the runtime performs the `import()`). On build and publish the file gets a
   content hash in its name (`frame-loop.<hash>.js`), and the import map that the SDK writes into `index.html`
   maps the plain URL to it. See [build-and-deploy.md](build-and-deploy.md#static-web-assets).
+
+### Desktop platform
+
+`DesktopPlatform` runs the same game in a native window, for faster iteration (a Debug build starts in seconds, and
+a native debugger and profiler work) and as the base of a later desktop release. It implements the same contracts as
+the browser platform, so the engine and the game cannot tell them apart, except that it does not draw yet.
+
+- `RunAsync(sink)` sets the `SDL_HINT_TOUCH_MOUSE_EVENTS` hint to `0`, initializes SDL (video and gamepads), creates
+  a resizable high-density window and runs the frame loop on the calling thread, which must be the main thread
+  (macOS creates windows only there). It returns once the player closes the window (`SDL_EVENT_QUIT`); the returned
+  task is always complete, and failures are thrown from the call. The window, the gamepads and SDL are shut down on
+  the way out either way.
+- Each frame polls every SDL event, takes `SDL_GetTicksNS()` as the frame start, drains up to
+  `DesktopPlatform.InputCapacity` (512) events and calls `sink.Update(dt, events)` and `sink.Render()`. `FrameClock`
+  gives `dt` (0 for the first frame, as in the browser). Without a renderer there is no vsync, so the loop sleeps
+  (`SDL_DelayPrecise`) until one display refresh (`SDL_GetCurrentDisplayMode`, 60 Hz when unknown) after the frame
+  started.
+- `Graphics` is `NullGraphics` (accepts and drops everything) and `Audio` is `SilentAudio` (reports every sound
+  `SoundReady` on the next `Submit`, plays nothing). See the [backlog](../backlog.md#desktop-platform-follow-ups).
+- `Assets` is `FileAssetSource` on `assets/` next to the executable (`AppContext.BaseDirectory`). Reads use
+  `File.ReadAllBytesAsync` and finish on the thread pool, which is safe because `AssetManager` only checks the
+  task in `Update`. I/O errors become `AssetLoadException` with status 0. Windows and macOS file systems ignore
+  case; itch.io does not, so a wrong-case path still only fails in the browser.
+- `ReportError` writes the error to standard error. `Analytics` is the default `NullAnalytics`.
+
+`SdlInput` translates SDL events into `RawInputEvent`s with the browser's meaning, so `InputState` and the game work
+unchanged. It makes no SDL calls, so the tests build SDL events by hand and run without a window or the native
+library.
+
+- Keys: SDL scancodes are USB HID usages like `Key`, so a scancode is its key when `Key` has the member
+  (`KeyMap`); others are dropped, and so are repeats.
+- Mouse: pointer id 1, buttons numbered from 0 like the browser's (SDL counts from 1), positions in window
+  coordinates, which are logical pixels. A pen's mouse events (`SDL_PEN_MOUSEID`) become pointer id 2 with
+  `PointerType.Pen`. SDL3-CS declares `PenMouseID` as an `int` (-2), so `SdlInput.PenMouseId` holds the `uint` value
+  that `Which` is compared with. Mouse events made up from touches (`SDL_TOUCH_MOUSEID`) are dropped.
+- Wheel: notches times 16 pixels (`WHEEL_LINE_PIXELS` in `input.js`), Y negated, because SDL counts away from the
+  user as positive and the browser counts scrolling down as positive. Flipped (natural) scrolling is undone.
+- Touch: finger events become `PointerType.Touch` pointers numbered from 3, with the lowest free number reused, and
+  positions scaled from SDL's 0..1 to logical pixels. Touches made up from the mouse are dropped.
+- Focus: `FocusLost` when the window loses keyboard focus or is hidden or minimized, `FocusGained` when both are back.
+- Resize: on `SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED` and `SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED`, the size in pixels
+  divided by `SDL_GetWindowPixelDensity`, so `X * Z` gives back the exact pixels. `Resize` and the focus state are
+  queued first at startup.
+- Gamepads: SDL's gamepad API maps every pad to one layout, so `GamepadConnected` always has the standard flag. Pads
+  get the lowest free index. Buttons are renumbered to the W3C Standard Gamepad indices; the triggers, which SDL
+  reports as axes, become analog buttons 6 and 7 (pressed above 30/255, XInput's threshold). Stick axes keep indices
+  0 to 3 and are scaled to [-1, 1], with changes below 1/256 dropped as in the browser. Buttons outside the standard
+  layout (paddles, touchpad, misc) are dropped. Unlike the browser, connecting does not send the pad's current state.
+- `InputQueue` is the C# twin of `createInputQueue` in `input.js`: 4096 events, the same `Overflow` rule, and times
+  rewritten relative to the frame start on drain.
 
 ## Assets
 
