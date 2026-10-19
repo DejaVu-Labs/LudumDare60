@@ -103,6 +103,10 @@ Source: <https://itch.io/docs/creators/html5> (checked 2026-10-17).
   `Accept-Encoding` and for range requests. The corrupt copies stayed in the browser cache, so every reload failed
   the same way. `boot.js` now retries and repairs past the cache. If a device still fails, clear the site data of
   `html-classic.itch.zone` there and check whether it loads.
+- On the same phone's network, downloads froze after about 15.7 KB each (`System.Private.CoreLib`, `LudumDare60.Game`,
+  `System.Text.Json`) and failed only at the browser's 120 s timeout, while some retries finished in under a second.
+  This looks like throttling of Cloudflare on that network. `boot.js` aborts a download after 10 s without data and
+  retries it. A VPN or another network is the real fix for such a player.
 
 ## Asset caching
 

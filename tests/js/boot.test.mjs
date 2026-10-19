@@ -2,8 +2,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { createHash } from 'node:crypto';
+
 import {
   createResourceLoader,
+  createWatchedFetch,
+  STALL_MS,
   ERROR_TEXT,
   fetchWithRetry,
   getErrorText,
@@ -306,13 +310,13 @@ test('fetchWithRetry_TransientStatusEveryTime_ReturnsLastResponse', async () => 
   assert.equal(response.status, 503);
 });
 
-test('fetchWithRetry_DefaultDelays_FourRetries', async () => {
+test('fetchWithRetry_DefaultDelays_OneRetryPerDelay', async () => {
   const errors = Array.from({ length: RETRY_DELAYS_MS.length + 1 }, () => new TypeError('Failed to fetch'));
   const { fetchLike, requests } = scriptedFetch(errors);
   const { sleep, waits } = recordedSleep();
 
   await assert.rejects(fetchWithRetry('a.wasm', {}, fetchLike, sleep));
-  assert.equal(requests.length, 5);
+  assert.equal(requests.length, RETRY_DELAYS_MS.length + 1);
   assert.deepEqual(waits, [...RETRY_DELAYS_MS]);
 });
 
@@ -469,4 +473,167 @@ test('repairOnce_NoStoreOrStoreThrows_False', () => {
     setItem() {},
   };
   assert.equal(repairOnce(moduleFailure, throwing), false);
+});
+
+/** Timers the test fires by hand. */
+function manualTimers() {
+  /** @type {Map<number, () => void>} */
+  const pending = new Map();
+  let next = 1;
+  let armed = 0;
+  return {
+    pending,
+    get armed() {
+      return armed;
+    },
+    /** @param {() => void} callback */
+    setTimer: (callback) => {
+      armed++;
+      pending.set(next, callback);
+      return next++;
+    },
+    /** @param {unknown} timer */
+    clearTimer: (timer) => {
+      pending.delete(/** @type {number} */ (timer));
+    },
+    /** Runs the one pending timer. */
+    fire() {
+      assert.equal(pending.size, 1, 'exactly one timer pending');
+      const [[id, callback]] = pending;
+      pending.delete(id);
+      callback();
+    },
+  };
+}
+
+/** @param {Uint8Array} bytes */
+const sha256 = (bytes) => `sha256-${createHash('sha256').update(bytes).digest('base64')}`;
+
+/** @type {(algorithm: string, bytes: Uint8Array) => Promise<ArrayBuffer>} */
+const digest = (algorithm, bytes) => globalThis.crypto.subtle.digest(algorithm, bytes);
+
+/** @returns {Promise<void>} Lets pending promise callbacks run. */
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+
+test('watchedFetch_FullBody_ChecksIntegrityAndKeepsContentType', async () => {
+  const body = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]);
+  /** @type {RequestInit | undefined} */
+  let seen;
+  const timers = manualTimers();
+  const watched = createWatchedFetch(async (_url, init) => {
+    seen = init;
+    return new Response(body, { headers: { 'content-type': 'application/wasm', 'content-encoding': 'gzip' } });
+  }, { digest, ...timers });
+
+  const response = await watched('https://x/_framework/a.wasm', { integrity: sha256(body), cache: 'reload' });
+
+  assert.deepEqual(new Uint8Array(await response.arrayBuffer()), body);
+  assert.equal(response.headers.get('content-type'), 'application/wasm');
+  assert.equal(response.headers.get('content-encoding'), null);
+  assert.equal(seen?.cache, 'reload');
+  assert.equal('integrity' in (seen ?? {}), false);
+  assert.ok(seen?.signal instanceof AbortSignal);
+  assert.equal(timers.pending.size, 0);
+});
+
+test('watchedFetch_IntegrityMismatch_RejectsWithTypeError', async () => {
+  const watched = createWatchedFetch(async () => new Response(new Uint8Array([1, 2, 3])), { digest, ...manualTimers() });
+
+  await assert.rejects(
+    watched('https://x/a.wasm', { integrity: sha256(new Uint8Array([9])) }),
+    (error) => error instanceof TypeError && error.message.startsWith('integrity check failed'),
+  );
+});
+
+test('watchedFetch_UnknownIntegrityAlgorithm_NotChecked', async () => {
+  const watched = createWatchedFetch(async () => new Response('x'), { digest, ...manualTimers() });
+
+  const response = await watched('https://x/a.wasm', { integrity: 'md5-abc' });
+
+  assert.equal(await response.text(), 'x');
+});
+
+test('watchedFetch_ErrorStatus_ReturnedUnread', async () => {
+  const watched = createWatchedFetch(async () => new Response('missing', { status: 404 }), { digest, ...manualTimers() });
+
+  const response = await watched('https://x/a.wasm', {});
+
+  assert.equal(response.status, 404);
+  assert.equal(response.bodyUsed, false);
+});
+
+/**
+ * A fetch whose response never comes, or whose body sends `chunks` and then hangs; aborting the signal fails it the
+ * way a browser does.
+ * @param {Uint8Array[] | null} chunks `null`: no response at all.
+ */
+function hangingFetch(chunks) {
+  /** @type {(url: string, init: RequestInit) => Promise<Response>} */
+  return (_url, init) =>
+    new Promise((resolve, reject) => {
+      const abortError = () => new DOMException('The operation was aborted.', 'AbortError');
+      if (chunks === null) {
+        init.signal?.addEventListener('abort', () => reject(abortError()));
+        return;
+      }
+      const body = new ReadableStream({
+        start(controller) {
+          for (const chunk of chunks) {
+            controller.enqueue(chunk);
+          }
+          init.signal?.addEventListener('abort', () => controller.error(abortError()));
+        },
+      });
+      resolve(new Response(body));
+    });
+}
+
+test('watchedFetch_NoResponse_RejectsAfterStall', async () => {
+  const timers = manualTimers();
+  const download = createWatchedFetch(hangingFetch(null), { digest, ...timers })('https://x/a.wasm', {});
+  await settle();
+
+  timers.fire();
+
+  await assert.rejects(download, (error) => error instanceof TypeError && error.message === `no data for ${STALL_MS / 1000} s`);
+});
+
+test('watchedFetch_BodyStopsMidway_RejectsAfterStall', async () => {
+  const timers = manualTimers();
+  const download = createWatchedFetch(hangingFetch([new Uint8Array(16_000)]), { digest, ...timers, stallMs: 4000 })(
+    'https://x/a.wasm',
+    {},
+  );
+  await settle();
+
+  timers.fire();
+
+  await assert.rejects(download, (error) => error instanceof TypeError && error.message === 'no data for 4 s');
+});
+
+test('watchedFetch_EachChunk_RearmsTimer', async () => {
+  const timers = manualTimers();
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Uint8Array([1]));
+      controller.enqueue(new Uint8Array([2]));
+      controller.enqueue(new Uint8Array([3]));
+      controller.close();
+    },
+  });
+
+  const response = await createWatchedFetch(async () => new Response(body), { digest, ...timers })('https://x/a.wasm', {});
+
+  assert.deepEqual(new Uint8Array(await response.arrayBuffer()), new Uint8Array([1, 2, 3]));
+  assert.ok(timers.armed >= 4, `armed ${timers.armed} times`);
+  assert.equal(timers.pending.size, 0);
+});
+
+test('watchedFetch_NetworkError_PassedThrough', async () => {
+  const failure = new TypeError('Failed to fetch');
+  const watched = createWatchedFetch(async () => {
+    throw failure;
+  }, { digest, ...manualTimers() });
+
+  await assert.rejects(watched('https://x/a.wasm', {}), (error) => error === failure);
 });

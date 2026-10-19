@@ -48,10 +48,121 @@ export function getErrorText() {
  */
 
 /**
- * Waits before each retry of a failed download, in milliseconds: four retries over about 15 s. The runtime's own retry
+ * Waits before each retry of a failed download, in milliseconds: six retries over about 31 s. The runtime's own retry
  * gives up after about 100 ms, which a reset connection on a slow network outlasts (itch.io's CDN, seen 2026-10-19).
  */
-export const RETRY_DELAYS_MS = Object.freeze([1000, 2000, 4000, 8000]);
+export const RETRY_DELAYS_MS = Object.freeze([1000, 2000, 4000, 8000, 8000, 8000]);
+
+/**
+ * A download that receives no bytes for this long is aborted and retried. On one phone's network, connections to
+ * itch.io's CDN froze after about 16 KB and only failed at the browser's 120 s timeout, while a fresh request often
+ * finished in under a second (Sentry traces, 2026-10-19).
+ */
+export const STALL_MS = 10_000;
+
+/** Web Crypto names of the hash algorithms that `integrity` values use. */
+const INTEGRITY_ALGORITHMS = Object.freeze({ sha256: 'SHA-256', sha384: 'SHA-384', sha512: 'SHA-512' });
+
+/**
+ * @typedef {object} WatchedFetchDeps
+ * @property {(algorithm: string, bytes: Uint8Array) => Promise<ArrayBuffer>} digest Usually `crypto.subtle.digest`.
+ * @property {(callback: () => void, ms: number) => unknown} setTimer Usually `setTimeout`.
+ * @property {(timer: unknown) => void} clearTimer Usually `clearTimeout`.
+ * @property {number} [stallMs] Defaults to `STALL_MS`.
+ */
+
+/**
+ * @param {Uint8Array} bytes
+ * @returns {string}
+ */
+function toBase64(bytes) {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
+}
+
+/**
+ * Wraps `fetchLike` so a request fails when no bytes arrive for `stallMs`, before the headers or between two chunks of
+ * the body. The body is read to the end here, and `init.integrity` (SHA-256, -384 or -512) is checked against it here
+ * too: with `integrity` on the request, `fetch` resolves only once the whole body is in, so a stall could not be seen.
+ *
+ * @param {FetchLike} fetchLike Usually `fetch`. Gets `init` without `integrity`, plus an abort `signal`.
+ * @param {WatchedFetchDeps} deps
+ * @returns {FetchLike} Resolves with a response that holds the whole body and the original status and
+ *   `content-type`. Rejects with `TypeError` on a stall, a network error or a failed integrity check.
+ */
+export function createWatchedFetch(fetchLike, deps) {
+  const stallMs = deps.stallMs ?? STALL_MS;
+  return async (url, init) => {
+    const { integrity, ...rest } = init;
+    const controller = new AbortController();
+    let stalled = false;
+    /** @type {unknown} */
+    let timer;
+    const arm = () => {
+      deps.clearTimer(timer);
+      timer = deps.setTimer(() => {
+        stalled = true;
+        controller.abort();
+      }, stallMs);
+    };
+
+    arm();
+    try {
+      const response = await fetchLike(url, { ...rest, signal: controller.signal });
+      if (!response.ok || response.body === null) {
+        return response;
+      }
+      /** @type {Uint8Array[]} */
+      const chunks = [];
+      let length = 0;
+      const reader = response.body.getReader();
+      for (;;) {
+        arm();
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+        chunks.push(value);
+        length += value.byteLength;
+      }
+      const bytes = new Uint8Array(length);
+      let offset = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+
+      if (integrity) {
+        const dash = integrity.indexOf('-');
+        const algorithm = INTEGRITY_ALGORITHMS[/** @type {keyof typeof INTEGRITY_ALGORITHMS} */ (integrity.slice(0, dash))];
+        if (algorithm !== undefined) {
+          const actual = `${integrity.slice(0, dash)}-${toBase64(new Uint8Array(await deps.digest(algorithm, bytes)))}`;
+          if (actual !== integrity) {
+            throw new TypeError(`integrity check failed (${actual})`);
+          }
+        }
+      }
+
+      /** @type {Record<string, string>} */
+      const headers = {};
+      const contentType = response.headers.get('content-type');
+      if (contentType !== null) {
+        headers['content-type'] = contentType;
+      }
+      return new Response(bytes, { status: response.status, statusText: response.statusText, headers });
+    } catch (error) {
+      if (stalled) {
+        throw new TypeError(`no data for ${stallMs / 1000} s`);
+      }
+      throw error;
+    } finally {
+      deps.clearTimer(timer);
+    }
+  };
+}
 
 /**
  * @param {number} status
@@ -341,7 +452,11 @@ export function boot(frameworkRoot = './_framework/', statusId = 'status', repor
         (dotnet) =>
           dotnet.withResourceLoader(
             createResourceLoader(
-              (url, init) => fetch(url, init),
+              createWatchedFetch((url, init) => fetch(url, init), {
+                digest: (algorithm, bytes) => crypto.subtle.digest(algorithm, bytes),
+                setTimer: (callback, ms) => setTimeout(callback, ms),
+                clearTimer: (timer) => clearTimeout(/** @type {number | undefined} */ (timer)),
+              }),
               delay,
               (name, attempt, delayMs, reason) => log.retry(name, attempt, RETRY_DELAYS_MS.length, delayMs, reason),
             ),

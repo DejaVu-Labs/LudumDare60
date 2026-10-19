@@ -61,8 +61,11 @@ reports (see [Audio](#audio)).
 2. `boot(frameworkRoot)` resolves `dotnet.js` in `frameworkRoot` against the page URL (`document.baseURI`), imports
    it with `import()`, sets a resource loader (`dotnet.withResourceLoader`), calls `dotnet.create()` and then
    `runMain()`. The loader downloads the runtime's `.wasm` files with `fetchWithRetry`: a network error or a 408,
-   429 or 5xx response is retried four times over about 15 s (`RETRY_DELAYS_MS`), where the runtime's own retry gives
-   up after about 100 ms. Retries bypass the HTTP cache (`cache: 'reload'`): a body that failed its integrity check
+   429 or 5xx response is retried six times over about 31 s (`RETRY_DELAYS_MS`), where the runtime's own retry gives
+   up after about 100 ms. Each attempt goes through `createWatchedFetch`, which reads the body itself and aborts the
+   request when no bytes arrive for 10 s (`STALL_MS`), so a frozen connection fails fast instead of at the browser's
+   120 s timeout. Because it reads the body, it also checks the `integrity` hash itself (`crypto.subtle.digest`):
+   with `integrity` on the request, `fetch` resolves only after the whole body, and a stall could not be seen. Retries bypass the HTTP cache (`cache: 'reload'`): a body that failed its integrity check
    stays cached, and reading it again would fail the same way. The first attempt drops the runtime's
    `cache: 'no-cache'`, so a returning player loads the content-hashed files from the HTTP cache without
    revalidating each one. The root is a parameter so an app can ship
