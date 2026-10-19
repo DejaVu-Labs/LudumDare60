@@ -152,6 +152,11 @@ public sealed class LudumDare60Game : IGame
 
     private AssetManager? _assets;
     private ShopAnalytics? _shopAnalytics;
+    private RoomAnalytics? _roomAnalytics;
+
+    // When the shop opened (the title screen came up), in seconds of the run, and the seconds played since the press.
+    private float _readyAt;
+    private float _playSeconds;
     private Graphics? _graphics;
     private Audio? _audio;
     private AssetHandle<Image> _benchImage;
@@ -388,6 +393,7 @@ public sealed class LudumDare60Game : IGame
         var deltaTime = (float)context.DeltaTime;
         shop.Step(PointerSample.From(context.Input), deltaTime);
         _shopAnalytics!.Observe(shop, deltaTime);
+        _playSeconds += deltaTime;
         PlayShopSounds(shop.Events);
         var pointer = PointerSample.From(context.Input);
         TrumpetIfElephantPressed(pointer, deltaTime);
@@ -457,12 +463,15 @@ public sealed class LudumDare60Game : IGame
                 _isLoaded = true;
                 _shopAnalytics = new ShopAnalytics(Analytics);
                 _shopAnalytics.Open((float)context.TotalTime);
+                _roomAnalytics = new RoomAnalytics(Analytics, AssetPaths.MusicTracks);
+                _readyAt = (float)context.TotalTime;
             }
 
             if (IsOnTitle && context.Input.IsAnyPressed)
             {
                 // The shop opens this frame; the press is over by the next step, so it does not reach the shop.
                 HasStarted = true;
+                _roomAnalytics?.Started((float)context.TotalTime - _readyAt);
             }
 
             if (!IsOnTitle)
@@ -922,6 +931,7 @@ public sealed class LudumDare60Game : IGame
 
         PlaySound(s_phoneTap);
         var track = _phonePlayer.Next();
+        _roomAnalytics?.Phone(track, _playSeconds);
         if (track < 0)
         {
             _audio!.StopMusic(MusicFadeSeconds);
@@ -958,6 +968,7 @@ public sealed class LudumDare60Game : IGame
         {
             _audio!.Play(_elephantSound, AudioBus.Sfx, s_elephant);
             _elephantLeft = ShopDecor.ElephantSeconds;
+            _roomAnalytics?.Trumpet(_playSeconds);
         }
     }
 

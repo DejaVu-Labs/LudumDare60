@@ -54,6 +54,24 @@ public sealed class GameAnalyticsWiringTests
     }
 
     [Fact]
+    public void Frame_PressOnTheTitle_SendsStartedWithTheTitleSecondsOnce()
+    {
+        var game = new LudumDare60Game { Analytics = _recorded };
+        _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(game, _platform);
+        _platform.Frame(Step);
+        for (var i = 0; i < 30; i++)
+        {
+            _platform.Frame(Step);
+        }
+
+        _platform.Frame(Step, new RawInputEvent(RawInputEventKind.KeyDown, 0, (ushort)Key.Space, 0, 0, 0, 0, 0));
+        _platform.Frame(Step, new RawInputEvent(RawInputEventKind.KeyDown, 0, (ushort)Key.Enter, 0, 0, 0, 0, 0));
+
+        Assert.False(game.IsOnTitle);
+        Assert.InRange(_recorded.ValueOf(RoomAnalytics.StartedEvent)!.Value, 0.4, 0.6);
+    }
+
+    [Fact]
     public void Platform_WithoutAnalytics_DropsEvents()
         => Assert.Same(NullAnalytics.Instance, ((IPlatform)_platform).Analytics);
 

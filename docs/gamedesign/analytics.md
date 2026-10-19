@@ -20,6 +20,7 @@ about retention or money:
    to go back, the trigger before full cock, and pauses long enough that the hint ladder would step in.
 6. **How many reach the ending?** Orders completed, and the shop finished.
 7. **Does touch play as well as a mouse?** Every question above, split by input device.
+8. **Do players find the room's extras?** The music on the phone and the elephant statuette, and when in the session.
 
 ## Events
 
@@ -33,6 +34,7 @@ the browser platform adds. `<order>` is the order's `id` from `orders.json` (`ho
 | --- | --- | --- | --- | --- |
 | session start | automatic | - | The page loaded the SDK, early during loading. | 1 |
 | `Game:Ready` | design | Seconds from the first frame to the shop open (the loading screen). | Once, when every file is in. | 1 |
+| `Game:Started` | design | Seconds the title screen was up, from the shop open to the press. | Once, when the player presses on the title screen. | 1 |
 | `Game:Finished` | design | Seconds from the shop open to the shop closed. | Once, when the shop runs out of orders it can play. | 6 |
 | error, `Critical` | error | The error's type and message. | Once, when startup or the game stops on an error (the page shows its error text). | 1 |
 
@@ -89,6 +91,17 @@ Progress is anything that clicks: a part snaps or docks, a part is cleaned, oile
 half or full cock, the trigger fires, the revolver comes together or is handed back. A failed pull that snaps back
 counts too: the player is acting, not stuck.
 
+### The room
+
+Design events `Analytics/RoomAnalytics` sends for what the player does outside the repair, each with the seconds
+since the player left the title screen (question 8).
+
+| Event | When |
+| --- | --- |
+| `Phone:Track:<track>` | A click on the phone starts a track; `<track>` is its file name: `blues`, `everything-you-ever-dreamed`, `two-hour-delay`. |
+| `Phone:Off` | The click after the last track turns the music off. |
+| `Elephant:Trumpet` | The elephant statuette on the shelf trumpets (a press while it still plays sends nothing). |
+
 ### Custom dimension
 
 Custom dimension 01 is the kind of pointer the player last pressed with: `mouse`, `touch` or `pen`. Every event
@@ -106,6 +119,18 @@ after the first press carries it, so each question above can be split by input d
   `HammerFirst` on order 1 means half cock is not discovered; a high `NotReady` means the dirt or crack does not read.
 - **Pacing**: the `Complete` score per order against `targetSeconds` in `orders.json`, and `Game:Finished` against the
   11 minutes of the shop loop.
+- **Title screen**: `Game:Ready` count against `Game:Started` count is who left on the title; the mean of `Game:Started`
+  is how long "PRESS ANY KEY" takes to read.
+- **Extras**: sessions with any `Phone:Track:blues` or `Elephant:Trumpet`, and their mean value: found early or late.
+  How far players click through the tracks shows whether the music keeps them.
+
+## When analytics or reporting fail
+
+Neither may stop the game. `boot.js` imports `analytics.js` and `reporting.js` only through `startOptional`, so a
+content blocker that strips a file named like a tracker, a dropped connection or a start that throws leaves a console
+warning and a game without them. The platform's own import of both modules is optional too
+(`OptionalImport.TryAsync`), every call into them catches what JS throws, a broken SDK only makes events wait in a
+bounded queue, and a blocked or failing Sentry request is dropped.
 
 ## Rules for new events
 
