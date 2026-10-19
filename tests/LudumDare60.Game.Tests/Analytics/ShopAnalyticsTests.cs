@@ -292,6 +292,29 @@ public sealed partial class ShopAnalyticsTests
     }
 
     [Fact]
+    public void Observe_EveryShippedOrder_StartsItsProgressionWithItsOwnIdWhenClicked()
+    {
+        var expected = new List<(ProgressionStatus, string)>();
+        for (var i = 0; i < s_shipped.Orders.Count; i++)
+        {
+            _shop.Restart(i);
+            Step(s_idle);
+            ComeToTheCounter();
+
+            // A parcel lies on the counter and takes the click on its box; a person at the counter takes it on the bust.
+            var click = _shop.FixedPlace is { } place
+                ? place.Bottom - new Vector2(0, place.Scale * CustomerSheet.FrameHeight / 4)
+                : CustomerMiddle;
+            Step(Press(click));
+            Step(Release(click));
+            expected.Add((ProgressionStatus.Start, $"{ShopAnalytics.OrderProgression}:{s_shipped.Orders[i].Id}"));
+        }
+
+        Assert.Equal(expected, _recorded.Progressions.Select(p => (p.Status!.Value, p.Id)));
+        Assert.All(_recorded.Progressions, p => Assert.Null(p.Value));
+    }
+
+    [Fact]
     public void Observe_CustomerSentAwayByADebugKey_DropsTheOrderWithoutCompletingIt()
     {
         ComeToTheCounter();
