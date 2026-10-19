@@ -1,5 +1,7 @@
+using System.Runtime.InteropServices;
 using System.Text;
 using LudumDare60.Engine.Platform.Desktop.Rendering;
+using Silk.NET.Core.Contexts;
 using Silk.NET.Shaderc;
 
 namespace LudumDare60.Engine.Platform.Desktop.Tests;
@@ -14,6 +16,10 @@ public sealed unsafe class SpriteShaderTests
 
     private static readonly string s_shaderFolder = Path.Combine(
         FindRepositoryRoot(), "src", "engine", "platforms", "LudumDare60.Engine.Platform.Desktop", "Shaders");
+
+    // One shaderc for the whole run, never unloaded: unloading it leaves its exit handlers pointing at freed code, and
+    // the test process crashes on the way out.
+    private static readonly Lazy<Shaderc> s_shaderc = new(static () => new Shaderc(new DefaultNativeContext(ShadercLibraryPath())));
 
     public static TheoryData<string, int> Shaders => new()
     {
@@ -55,7 +61,7 @@ public sealed unsafe class SpriteShaderTests
     private static byte[] Compile(string name, ShaderKind kind)
     {
         var source = File.ReadAllText(Path.Combine(s_shaderFolder, name));
-        var shaderc = Shaderc.GetApi();
+        var shaderc = s_shaderc.Value;
         var compiler = shaderc.CompilerInitialize();
         var options = shaderc.CompileOptionsInitialize();
         try
@@ -82,6 +88,20 @@ public sealed unsafe class SpriteShaderTests
             shaderc.CompileOptionsRelease(options);
             shaderc.CompilerRelease(compiler);
         }
+    }
+
+    /// <summary>
+    /// The shaderc library Silk.NET.Shaderc.Native puts in the test output. <c>Shaderc.GetApi</c> looks for it under the
+    /// runtime identifier it works out itself, which on some distributions (Ubuntu, so the CI runner) is not the
+    /// portable <c>linux-x64</c> the package's folder is named after, and then finds nothing; the process's own
+    /// identifier is the portable one.
+    /// </summary>
+    private static string ShadercLibraryPath()
+    {
+        var name = OperatingSystem.IsWindows() ? "shaderc_shared.dll"
+            : OperatingSystem.IsMacOS() ? "libshaderc_shared.dylib"
+            : "libshaderc_shared.so";
+        return Path.Combine(AppContext.BaseDirectory, "runtimes", RuntimeInformation.RuntimeIdentifier, "native", name);
     }
 
     private static string FindRepositoryRoot()
