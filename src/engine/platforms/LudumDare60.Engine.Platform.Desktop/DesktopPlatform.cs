@@ -1,11 +1,12 @@
+using LudumDare60.Engine.Platform.Desktop.Rendering;
 using SDL3;
 
 namespace LudumDare60.Engine.Platform.Desktop;
 
 /// <summary>
-/// <see cref="IPlatform"/> for Windows, Linux and macOS on SDL3: one window, frames from a loop on the calling thread.
-/// It does not draw yet (<see cref="Graphics"/> discards every frame) and plays no sound (<see cref="Audio"/>), but it
-/// runs the game with keyboard, mouse, touch and gamepad input and real asset files.
+/// <see cref="IPlatform"/> for Windows, Linux and macOS on SDL3: one window drawn with Vulkan through SDL_GPU, frames
+/// from a loop on the calling thread, keyboard, mouse, touch and gamepad input and real asset files. It plays no sound
+/// yet (<see cref="Audio"/>).
 /// </summary>
 /// <param name="title">Window title.</param>
 /// <param name="width">Initial window width in logical pixels.</param>
@@ -29,13 +30,16 @@ public sealed class DesktopPlatform(string title, int width, int height, string?
 
     private readonly Dictionary<uint, nint> _gamepads = [];
 
+    private readonly GpuGraphics _graphics = new();
+
     /// <inheritdoc />
     /// <remarks>Files under the asset root, read on the thread pool.</remarks>
     public IAssetSource Assets => _assets;
 
     /// <inheritdoc />
-    /// <remarks>Draws nothing yet: the desktop renderer does not exist.</remarks>
-    public IGraphicsBackend Graphics { get; } = new NullGraphics();
+    /// <remarks>Vulkan through SDL_GPU, with vsync. <see cref="RunAsync"/> creates the device on the window before the
+    /// first frame.</remarks>
+    public IGraphicsBackend Graphics => _graphics;
 
     /// <inheritdoc />
     /// <remarks>Plays nothing yet: every sound reports ready and stays silent.</remarks>
@@ -44,9 +48,11 @@ public sealed class DesktopPlatform(string title, int width, int height, string?
     /// <inheritdoc />
     /// <remarks>Runs the frame loop on the calling thread, which must be the process's main thread (macOS needs that
     /// for windows), and returns once the player closes the window: the returned task is always complete. Exceptions,
-    /// including a failure to create the window, are thrown from this call. Without a renderer there is no vsync, so
-    /// the loop waits between frames to match the display's refresh rate.</remarks>
-    /// <exception cref="InvalidOperationException">SDL could not start or create the window.</exception>
+    /// including a failure to create the window or the Vulkan device, are thrown from this call. Presenting waits for
+    /// vsync; while the window shows nothing (minimized), the loop waits between frames to match the display's
+    /// refresh rate instead.</remarks>
+    /// <exception cref="InvalidOperationException">SDL could not start, or could not create the window or the Vulkan
+    /// device.</exception>
     public Task RunAsync(IFrameSink frameSink)
     {
         ArgumentNullException.ThrowIfNull(frameSink);
@@ -68,10 +74,12 @@ public sealed class DesktopPlatform(string title, int width, int height, string?
 
             try
             {
+                _graphics.Initialize(window);
                 Run(window, frameSink);
             }
             finally
             {
+                _graphics.Shutdown();
                 foreach (var gamepad in _gamepads.Values)
                 {
                     SDL.CloseGamepad(gamepad);
@@ -144,11 +152,15 @@ public sealed class DesktopPlatform(string title, int width, int height, string?
             frameSink.Update(clock.Tick(frameStartNs), events.AsSpan(0, count));
             frameSink.Render();
 
-            var periodNs = FrameClock.GetFramePeriodNs(GetRefreshRate(window));
-            var waitNs = FrameClock.GetWaitNs(frameStartNs, SDL.GetTicksNS(), periodNs);
-            if (waitNs > 0)
+            if (!_graphics.Presented)
             {
-                SDL.DelayPrecise(waitNs);
+                // Nothing waited for vsync this frame.
+                var periodNs = FrameClock.GetFramePeriodNs(GetRefreshRate(window));
+                var waitNs = FrameClock.GetWaitNs(frameStartNs, SDL.GetTicksNS(), periodNs);
+                if (waitNs > 0)
+                {
+                    SDL.DelayPrecise(waitNs);
+                }
             }
         }
     }

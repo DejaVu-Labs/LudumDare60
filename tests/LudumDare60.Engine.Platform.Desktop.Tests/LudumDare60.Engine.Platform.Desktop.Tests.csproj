@@ -1,7 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <!-- shaderc results are read through pointers. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\engine\platforms\LudumDare60.Engine.Platform.Desktop\LudumDare60.Engine.Platform.Desktop.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Silk.NET.Shaderc" />
+    <PackageReference Include="Silk.NET.Shaderc.Native" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Shared with tests/js/webgl2.test.mjs and SpriteBatchTests. -->
+    <None Include="..\fixtures\render-frame.json" Link="fixtures\render-frame.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

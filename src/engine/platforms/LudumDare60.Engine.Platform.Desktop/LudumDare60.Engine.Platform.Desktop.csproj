@@ -1,11 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <!-- SDL_GPU hands out mapped buffers as pointers. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="LudumDare60.Engine.Platform.Desktop.Tests" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\LudumDare60.Engine.Platform\LudumDare60.Engine.Platform.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Compiled from Shaders/*.vert and *.frag by SpriteShaderTests (LD60_UPDATE_SHADERS=1). -->
+    <EmbeddedResource Include="Shaders\*.spv" LogicalName="Shaders/%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

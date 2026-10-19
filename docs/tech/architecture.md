@@ -17,7 +17,7 @@ desktop one.
 | `src/engine/LudumDare60.Engine.Platform` | `Microsoft.NET.Sdk` | Platform contracts: `IPlatform` (with `ReportError`, a no-op by default), `IFrameSink`, raw input (`RawInputEvent`, `RawInputEventKind`, `Key`, `PointerType`), asset reads (`IAssetSource`, `AssetLoadException`), the GPU (`IGraphicsBackend`, `RenderCommandKind`, `SpriteInstance`, `Color`), sound output (`IAudioBackend`, `AudioCommandKind`, `AudioBus`, `AudioEvent`, `AudioEventKind`, `AudioLimits`), product analytics (`IAnalytics`, `ProgressionStatus`, `NullAnalytics`). No dependencies. |
 | `src/engine/LudumDare60.Engine` | `Microsoft.NET.Sdk` | `GameEngine`, `IGame`, `FrameContext`, `Input/` (`InputState`, `PointerButton`), `Assets/` (`AssetManager` and loaders), `Rendering/` (`PixelViewport`, `Graphics`, `Texture`, `SpriteBatch`, `SpriteOptions`, `IntRect`), `Sounds/` (`Audio`, `Sound`, `SoundState`, `Voice`, `SoundOptions`). Depends only on the platform contracts and the managed `StbImageSharp` package (image decoding). |
 | `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `Microsoft.NET.Sdk.StaticWebAssets` | `BrowserPlatform : IPlatform` and its JS: `wwwroot/boot.js` (runtime start), `wwwroot/load-log.js` (load timing), `wwwroot/reporting.js` (errors and load timing to Sentry), `wwwroot/frame-loop.js`, `wwwroot/input.js`, `wwwroot/assets.js`, `wwwroot/webgl2.js` (renderer, shaders in `wwwroot/shaders/`), `wwwroot/webaudio.js` (sound) and `wwwroot/analytics.js` (product analytics, on the GameAnalytics SDK in `wwwroot/vendor/gameanalytics.js`). Its `wwwroot/` ships with the app under `_content/LudumDare60.Engine.Platform.Browser/`. |
-| `src/engine/platforms/LudumDare60.Engine.Platform.Desktop` | `Microsoft.NET.Sdk` | `DesktopPlatform : IPlatform` on SDL3 (the `SDL3-CS` wrapper and its native packages for Windows, Linux and macOS): window, frame loop, input, asset files. No renderer and no sound yet. See [Desktop platform](#desktop-platform). |
+| `src/engine/platforms/LudumDare60.Engine.Platform.Desktop` | `Microsoft.NET.Sdk` | `DesktopPlatform : IPlatform` on SDL3 (the `SDL3-CS` wrapper and its native packages for Windows, Linux and macOS): window, frame loop, input, asset files, and a Vulkan renderer on SDL_GPU (`Rendering/`, shaders in `Shaders/`). No sound yet. See [Desktop platform](#desktop-platform) and [Desktop renderer](#desktop-renderer). |
 | `src/game/LudumDare60.Game` | `Microsoft.NET.Sdk` | `LudumDare60Game : IGame`, `Parts/` (the touch loop: `PartDrag` moves a part along a `PartPath` (a `LinePath`, or a screw turned by circling it) with the `DragFeel` it is given, fed one `PointerSample` per fixed step, and with a `FreeMove` lets it lie anywhere on the work surface once out and stick back to its rail, or drop straight into its seat; `PartAssembly` steps the parts of a gun and enforces which part blocks which), `Cleaning/` (`DirtLayer`: dirt pixels scrubbed off a part and counted; `BrushTool`: a tool the player picks up and puts down anywhere, the brush that scrubs and the oil can that oils), `Orders/` (the order data of `orders.json`, its loader and validation, and `RevolverParts`), `Bench/` (`OrderBench`: one order on the bench with its parts, dirt, oil, spares and tools; `ActionTest`: the hammer at half cock to take the revolver apart, then full cock and the trigger to test it; `BenchLayout`: where the revolver, its parts, the tools and the tray of spares lie), `Customers/` (`Shop`: customers coming in, the repair, the hand-back, the next customer), `Analytics/` (`ShopAnalytics`: the shop's moments as analytics events), the parts sheet (`PlaceholderParts`: the revolver from `RevolverSheet`, its sprites embedded in the assembly, and the pieces still generated in code) and placeholder sounds generated in code. No platform dependency. |
 | `src/game/LudumDare60.Game.Browser` | `Microsoft.NET.Sdk.WebAssembly` | Entry point, host page and `main.js`. Only wires the game and the browser platform together. |
 | `src/game/LudumDare60.Game.Desktop` | `Microsoft.NET.Sdk` | Desktop entry point: wires the game and the desktop platform together, and copies the browser project's `wwwroot/assets/` to `assets/` next to the executable. |
@@ -150,7 +150,7 @@ to Sentry when reporting is configured (see
 
 `DesktopPlatform` runs the same game in a native window, for faster iteration (a Debug build starts in seconds, and
 a native debugger and profiler work) and as the base of a later desktop release. It implements the same contracts as
-the browser platform, so the engine and the game cannot tell them apart, except that it does not draw yet.
+the browser platform, so the engine and the game cannot tell them apart, except that it plays no sound yet.
 
 - `RunAsync(sink)` sets the `SDL_HINT_TOUCH_MOUSE_EVENTS` hint to `0`, initializes SDL (video and gamepads), creates
   a resizable high-density window and runs the frame loop on the calling thread, which must be the main thread
@@ -159,11 +159,13 @@ the browser platform, so the engine and the game cannot tell them apart, except 
   the way out either way.
 - Each frame polls every SDL event, takes `SDL_GetTicksNS()` as the frame start, drains up to
   `DesktopPlatform.InputCapacity` (512) events and calls `sink.Update(dt, events)` and `sink.Render()`. `FrameClock`
-  gives `dt` (0 for the first frame, as in the browser). Without a renderer there is no vsync, so the loop sleeps
-  (`SDL_DelayPrecise`) until one display refresh (`SDL_GetCurrentDisplayMode`, 60 Hz when unknown) after the frame
-  started.
-- `Graphics` is `NullGraphics` (accepts and drops everything) and `Audio` is `SilentAudio` (reports every sound
-  `SoundReady` on the next `Submit`, plays nothing). See the [backlog](../backlog.md#desktop-platform-follow-ups).
+  gives `dt` (0 for the first frame, as in the browser). Presenting waits for vsync. In a frame that showed nothing
+  (the window is minimized), the loop sleeps (`SDL_DelayPrecise`) until one display refresh
+  (`SDL_GetCurrentDisplayMode`, 60 Hz when unknown) after the frame started instead.
+- `Graphics` is `GpuGraphics`, Vulkan through SDL_GPU (see [Desktop renderer](#desktop-renderer)). `RunAsync`
+  creates its device on the window before the first frame and releases it before the window is destroyed.
+- `Audio` is `SilentAudio` (reports every sound `SoundReady` on the next `Submit`, plays nothing). See the
+  [backlog](../backlog.md#desktop-platform-follow-ups).
 - `Assets` is `FileAssetSource` on `assets/` next to the executable (`AppContext.BaseDirectory`). Reads use
   `File.ReadAllBytesAsync` and finish on the thread pool, which is safe because `AssetManager` only checks the
   task in `Update`. I/O errors become `AssetLoadException` with status 0. Windows and macOS file systems ignore
@@ -525,6 +527,39 @@ the first frame. Each frame is one `submit(commands, instances)` interop call; t
 
 WebGPU is not implemented yet (see [docs/backlog.md](../backlog.md#webgpu-backend)). It will consume the same command
 stream and instance layout.
+
+### Desktop renderer
+
+`DesktopPlatform.Graphics` is a `GpuGraphics`: SDL_GPU with the `vulkan` driver (MoltenVK on macOS), so the same code
+could later run Metal or D3D12 by changing the driver and adding their shader formats. It does what `webgl2.js` does,
+command for command:
+
+- `Initialize(window)` creates the device (with validation layers in Debug builds, when they are installed), claims
+  the window, sets an SDR swapchain with vsync and builds the sprite pipeline: the `SpriteInstance` layout as one
+  instance-rate vertex buffer, a triangle strip, blending `ONE, ONE_MINUS_SRC_ALPHA` into an `R8G8B8A8_UNORM`
+  target, and a nearest, clamp-to-edge sampler.
+- Texture uploads (`CreateTexture`, `UpdateTexture`) and the frame's drawing are recorded into one command buffer,
+  which `Submit` hands to the GPU. Each upload copies through a `GpuUploadBuffer`, a transfer buffer cycled on every
+  write, so an upload never overwrites data a pending copy still reads. `DestroyTexture` releases the texture, and
+  SDL_GPU frees it once the GPU is done with it.
+- `Submit` uploads the instances (the vertex buffer is cycled too), then `RenderCommandReader` reads the stream with
+  the same checks as `webgl2.js` and calls `GpuGraphics` once per command. `SetSurface` (re)creates the render target
+  of the virtual size. `Clear` starts a render pass on it that clears; `DrawSprites` continues it (or starts one that
+  keeps the contents) and draws 4 vertices per instance with the run's first instance as the base instance, after
+  pushing the target and texture sizes as the vertex uniform. `Present` waits for the swapchain image, clears it to
+  black and blits the target into the viewport with nearest filtering. The viewport is clamped to the swapchain, which
+  can be one frame behind a resize. A minimized window has no swapchain image; the frame then shows nothing and
+  `GpuGraphics.Presented` tells the platform to pace the loop itself.
+- `Shutdown` waits for the GPU and releases everything. Textures still alive are released but keep their ids, because
+  the engine destroys them after the platform's run returns.
+- The shaders are GLSL 4.50 in `Shaders/sprite.vert` and `Shaders/sprite.frag`, the twins of `sprite.glsl.js`. They
+  follow SDL_GPU's SPIR-V binding rules (vertex uniforms in descriptor set 1, fragment samplers in set 2). The compiled
+  SPIR-V (`*.spv`) is committed and embedded in the assembly, so building needs no shader compiler.
+  `SpriteShaderTests` compiles the GLSL with shaderc (`Silk.NET.Shaderc`) and fails when a `.spv` is stale; run it with
+  `LD60_UPDATE_SHADERS=1` to write them.
+- **Failures.** Without a Vulkan driver, or when the window cannot get a swapchain, `RunAsync` throws with SDL's
+  error. On ChromeOS (Crostini), the Venus driver gets no swapchain on XWayland, where SDL goes when the compositor
+  lacks `fifo-v1`: run with `SDL_VIDEO_DRIVER=wayland`.
 
 ## Audio
 

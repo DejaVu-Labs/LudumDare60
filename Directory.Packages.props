@@ -24,6 +24,9 @@
   <ItemGroup Label="Testing">
     <PackageVersion Include="xunit.v3.mtp-v2" Version="4.0.2" />
     <PackageVersion Include="Microsoft.Playwright" Version="1.63.0" />
+    <!-- shaderc, to compile the desktop platform's GLSL shaders to SPIR-V (DesktopShaderTests). -->
+    <PackageVersion Include="Silk.NET.Shaderc" Version="2.23.0" />
+    <PackageVersion Include="Silk.NET.Shaderc.Native" Version="2.23.0" />
   </ItemGroup>
 
 </Project>
