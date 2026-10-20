@@ -148,6 +148,15 @@ Source: <https://itch.io/docs/creators/html5> (checked 2026-10-17).
   `Accept-Encoding` and for range requests. The corrupt copies stayed in the browser cache, so every reload failed
   the same way. `boot.js` now retries and repairs past the cache. If a device still fails, clear the site data of
   `html-classic.itch.zone` there and check whether it loads.
+- Right after a deploy, a returning player (Chrome OS, 2026-10-19 and 20) often failed to load
+  `System.Private.CoreLib`, while a private window loaded. Sentry's load traces showed why: the download stalled,
+  was aborted after 10 s without data, and every retry stalled the same way (six in a row), while the same file came
+  in 70 ms on a good load. Retries used `cache: 'reload'` on the same address, and an aborted download can keep
+  holding its HTTP cache entry, so the retry waited on it; a private window has a cache of its own. Retries now use
+  `cache: 'no-store'` at an address of their own (`?ld60retry=<n>`), so they never touch that entry. Runtime files
+  that come back 403, 404 or 410 are retried too (itch.io may still be unpacking a fresh upload), and if a file is
+  still missing, or a runtime module fails to load, `boot.js` loads the page again at a fresh address
+  (`?ld60fresh=<time>`), past the browser's and the CDN's cache, at most once a minute per tab.
 - On the same phone's network, downloads froze after about 15.7 KB each (`System.Private.CoreLib`, `LudumDare60.Game`,
   `System.Text.Json`) and failed only at the browser's 120 s timeout, while some retries finished in under a second.
   This looks like throttling of Cloudflare on that network. `boot.js` aborts a download after 10 s without data and
@@ -160,9 +169,8 @@ Checked on 2026-10-17 against live HTML5 games on itch.io:
 - Games are served from `https://html-classic.itch.zone/html/<id>/` through Cloudflare, with
   `cache-control: max-age` of about 2.5 million seconds (**about 29 days**), plus `etag` and `last-modified`.
 - itch.io loads `index.html` with `?v=<timestamp>`, so the page itself is always fresh after an upload.
-- An itch.io admin wrote (2018) that every re-upload gets new file URLs. Whether `<id>` also changes for a `butler push`
-  to the same channel is **not confirmed**. To check it, push twice to the dev channel and compare the `<id>` in the
-  game iframe's URL.
+- An itch.io admin wrote (2018) that every re-upload gets new file URLs, but a `butler push` to the same channel keeps
+  `<id>`: Sentry saw `html/19885674-2165299/` for releases 1.1 to 1.5 (2026-10-19).
 
 Files whose name carries a content hash (`_framework/*`, every `.js` through the import map) are safe either way. Asset
 files under `wwwroot/assets/` are not. If `<id>` stayed the same, a returning player could get the new code with an

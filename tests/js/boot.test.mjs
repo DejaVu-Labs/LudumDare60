@@ -14,13 +14,19 @@ import {
   getErrorText,
   isModuleLoadFailure,
   refreshCache,
+  REPAIR_COOLDOWN_MS,
   REPAIR_KEY,
   repairOnce,
   resolveRuntimeUrl,
   RETRY_DELAYS_MS,
+  RETRY_PARAM,
+  retryUrl,
   runtimeModuleUrls,
   runWithStatus,
   setErrorText,
+  freshPageUrl,
+  FRESH_PARAM,
+  isMissingFile,
   startOptional,
   startRuntime,
   NO_REPORTER,
@@ -268,9 +274,10 @@ test('fetchWithRetry_NetworkErrorsThenOk_RetriesWithDelays', async () => {
   assert.deepEqual(waits, [10, 20]);
   assert.deepEqual(requests.map((r) => r.init), [
     { integrity: 'sha256-x' },
-    { integrity: 'sha256-x', cache: 'reload' },
-    { integrity: 'sha256-x', cache: 'reload' },
+    { integrity: 'sha256-x', cache: 'no-store' },
+    { integrity: 'sha256-x', cache: 'no-store' },
   ]);
+  assert.deepEqual(requests.map((r) => r.url), ['a.wasm', `a.wasm?${RETRY_PARAM}=1`, `a.wasm?${RETRY_PARAM}=2`]);
 });
 
 test('fetchWithRetry_TransientStatusThenOk_Retries', async () => {
@@ -455,9 +462,9 @@ function createStore() {
 test('repairOnce_ModuleFailure_TrueOnceThenFalse', () => {
   const store = createStore();
 
-  assert.equal(repairOnce(moduleFailure, store), true);
-  assert.equal(store.items.get(REPAIR_KEY), '1');
-  assert.equal(repairOnce(moduleFailure, store), false);
+  assert.equal(repairOnce(moduleFailure, store, false, 5000), true);
+  assert.equal(store.items.get(REPAIR_KEY), '5000');
+  assert.equal(repairOnce(moduleFailure, store, false, 6000), false);
 });
 
 test('repairOnce_OtherError_FalseAndNotMarked', () => {
@@ -651,7 +658,8 @@ test('createRetryingFetch_FailsThenOk_RetriesAndReportsUrl', async () => {
   const response = await retrying('https://x/assets/bench.png?v=1', { cache: 'default' });
 
   assert.equal(response.status, 200);
-  assert.deepEqual(requests.map((r) => r.init), [{ cache: 'default' }, { cache: 'reload' }]);
+  assert.deepEqual(requests.map((r) => r.init), [{ cache: 'default' }, { cache: 'no-store' }]);
+  assert.equal(requests[1].url, `https://x/assets/bench.png?v=1&${RETRY_PARAM}=1`);
   assert.deepEqual(waits, [RETRY_DELAYS_MS[0]]);
   assert.deepEqual(retries, [['https://x/assets/bench.png?v=1', 1, RETRY_DELAYS_MS[0], 'TypeError: no data for 10 s']]);
 });
@@ -705,4 +713,93 @@ test('NO_REPORTER_StandsInForReporting_DoesNothingAndIsIdle', async () => {
   NO_REPORTER.captureError(new Error('boom'), 'boot');
 
   assert.equal(await NO_REPORTER.idle, undefined);
+});
+
+test('createResourceLoader_ServerStillDoesNotHaveTheFile_ReportsItMissingAfterTheRetries', async () => {
+  const { fetchLike, requests } = scriptedFetch(Array(RETRY_DELAYS_MS.length + 1).fill(404));
+  const { sleep } = recordedSleep();
+  /** @type {unknown[][]} */
+  const missing = [];
+  const load = createResourceLoader(fetchLike, sleep, () => {}, (...args) => missing.push(args));
+
+  const response = await load('assembly', 'System.Private.CoreLib.old.wasm', './_framework/System.Private.CoreLib.old.wasm', 'sha256-x');
+
+  assert.equal(response?.status, 404);
+  assert.equal(requests.length, RETRY_DELAYS_MS.length + 1);
+  assert.deepEqual(missing, [['System.Private.CoreLib.old.wasm', 404]]);
+});
+
+test('createResourceLoader_FileThere_ReportsNothingMissing', async () => {
+  const { fetchLike } = scriptedFetch([200]);
+  const { sleep } = recordedSleep();
+  /** @type {unknown[][]} */
+  const missing = [];
+  const load = createResourceLoader(fetchLike, sleep, () => {}, (...args) => missing.push(args));
+
+  await load('assembly', 'System.Linq.abc.wasm', './_framework/System.Linq.abc.wasm', 'sha256-x');
+
+  assert.deepEqual(missing, []);
+});
+
+test('isMissingFile_NotFoundGoneOrS3Forbidden_True', () => {
+  assert.deepEqual([403, 404, 410].map(isMissingFile), [true, true, true]);
+  assert.deepEqual([200, 304, 500, 503].map(isMissingFile), [false, false, false, false]);
+});
+
+test('repairOnce_MissingRuntimeFile_TrueOnceThenFalse', () => {
+  const store = createStore();
+  const error = new Error('Failed to load System.Private.CoreLib');
+
+  assert.equal(repairOnce(error, store, true), true);
+  assert.equal(repairOnce(error, store, true), false);
+});
+
+test('repairOnce_AfterTheCooldown_RepairsAgain', () => {
+  const store = createStore();
+
+  assert.equal(repairOnce(moduleFailure, store, false, 1000), true);
+  assert.equal(repairOnce(moduleFailure, store, false, 1000 + REPAIR_COOLDOWN_MS - 1), false);
+  assert.equal(repairOnce(moduleFailure, store, false, 1000 + REPAIR_COOLDOWN_MS), true);
+});
+
+test('repairOnce_MarkFromAnOlderVersion_RepairsAgain', () => {
+  const store = createStore();
+  store.setItem(REPAIR_KEY, '1');
+
+  assert.equal(repairOnce(moduleFailure, store, false, 10 * REPAIR_COOLDOWN_MS), true);
+});
+
+test('createResourceLoader_MissingThenThere_RetriesPastTheCacheAndReportsNothing', async () => {
+  const { fetchLike, requests } = scriptedFetch([404, 200]);
+  const { sleep } = recordedSleep();
+  /** @type {unknown[][]} */
+  const missing = [];
+  const load = createResourceLoader(fetchLike, sleep, () => {}, (...args) => missing.push(args));
+
+  const response = await load('assembly', 'System.Private.CoreLib.abc.wasm', './_framework/System.Private.CoreLib.abc.wasm', 'sha256-x');
+
+  assert.equal(response?.status, 200);
+  assert.equal(requests[1].init.cache, 'no-store');
+  assert.deepEqual(missing, []);
+});
+
+test('freshPageUrl_PageWithParameters_SetsTheStampAndKeepsTheRest', () => {
+  const fresh = new URL(freshPageUrl(`${page}?debug#top`, 1234));
+
+  assert.equal(fresh.searchParams.get(FRESH_PARAM), '1234');
+  assert.equal(fresh.searchParams.has('debug'), true);
+  assert.equal(fresh.hash, '#top');
+  assert.equal(fresh.pathname, new URL(page).pathname);
+});
+
+test('freshPageUrl_AlreadyFresh_ReplacesTheStamp', () => {
+  const fresh = new URL(freshPageUrl(freshPageUrl(page, 1), 2));
+
+  assert.deepEqual(fresh.searchParams.getAll(FRESH_PARAM), ['2']);
+});
+
+test('retryUrl_PlainQueriedRelativeOrHashed_AddsTheAttemptOnce', () => {
+  assert.equal(retryUrl('./_framework/a.wasm', 1), `./_framework/a.wasm?${RETRY_PARAM}=1`);
+  assert.equal(retryUrl('https://x/bench.png?v=abc', 2), `https://x/bench.png?v=abc&${RETRY_PARAM}=2`);
+  assert.equal(retryUrl('https://x/a.js#top', 3), `https://x/a.js?${RETRY_PARAM}=3`);
 });

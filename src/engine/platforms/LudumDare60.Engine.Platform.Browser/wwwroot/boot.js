@@ -208,9 +208,13 @@ function isTransient(status) {
  * Fetches `url`, and again after each delay in `delaysMs` while the request fails with a network error or a
  * transient status (408, 429, 5xx). Other responses, including 404, are returned at once.
  *
- * Retries bypass the HTTP cache (`cache: 'reload'`). A failed integrity check is a network error, and the corrupt
- * body that failed it stays in the cache: a retry that read the cache would fail the same way, on every later visit
- * too (seen on itch.io from Chrome on Android, 2026-10-19).
+ * Retries go past the HTTP cache entirely: `cache: 'no-store'` at an address the cache has never seen (`retryUrl`).
+ * A failed integrity check is a network error, and the corrupt body that failed it stays in the cache: a retry that
+ * read the cache would fail the same way (seen on itch.io from Chrome on Android, 2026-10-19). And a download aborted
+ * for stalling can keep holding its cache entry, so a retry of the same address that only bypasses reading
+ * (`cache: 'reload'`) waits on that entry and stalls too: a returning player's Chrome stalled on
+ * `System.Private.CoreLib` six times in a row after a deploy, while a private window, with its own cache, loaded
+ * (Sentry load traces, 2026-10-20).
  *
  * @param {string} url
  * @param {RequestInit} init
@@ -219,15 +223,28 @@ function isTransient(status) {
  * @param {readonly number[]} [delaysMs] One entry per retry.
  * @param {(attempt: number, delayMs: number, reason: string) => void} [onRetry] Called before each wait, with the
  *   1-based number of the retry that follows and why the request failed.
+ * @param {(status: number) => boolean} [retryStatus] Which statuses to retry; transient ones (`isTransient`) by
+ *   default.
  * @returns {Promise<Response>} The last response. Rejects with the last network error.
  */
-export async function fetchWithRetry(url, init, fetchLike, sleep, delaysMs = RETRY_DELAYS_MS, onRetry = () => {}) {
+export async function fetchWithRetry(
+  url,
+  init,
+  fetchLike,
+  sleep,
+  delaysMs = RETRY_DELAYS_MS,
+  onRetry = () => {},
+  retryStatus = isTransient,
+) {
   for (let attempt = 0; ; attempt++) {
     const last = attempt >= delaysMs.length;
     let reason = '';
     try {
-      const response = await fetchLike(url, attempt === 0 ? init : { ...init, cache: 'reload' });
-      if (response.ok || last || !isTransient(response.status)) {
+      const response = await fetchLike(
+        attempt === 0 ? url : retryUrl(url, attempt),
+        attempt === 0 ? init : { ...init, cache: 'no-store' },
+      );
+      if (response.ok || last || !retryStatus(response.status)) {
         return response;
       }
       reason = `HTTP ${response.status}`;
@@ -242,6 +259,22 @@ export async function fetchWithRetry(url, init, fetchLike, sleep, delaysMs = RET
   }
 }
 
+/** Query parameter that `retryUrl` sets: the static hosts ignore it, but every cache keys on it. */
+export const RETRY_PARAM = 'ld60retry';
+
+/**
+ * `url` with `RETRY_PARAM` set to `attempt`, so a retry has a cache entry of its own. Works on relative URLs, keeps
+ * the query (`?v=` on assets) and drops any hash.
+ *
+ * @param {string} url
+ * @param {number} attempt 1 for the first retry.
+ * @returns {string}
+ */
+export function retryUrl(url, attempt) {
+  const [path] = url.split('#', 1);
+  return `${path}${path.includes('?') ? '&' : '?'}${RETRY_PARAM}=${attempt}`;
+}
+
 /**
  * Returns a resource loader that downloads the runtime's files with `fetchWithRetry`. JS modules (`dotnetjs`) and the
  * boot manifest keep the default path: the runtime needs a URL for those, not a response.
@@ -249,13 +282,19 @@ export async function fetchWithRetry(url, init, fetchLike, sleep, delaysMs = RET
  * The runtime's default download sends `cache: 'no-cache'`, so every start revalidates every file. This loader uses
  * the normal HTTP cache instead: every runtime file name carries a content hash (`WasmFingerprintAssets`).
  *
+ * A runtime file the server says it does not have (`isMissingFile`) is retried like a transient failure: its name
+ * carries a content hash, so it exists in the upload the page belongs to, and right after a deploy itch.io may still
+ * be unpacking it (or its CDN still serving a cached "not found"). One still missing after the retries goes to
+ * `onMissing`: the page is out of date (see `repairOnce`).
+ *
  * @param {FetchLike} fetchLike
  * @param {(ms: number) => Promise<void>} sleep
  * @param {(name: string, attempt: number, delayMs: number, reason: string) => void} [onRetry] Called before each
  *   retry of the file `name` (see `fetchWithRetry`).
+ * @param {(name: string, status: number) => void} [onMissing] Called when the server answers that `name` is not there.
  * @returns {LoadBootResource}
  */
-export function createResourceLoader(fetchLike, sleep, onRetry = () => {}) {
+export function createResourceLoader(fetchLike, sleep, onRetry = () => {}, onMissing = () => {}) {
   return (type, name, defaultUri, integrity) => {
     if (type === 'dotnetjs' || type === 'manifest') {
       return undefined;
@@ -267,12 +306,33 @@ export function createResourceLoader(fetchLike, sleep, onRetry = () => {}) {
       sleep,
       RETRY_DELAYS_MS,
       (attempt, delayMs, reason) => onRetry(name, attempt, delayMs, reason),
-    );
+      (status) => isTransient(status) || isMissingFile(status),
+    ).then((response) => {
+      if (isMissingFile(response.status)) {
+        onMissing(name, response.status);
+      }
+      return response;
+    });
   };
 }
 
-/** Session storage key that marks a page reload done by `boot` to repair the runtime's cached modules. */
+/**
+ * @param {number} status An HTTP status.
+ * @returns {boolean} Whether it says the file is not on the server: 404 or 410, or 403, which S3-backed hosts such as
+ *   itch.io's send for a key they do not have.
+ */
+export function isMissingFile(status) {
+  return status === 403 || status === 404 || status === 410;
+}
+
+/** Session storage key that holds when `boot` last reloaded the page to repair the runtime's cached files. */
 export const REPAIR_KEY = 'ld60.boot.repaired';
+
+/**
+ * How long after a repair another one waits, in milliseconds: a failure that a fresh download does not fix shows the
+ * error instead of reloading in a loop, while a tab left open across deploys can still repair after each one.
+ */
+export const REPAIR_COOLDOWN_MS = 60_000;
 
 /**
  * @param {unknown} error Why startup failed.
@@ -343,26 +403,53 @@ export async function refreshCache(urls, fetchLike) {
  */
 
 /**
- * Decides whether to repair the cache and reload after a failed start: only for a module load failure, and once per
- * browser tab, so a failure that a fresh download does not fix shows the error instead of reloading forever.
+ * Decides whether to repair the cache and reload after a failed start: for a module load failure or a runtime file
+ * the server does not have, and at most once per `REPAIR_COOLDOWN_MS` in a browser tab, so a failure that a fresh
+ * download does not fix shows the error instead of reloading forever.
+ *
+ * A missing file means the page is out of date: itch.io serves a new upload of a channel at the same address, and a
+ * cached `index.html` keeps asking for the last version's fingerprinted runtime files (`System.Private.CoreLib` and
+ * the rest), which are gone. A private window, with no cache, loads fine.
  *
  * @param {unknown} error
  * @param {RepairStore | null} store Usually `sessionStorage`; without one, never.
+ * @param {boolean} [missingFile] Whether a runtime file came back missing (`createResourceLoader`'s `onMissing`).
+ * @param {number} [now] The time in milliseconds, usually `Date.now()`.
  * @returns {boolean} `true` after marking the repair in `store`.
  */
-export function repairOnce(error, store) {
-  if (store === null || !isModuleLoadFailure(error)) {
+export function repairOnce(error, store, missingFile = false, now = Date.now()) {
+  if (store === null || !(isModuleLoadFailure(error) || missingFile)) {
     return false;
   }
   try {
-    if (store.getItem(REPAIR_KEY) !== null) {
+    const marked = store.getItem(REPAIR_KEY);
+    const last = marked === null ? Number.NaN : Number(marked);
+    if (Number.isFinite(last) && now - last < REPAIR_COOLDOWN_MS) {
       return false;
     }
-    store.setItem(REPAIR_KEY, '1');
+    store.setItem(REPAIR_KEY, String(now));
     return true;
   } catch {
     return false;
   }
+}
+
+/** Query parameter that `freshPageUrl` sets, so the reload gets the page past every cache. */
+export const FRESH_PARAM = 'ld60fresh';
+
+/**
+ * The page's address with `FRESH_PARAM` set to `stamp`: a URL no cache has seen, so the browser and the CDN in front
+ * of itch.io both fetch the current `index.html`, with the current version's file names. Other parameters (`debug`)
+ * and the hash stay.
+ *
+ * @param {string} href The page's address.
+ * @param {number} stamp Usually `Date.now()`.
+ * @returns {string}
+ */
+export function freshPageUrl(href, stamp) {
+  const url = new URL(href);
+  url.searchParams.set(FRESH_PARAM, String(stamp));
+  return url.href;
 }
 
 /** @returns {RepairStore | null} */
@@ -499,6 +586,8 @@ export function boot(
   analyticsConfig = './analytics.json',
 ) {
   const log = getLoadLog();
+  // Set when the server does not have a runtime file this page asks for: the page is out of date.
+  let missingFile = false;
   // Reporting and analytics are optional: blocked or broken, they never stop the game from starting.
   /** @type {Promise<Pick<Reporter, 'captureError' | 'idle'>>} */
   const reporterReady = startOptional(
@@ -541,6 +630,10 @@ export function boot(
               browserWatchedFetch(),
               delay,
               (name, attempt, delayMs, reason) => log.retry(name, attempt, RETRY_DELAYS_MS.length, delayMs, reason),
+              (name, status) => {
+                missingFile = true;
+                log.step(`runtime file missing (HTTP ${status}): ${name}`);
+              },
             ),
           ),
       );
@@ -553,12 +646,12 @@ export function boot(
     } catch {
       // Reporting must never get in the way of the repair below.
     }
-    if (repairOnce(error, sessionStore())) {
+    if (repairOnce(error, sessionStore(), missingFile)) {
       const status = document.getElementById(statusId);
       if (status !== null) {
         status.textContent = 'Loading...';
       }
-      log.step('repairing cached runtime modules, then reloading');
+      log.step('repairing cached runtime modules, then loading the current page past the caches');
       const frameworkUrl = new URL(frameworkRoot.endsWith('/') ? frameworkRoot : `${frameworkRoot}/`, document.baseURI).href;
       const importMap = document.querySelector('script[type="importmap"]');
       await refreshCache(
@@ -566,7 +659,8 @@ export function boot(
         (url, init) => fetch(url, init),
       );
       await Promise.race([reporter.idle, delay(REPORT_WAIT_MS)]);
-      globalThis.location.reload();
+      // A plain reload could get the same stale index.html from a cache; a new address cannot.
+      globalThis.location.replace(freshPageUrl(globalThis.location.href, Date.now()));
     } else {
       try {
         (await analyticsReady)?.captureFatal(error);
