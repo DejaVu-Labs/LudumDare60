@@ -32,7 +32,8 @@
           "SDL3-CS": "[3.4.18, )",
           "SDL3-CS.Linux": "[3.4.18, )",
           "SDL3-CS.MacOS": "[3.4.18, )",
-          "SDL3-CS.Windows": "[3.4.18, )"
+          "SDL3-CS.Windows": "[3.4.18, )",
+          "Sentry": "[6.12.1, )"
         }
       },
       "ludumdare60.game": {
@@ -70,6 +71,12 @@
         "requested": "[3.4.18, )",
         "resolved": "3.4.18",
         "contentHash": "JNzFcjtKZ4DmGH1ImHswahrUhUD9+IM61agunfZ7qkOpxBQ+37i6ebyq74sUYhQB7lpLA6QRr4PW/lMXx0/qCA=="
+      },
+      "Sentry": {
+        "type": "CentralTransitive",
+        "requested": "[6.12.1, )",
+        "resolved": "6.12.1",
+        "contentHash": "yCHz3cLGZ3TVik3rLV6rp6SaqJ0Ai7PyIi2KdoHNGpZYWEkcX7kx13IV46mufAzPW7pqZZoKNoru0w0RpmkmrA=="
       },
       "StbImageSharp": {
         "type": "CentralTransitive",

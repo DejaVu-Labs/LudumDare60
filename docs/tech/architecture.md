@@ -171,7 +171,9 @@ the browser platform, so the engine and the game cannot tell them apart.
   `File.ReadAllBytesAsync` and finish on the thread pool, which is safe because `AssetManager` only checks the
   task in `Update`. I/O errors become `AssetLoadException` with status 0. Windows and macOS file systems ignore
   case; itch.io does not, so a wrong-case path still only fails in the browser.
-- `ReportError` writes the error to standard error. `Analytics` is the default `NullAnalytics`.
+- `ReportError` writes the error to standard error and, when the build is configured for it, sends it to Sentry.
+  `Analytics` sends GameAnalytics events when configured and drops them otherwise. See
+  [Desktop error reports and analytics](#desktop-error-reports-and-analytics).
 
 `SdlInput` translates SDL events into `RawInputEvent`s with the browser's meaning, so `InputState` and the game work
 unchanged. It makes no SDL calls, so the tests build SDL events by hand and run without a window or the native
@@ -745,3 +747,32 @@ module are dropped (the game sends none before its first frame).
   event.
 - The SDK batches events and posts them every few seconds, keeps the unsent ones in `localStorage`, and ends the
   session on `beforeunload`.
+
+### Desktop error reports and analytics
+
+`DesktopPlatform` sends the same reports and events as the browser build when the build ships the same config files,
+`reporting.json` and `analytics.json`, next to the executable (`Telemetry/`). `DesktopTelemetry.Start` reads them when
+the platform is created; a missing, empty or broken file turns its service off, with the rules of `readConfig` in
+`reporting.js` and `analytics.js` (`TelemetryConfig`).
+
+- **Errors** go to Sentry through the Sentry .NET SDK (`SentryReporting`). `ReportError` captures the exception with
+  mechanism `dotnet.handled` or `dotnet.unhandled`; the SDK itself reports exceptions that no code catches
+  (`AppDomain.UnhandledException`, `TaskScheduler.UnobservedTaskException`) and sends what is queued when the process
+  exits. Like `reporting.js`, each error is sent once and at most 10 per run (`ErrorBudget`, in `BeforeSend`). No
+  personal data: no user, the server name is the platform (`windows`, `linux` or `macos`, also the `game.platform`
+  tag), no sessions or traces. A missing sound device is written to standard error only: it is not a bug.
+- **Analytics** go to GameAnalytics through its REST API v2 (`GameAnalyticsClient`), because there is no .NET SDK for
+  desktop. Calls only queue the event after the `analytics.js` id checks (`AnalyticsIds`); a background task signs in
+  with `POST /v2/{game_key}/init`, takes the server time from the reply, and posts the queue to `/events` every 8 s,
+  each body signed with the HMAC-SHA256 of the secret key in the `Authorization` header (`GameAnalyticsProtocol`). A
+  run is one session: a `user` event when the platform is created, `session_end` with the length when `RunAsync`
+  returns, waiting at most 2 s for the last send. Events carry the default annotations (user id, session id and
+  number, build, `platform` `windows`, `linux` or `mac_osx`, `os_version`, `device` the CPU architecture), and
+  `custom_01` the pointer type of the last press, as in the browser.
+- `AnalyticsState` keeps what the browser SDK keeps in `localStorage`: a random user id, the session count, and the
+  starts of each progression since it was last completed (its `attempt_num`), in
+  `LudumDare60/analytics-state.json` under the user's local application data folder.
+- Failures: network errors and 5xx keep the events for the next send (at most 500, oldest dropped); a 400 drops the
+  batch; rejected keys (401, 403) or `enabled: false` turn analytics off for the run. An unhandled exception queues one
+  `Critical` error event and sends it before the process ends, like `captureFatal` in the browser. Nothing here throws
+  into the game.

@@ -45,6 +45,14 @@ Controls
 The game starts fullscreen.
 
 
+Privacy
+-------
+
+The game reports errors and sends anonymous gameplay statistics (which orders were finished, how long they took)
+to help fix and balance it. It sends no names and no files. It keeps a random player id in
+~/.local/share/LudumDare60; delete that folder to start over as a new player.
+
+
 Troubleshooting
 ---------------
 

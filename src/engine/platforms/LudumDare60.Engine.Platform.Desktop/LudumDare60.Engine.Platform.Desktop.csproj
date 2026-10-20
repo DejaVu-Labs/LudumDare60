@@ -21,6 +21,7 @@
   <ItemGroup>
     <PackageReference Include="NVorbis" />
     <PackageReference Include="SDL3-CS" />
+    <PackageReference Include="Sentry" />
     <PackageReference Include="SDL3-CS.Linux" />
     <PackageReference Include="SDL3-CS.MacOS" />
     <PackageReference Include="SDL3-CS.Windows" />

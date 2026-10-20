@@ -7,6 +7,7 @@ var platform = new DesktopPlatform("LudumDare60", LudumDare60Game.VirtualWidth *
 var game = new LudumDare60Game
 {
     HasDebugKeys = args.Contains("--debug", StringComparer.Ordinal),
+    Analytics = platform.Analytics,
 };
 await new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight)
     .RunAsync(game, platform);

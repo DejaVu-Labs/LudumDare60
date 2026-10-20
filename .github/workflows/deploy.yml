@@ -182,6 +182,29 @@ jobs:
       - name: Publish
         run: dotnet publish "$DESKTOP_PROJECT" -c Release -p:DesktopRuntime=${{ matrix.runtime }}
 
+      # The same reports and analytics as the browser build, under the same variables. Without them the files are
+      # missing and the desktop build sends nothing. Events carry the game.platform tag (Sentry) or the platform field
+      # (GameAnalytics), so the dashboards can tell the builds apart.
+      - name: Write reporting config
+        if: vars.SENTRY_DSN != ''
+        env:
+          SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+          RELEASE: ${{ needs.plan.outputs.version }}
+          ENVIRONMENT: ${{ needs.plan.outputs.target }}
+        run: |
+          jq -n --arg dsn "$SENTRY_DSN" --arg release "$RELEASE" --arg environment "$ENVIRONMENT" \
+            '{dsn: $dsn, release: $release, environment: $environment}' > "$DESKTOP_PUBLISH_DIR/reporting.json"
+
+      - name: Write analytics config
+        if: vars.GAMEANALYTICS_GAME_KEY != '' && vars.GAMEANALYTICS_SECRET_KEY != ''
+        env:
+          GAME_KEY: ${{ vars.GAMEANALYTICS_GAME_KEY }}
+          SECRET_KEY: ${{ vars.GAMEANALYTICS_SECRET_KEY }}
+          BUILD: ${{ needs.plan.outputs.version }}
+        run: |
+          jq -n --arg gameKey "$GAME_KEY" --arg secretKey "$SECRET_KEY" --arg build "$BUILD" \
+            '{gameKey: $gameKey, secretKey: $secretKey, build: $build}' > "$DESKTOP_PUBLISH_DIR/analytics.json"
+
       - name: Check output
         env:
           EXECUTABLE: ${{ matrix.executable }}

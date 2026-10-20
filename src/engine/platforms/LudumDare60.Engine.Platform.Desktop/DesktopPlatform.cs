@@ -1,5 +1,6 @@
 using LudumDare60.Engine.Platform.Desktop.Rendering;
 using LudumDare60.Engine.Platform.Desktop.Sounds;
+using LudumDare60.Engine.Platform.Desktop.Telemetry;
 using SDL3;
 
 namespace LudumDare60.Engine.Platform.Desktop;
@@ -7,7 +8,7 @@ namespace LudumDare60.Engine.Platform.Desktop;
 /// <summary>
 /// <see cref="IPlatform"/> for Windows, Linux and macOS on SDL3: one window drawn with Vulkan through SDL_GPU, frames
 /// from a loop on the calling thread, sound mixed in managed code and played through SDL audio, keyboard, mouse, touch
-/// and gamepad input, and real asset files.
+/// and gamepad input, real asset files, and error reports and analytics when the build is configured for them.
 /// </summary>
 /// <param name="title">Window title.</param>
 /// <param name="width">Window width in logical pixels when not fullscreen.</param>
@@ -35,6 +36,8 @@ public sealed class DesktopPlatform(string title, int width, int height, string?
 
     private readonly SdlAudio _audio = new();
 
+    private readonly DesktopTelemetry _telemetry = DesktopTelemetry.Start(AppContext.BaseDirectory);
+
     /// <inheritdoc />
     /// <remarks>Files under the asset root, read on the thread pool.</remarks>
     public IAssetSource Assets => _assets;
@@ -49,6 +52,12 @@ public sealed class DesktopPlatform(string title, int width, int height, string?
     /// <see cref="RunAsync"/> opens the device before the first frame; without one the game runs silent. Unlike the
     /// browser, nothing has to unlock audio first.</remarks>
     public IAudioBackend Audio => _audio;
+
+    /// <inheritdoc />
+    /// <remarks>GameAnalytics through its REST API when <c>analytics.json</c> next to the executable has the game's keys
+    /// (see <see cref="GameAnalyticsClient"/>); otherwise every event is dropped. Events wait until
+    /// <see cref="RunAsync"/> starts sending; the session ends when it returns.</remarks>
+    public IAnalytics Analytics => _telemetry.Analytics;
 
     /// <inheritdoc />
     /// <remarks>Runs the frame loop on the calling thread, which must be the process's main thread (macOS needs that
@@ -88,13 +97,16 @@ public sealed class DesktopPlatform(string title, int width, int height, string?
                 _graphics.Initialize(window);
                 if (_audio.Initialize() is { } audioError)
                 {
-                    ReportError(new InvalidOperationException($"No sound: opening the audio device failed: {audioError}"), handled: true);
+                    // Not an error report: a machine without a sound device is not a bug.
+                    WriteError($"No sound: opening the audio device failed: {audioError}");
                 }
 
+                _telemetry.BeginRun();
                 Run(window, frameSink);
             }
             finally
             {
+                _telemetry.EndRun();
                 _audio.Shutdown();
                 _graphics.Shutdown();
                 foreach (var gamepad in _gamepads.Values)
@@ -115,12 +127,16 @@ public sealed class DesktopPlatform(string title, int width, int height, string?
     }
 
     /// <inheritdoc />
-    /// <remarks>Writes the error to the standard error stream.</remarks>
+    /// <remarks>Writes the error to the standard error stream, and sends it to Sentry when <c>reporting.json</c> next to
+    /// the executable has a DSN (see <see cref="SentryReporting"/>). Exceptions that no code catches are sent too.</remarks>
     public void ReportError(Exception exception, bool handled)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        Console.Error.WriteLine(handled ? $"Handled error: {exception}" : $"Unhandled error: {exception}");
+        WriteError(handled ? $"Handled error: {exception}" : $"Unhandled error: {exception}");
+        SentryReporting.Capture(exception, handled);
     }
+
+    private static void WriteError(string message) => Console.Error.WriteLine(message);
 
     private void Run(nint window, IFrameSink frameSink)
     {
@@ -181,6 +197,14 @@ public sealed class DesktopPlatform(string title, int width, int height, string?
 
             var frameStartNs = SDL.GetTicksNS();
             var count = input.Drain(events, frameStartNs);
+            for (var i = 0; i < count; i++)
+            {
+                if (events[i].Kind == RawInputEventKind.PointerDown)
+                {
+                    _telemetry.OnPointerDown((PointerType)events[i].Code);
+                }
+            }
+
             frameSink.Update(clock.Tick(frameStartNs), events.AsSpan(0, count));
             frameSink.Render();
 

@@ -252,8 +252,8 @@ artifacts drop file permissions) and pushes with butler.
    their channel names; check that each shows its platform.
 5. Optional, for [error and load reports](#error-and-load-reports): create a Sentry project (platform
    *Browser JavaScript*), turn on *Settings > Security & Privacy > Prevent Storing of IP Addresses*, and add its DSN
-   as the `SENTRY_DSN` repository variable. One project serves both targets; events carry `environment` `dev` or
-   `release`.
+   as the `SENTRY_DSN` repository variable. One project serves both targets and the desktop builds; events carry
+   `environment` `dev` or `release`, and desktop events the `game.platform` tag.
 6. Optional, for [product analytics](#product-analytics): create a game on GameAnalytics, and add its game key and
    secret key as the `GAMEANALYTICS_GAME_KEY` and `GAMEANALYTICS_SECRET_KEY` repository variables. One game serves both targets; events carry the build (`dev-42-abc1234` or `1.2.0`), so
    filter dashboards by build.
@@ -340,6 +340,25 @@ Privacy: the SDK stores a random user id and its event queue in `localStorage`, 
 browser, the build, the session length and the events above. GameAnalytics sees the sender's IP address. There is no
 consent prompt; say on the itch.io page that the game collects anonymous gameplay statistics. Ad blockers often block
 GameAnalytics, so expect events from only part of the players.
+
+### Desktop error reports and analytics
+
+The desktop builds send the same error reports and analytics events as the browser build, under the same variables:
+when `SENTRY_DSN` or both `GAMEANALYTICS_*` variables are set, the `publish-desktop` job writes `reporting.json` and
+`analytics.json`, in the browser's format, next to the executable. Without them the files are missing and the desktop
+build sends nothing, which is also the case for every local build. See
+[Desktop error reports and analytics](architecture.md#desktop-error-reports-and-analytics) for how they are sent.
+
+- Sentry: events come from the Sentry .NET SDK, platform `csharp`, with `game.platform` `windows` or `linux`. To try
+  it locally, put a `reporting.json` next to the executable in `artifacts/bin/LudumDare60.Game.Desktop/debug/`.
+- GameAnalytics: events come through the REST API with `platform` `windows` or `linux`; filter by platform to tell
+  them from the browser's. A local `analytics.json` works the same way, and GameAnalytics' *Realtime* view shows the
+  events within a minute; keys the API rejects turn analytics off with a message on standard error.
+
+Privacy: the desktop build keeps a random user id, the session count and progression attempts in
+`LudumDare60/analytics-state.json` under the local application data folder (`%LOCALAPPDATA%` on Windows,
+`~/.local/share` on Linux), and sends no user name or computer name. Sentry and GameAnalytics see the sender's IP
+address. The READMEs of the desktop builds say so.
 
 ### Updating butler
 
