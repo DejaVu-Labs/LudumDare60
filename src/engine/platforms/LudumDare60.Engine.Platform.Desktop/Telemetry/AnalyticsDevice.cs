@@ -30,10 +30,10 @@ internal sealed record AnalyticsDevice(string Platform, string OsVersion)
     {
         ArgumentNullException.ThrowIfNull(version);
         Span<int> parts = [version.Major, Math.Max(version.Minor, 0), Math.Max(version.Build, 0)];
-        var text = string.Create(CultureInfo.InvariantCulture, $"{platform} {Clamp(parts[0])}.{Clamp(parts[1])}.{Clamp(parts[2])}");
+        var text = string.Create(CultureInfo.InvariantCulture, $"{platform} {clamp(parts[0])}.{clamp(parts[1])}.{clamp(parts[2])}");
         return text;
 
-        static int Clamp(int part) => Math.Clamp(part, 0, 99999);
+        static int clamp(int part) => Math.Clamp(part, 0, 99999);
     }
 
     /// <summary>
