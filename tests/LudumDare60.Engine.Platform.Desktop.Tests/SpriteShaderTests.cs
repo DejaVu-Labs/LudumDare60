@@ -59,7 +59,7 @@ public sealed unsafe class SpriteShaderTests
     [InlineData(GlShaders.SpriteFragment, (int)ShaderKind.FragmentShader)]
     public void OpenGlShaders_CompileAsGlsl330(string source, int kind)
     {
-        var shaderc = Shaderc.GetApi();
+        var shaderc = s_shaderc.Value;
         var compiler = shaderc.CompilerInitialize();
         var options = shaderc.CompileOptionsInitialize();
         try
