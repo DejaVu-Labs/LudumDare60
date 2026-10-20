@@ -151,17 +151,19 @@ Source: <https://itch.io/docs/creators/html5> (checked 2026-10-17).
   `Accept-Encoding` and for range requests. The corrupt copies stayed in the browser cache, so every reload failed
   the same way. `boot.js` now retries and repairs past the cache. If a device still fails, clear the site data of
   `html-classic.itch.zone` there and check whether it loads.
-- Right after a deploy, loads fail or crawl for a few minutes, in a private window too (Chrome OS, 2026-10-19 and 20).
-  Sentry's load traces and the console showed three things: runtime files and every asset (new `?v=` addresses)
-  waited more than 10 s for the first byte, so they were aborted and retried again and again while the CDN fetched
-  them from itch.io; `dotnet.native.js` once came back with other bytes than the page's integrity hash (itch.io still
-  settling the upload); and the same files came in 70 ms a few minutes later. What `boot.js` does about it: a
-  download gets 30 s for its first byte and 10 s for each gap after that (`FIRST_BYTE_MS`, `STALL_MS`); retries go to
-  the same address, so the CDN can answer them from the first try, with `cache: 'no-store'`, so a corrupt copy in the
-  browser cache is never read again; runtime files that come back 403, 404 or 410 are retried too; and if a runtime
-  file is still missing or a runtime module fails to load (the integrity failure above), it loads the page again at
-  a fresh address (`?ld60fresh=<time>`), past the browser's and the CDN's cache, at most once a minute per tab. On
-  2026-10-20 that repair got the game running after the first attempt failed.
+- After a deploy, loads failed again and again for one player while others and a VPN loaded fine (2026-10-20). The
+  cause, checked with curl from that network: Cloudflare's Frankfurt node held a broken copy of a few new files
+  (`blues.ogg`, `dotnet.native.wasm`), cached while itch.io was still settling the upload, and served their first
+  15 KB and then nothing (`cf-cache-status: HIT`, 15,427 of 240,447 bytes), while the same file at another address
+  came whole in 1.6 s. A VPN goes through another node; the old release's copies are whole. Every retry of the same
+  address got the same broken copy, and integrity checks failed with a different hash each time. What `boot.js` does
+  about it: the first retry goes to the same address, later ones to an address of their own (`?ld60retry=<n>`),
+  which no cache has seen, all with `cache: 'no-store'`; a download gets 30 s for its first byte and 10 s for each gap
+  after that (`FIRST_BYTE_MS`, `STALL_MS`); runtime files that come back 403, 404 or 410 are retried too; and if a
+  runtime file is still missing or a runtime module fails to load, it loads the page again at a fresh address
+  (`?ld60fresh=<time>`), at most once a minute per tab. The game goes on without an optional file that still fails
+  (the phone, the scrub loop, the elephant, the rain, a music track); only the room, the street, the customer sheets
+  and `orders.json` stop it.
 - On the same phone's network, downloads froze after about 15.7 KB each (`System.Private.CoreLib`, `LudumDare60.Game`,
   `System.Text.Json`) and failed only at the browser's 120 s timeout, while some retries finished in under a second.
   This looks like throttling of Cloudflare on that network. `boot.js` aborts a download after 10 s without data and

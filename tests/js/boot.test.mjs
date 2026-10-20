@@ -10,6 +10,8 @@ import {
   createWatchedFetch,
   STALL_MS,
   FIRST_BYTE_MS,
+  RETRY_PARAM,
+  retryUrl,
   ERROR_TEXT,
   fetchWithRetry,
   getErrorText,
@@ -276,7 +278,7 @@ test('fetchWithRetry_NetworkErrorsThenOk_RetriesWithDelays', async () => {
     { integrity: 'sha256-x', cache: 'no-store' },
     { integrity: 'sha256-x', cache: 'no-store' },
   ]);
-  assert.deepEqual(requests.map((r) => r.url), ['a.wasm', 'a.wasm', 'a.wasm']);
+  assert.deepEqual(requests.map((r) => r.url), ['a.wasm', 'a.wasm', `a.wasm?${RETRY_PARAM}=2`]);
 });
 
 test('fetchWithRetry_TransientStatusThenOk_Retries', async () => {
@@ -796,4 +798,10 @@ test('freshPageUrl_AlreadyFresh_ReplacesTheStamp', () => {
   const fresh = new URL(freshPageUrl(freshPageUrl(page, 1), 2));
 
   assert.deepEqual(fresh.searchParams.getAll(FRESH_PARAM), ['2']);
+});
+
+test('retryUrl_PlainQueriedRelativeOrHashed_AddsTheAttemptOnce', () => {
+  assert.equal(retryUrl('./_framework/a.wasm', 2), `./_framework/a.wasm?${RETRY_PARAM}=2`);
+  assert.equal(retryUrl('https://x/blues.ogg?v=abc', 3), `https://x/blues.ogg?v=abc&${RETRY_PARAM}=3`);
+  assert.equal(retryUrl('https://x/a.js#top', 4), `https://x/a.js?${RETRY_PARAM}=4`);
 });

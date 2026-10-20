@@ -221,11 +221,14 @@ function isTransient(status) {
  * Fetches `url`, and again after each delay in `delaysMs` while the request fails with a network error or a
  * transient status (408, 429, 5xx). Other responses, including 404, are returned at once.
  *
- * Retries go past the browser's HTTP cache entirely (`cache: 'no-store'`), at the same address. A failed integrity check
- * is a network error, and the corrupt body that failed it stays in the cache: a retry that read the cache would fail
- * the same way (seen on itch.io from Chrome on Android, 2026-10-19). The address stays the same so the CDN in front of
- * itch.io can answer a retry from what it fetched for the first try; a new address per retry made every retry wait
- * for itch.io again (2026-10-20).
+ * Retries go past the browser's HTTP cache entirely (`cache: 'no-store'`). A failed integrity check is a network
+ * error, and the corrupt body that failed it stays in the cache: a retry that read the cache would fail the same way
+ * (seen on itch.io from Chrome on Android, 2026-10-19).
+ *
+ * The first retry goes to the same address, so the CDN in front of itch.io can answer it from what it fetched for the
+ * first try. Later ones go to an address of their own (`retryUrl`): the CDN can hold a broken copy of a file, cached
+ * while itch.io was still settling an upload, and serve its first 15 KB and then nothing to everyone who asks for that
+ * address, while the same file at another address comes whole in a second (2026-10-20, `cf-cache-status: HIT`).
  *
  * @param {string} url
  * @param {RequestInit} init
@@ -251,7 +254,10 @@ export async function fetchWithRetry(
     const last = attempt >= delaysMs.length;
     let reason = '';
     try {
-      const response = await fetchLike(url, attempt === 0 ? init : { ...init, cache: 'no-store' });
+      const response = await fetchLike(
+        attempt < 2 ? url : retryUrl(url, attempt),
+        attempt === 0 ? init : { ...init, cache: 'no-store' },
+      );
       if (response.ok || last || !retryStatus(response.status)) {
         return response;
       }
@@ -265,6 +271,22 @@ export async function fetchWithRetry(
     onRetry(attempt + 1, delaysMs[attempt], reason);
     await sleep(delaysMs[attempt]);
   }
+}
+
+/** Query parameter that `retryUrl` sets: the static host ignores it, but every cache keys on it. */
+export const RETRY_PARAM = 'ld60retry';
+
+/**
+ * `url` with `RETRY_PARAM` set to `attempt`, so a retry gets past a broken copy that a cache holds for `url`. Works
+ * on relative URLs, keeps the query (`?v=` on assets) and drops any hash.
+ *
+ * @param {string} url
+ * @param {number} attempt The retry's number.
+ * @returns {string}
+ */
+export function retryUrl(url, attempt) {
+  const [path] = url.split('#', 1);
+  return `${path}${path.includes('?') ? '&' : '?'}${RETRY_PARAM}=${attempt}`;
 }
 
 /**
