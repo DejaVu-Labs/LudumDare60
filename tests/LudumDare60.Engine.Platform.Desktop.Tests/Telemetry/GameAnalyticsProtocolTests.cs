@@ -52,6 +52,17 @@ public sealed class GameAnalyticsProtocolTests
         Assert.Equal(3, e.GetProperty("session_num").GetInt32());
         Assert.Equal("1.2.0", e.GetProperty("build").GetString());
         Assert.False(e.TryGetProperty("custom_01", out _));
+        Assert.False(e.TryGetProperty("custom_02", out _));
+    }
+
+    [Fact]
+    public void EventsBody_SessionWithRenderer_SendsItAsCustomDimension02()
+    {
+        var session = s_session with { Renderer = "opengl" };
+
+        using var body = JsonDocument.Parse(GameAnalyticsProtocol.EventsBody([new AnalyticsEvent("user", s_time, null)], session, TimeSpan.Zero));
+
+        Assert.Equal("opengl", body.RootElement[0].GetProperty("custom_02").GetString());
     }
 
     [Fact]

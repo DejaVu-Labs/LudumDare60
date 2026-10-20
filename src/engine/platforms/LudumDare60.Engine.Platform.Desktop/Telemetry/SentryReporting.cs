@@ -1,3 +1,4 @@
+using LudumDare60.Engine.Platform.Desktop.Rendering;
 using Sentry.Protocol;
 
 namespace LudumDare60.Engine.Platform.Desktop.Telemetry;
@@ -23,7 +24,8 @@ internal static class SentryReporting
     /// </summary>
     /// <param name="config">The project's settings.</param>
     /// <param name="platform">The <c>game.platform</c> tag: <c>windows</c>, <c>linux</c> or <c>macos</c>.</param>
-    public static void Start(ReportingConfig config, string platform)
+    /// <param name="renderer">The <c>game.renderer</c> tag: <c>vulkan</c> or <c>opengl</c>.</param>
+    public static void Start(ReportingConfig config, string platform, string renderer)
     {
         ArgumentNullException.ThrowIfNull(config);
         if (s_budget is not null)
@@ -35,14 +37,14 @@ internal static class SentryReporting
         s_budget = budget;
 
         // The SDK stays on until the process exits; its exit hook sends what is still queued.
-        _ = SentrySdk.Init(options => Configure(options, config, platform, budget));
+        _ = SentrySdk.Init(options => Configure(options, config, platform, renderer, budget));
     }
 
     /// <summary>
     /// The SDK options: no personal data, no sessions and no tracing, and at most <see cref="MaxErrors"/> different
     /// errors per run.
     /// </summary>
-    internal static void Configure(SentryOptions options, ReportingConfig config, string platform, ErrorBudget budget)
+    internal static void Configure(SentryOptions options, ReportingConfig config, string platform, string renderer, ErrorBudget budget)
     {
         options.Dsn = config.Dsn;
         options.Release = config.Release;
@@ -55,7 +57,30 @@ internal static class SentryReporting
         options.AutoSessionTracking = false;
         options.IsGlobalModeEnabled = true;
         options.DefaultTags["game.platform"] = platform;
+        options.DefaultTags["game.renderer"] = renderer;
         options.SetBeforeSend((sentryEvent, _) => budget.TryTake(Key(sentryEvent)) ? sentryEvent : null);
+    }
+
+    /// <summary>
+    /// Fills Sentry's GPU context with what the renderer found, for every later event.
+    /// </summary>
+    public static void SetGraphics(GraphicsInfo info)
+    {
+        ArgumentNullException.ThrowIfNull(info);
+        if (s_budget is null)
+        {
+            return;
+        }
+
+        SentrySdk.ConfigureScope(scope => ApplyGraphics(scope.Contexts.Gpu, info));
+    }
+
+    internal static void ApplyGraphics(Gpu gpu, GraphicsInfo info)
+    {
+        gpu.ApiType = info.Api;
+        gpu.Name = info.Device;
+        gpu.VendorName = info.Vendor;
+        gpu.Version = info.Version;
     }
 
     /// <summary>

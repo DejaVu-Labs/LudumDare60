@@ -785,7 +785,12 @@ the platform is created; a missing, empty or broken file turns its service off, 
   (`AppDomain.UnhandledException`, `TaskScheduler.UnobservedTaskException`) and sends what is queued when the process
   exits. Like `reporting.js`, each error is sent once and at most 10 per run (`ErrorBudget`, in `BeforeSend`). No
   personal data: no user, the server name is the platform (`windows`, `linux` or `macos`, also the `game.platform`
-  tag), no sessions or traces. A missing sound device is written to standard error only: it is not a bug.
+  tag), no sessions or traces. The `game.renderer` tag says which renderer runs (`vulkan` or `opengl`) from the first
+  event on, and once the renderer is up, Sentry's GPU context holds its API, GPU, vendor and driver or GL version
+  (`GraphicsInfo`, from the SDL_GPU device's properties or from `glGetString`). The same goes to standard output as one
+  line when the renderer is up, for bug reports from players: `Renderer: Vulkan, <GPU>, <driver> <version>` or
+  `Renderer: OpenGL, <GPU> (<vendor>), <GL version>`. A missing sound device is written to standard error only: it is
+  not a bug.
 - **Analytics** go to GameAnalytics through its REST API v2 (`GameAnalyticsClient`), because there is no .NET SDK for
   desktop. Calls only queue the event after the `analytics.js` id checks (`AnalyticsIds`); a background task signs in
   with `POST /v2/{game_key}/init`, takes the server time from the reply, and posts the queue to `/events` every 8 s,
@@ -793,7 +798,8 @@ the platform is created; a missing, empty or broken file turns its service off, 
   run is one session: a `user` event when the platform is created, `session_end` with the length when `RunAsync`
   returns, waiting at most 2 s for the last send. Events carry the default annotations (user id, session id and
   number, build, `platform` `windows`, `linux` or `mac_osx`, `os_version`, `device` the CPU architecture), and
-  `custom_01` the pointer type of the last press, as in the browser.
+  `custom_01` the pointer type of the last press, as in the browser, and `custom_02` the renderer, `vulkan` or
+  `opengl`, on every event of the session.
 - `AnalyticsState` keeps what the browser SDK keeps in `localStorage`: a random user id, the session count, and the
   starts of each progression since it was last completed (its `attempt_num`), in
   `LudumDare60/analytics-state.json` under the user's local application data folder.

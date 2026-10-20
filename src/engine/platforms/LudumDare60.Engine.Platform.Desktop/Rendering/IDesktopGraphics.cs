@@ -19,6 +19,11 @@ internal interface IDesktopGraphics : IGraphicsBackend
     bool Presented { get; }
 
     /// <summary>
+    /// The API, GPU and driver, once <see cref="Initialize"/> ran; null before.
+    /// </summary>
+    GraphicsInfo? Info { get; }
+
+    /// <summary>
     /// Runs after <c>SDL_Init</c> and before the window is created (OpenGL sets its context attributes here).
     /// </summary>
     void PrepareWindow();

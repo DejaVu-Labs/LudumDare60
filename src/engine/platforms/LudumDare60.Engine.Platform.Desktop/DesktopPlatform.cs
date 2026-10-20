@@ -47,7 +47,7 @@ public sealed class DesktopPlatform(
 
     private readonly SdlAudio _audio = new();
 
-    private readonly DesktopTelemetry _telemetry = DesktopTelemetry.Start(AppContext.BaseDirectory);
+    private readonly DesktopTelemetry _telemetry = DesktopTelemetry.Start(AppContext.BaseDirectory, renderer);
 
     /// <inheritdoc />
     /// <remarks>Files under the asset root, read on the thread pool.</remarks>
@@ -108,6 +108,12 @@ public sealed class DesktopPlatform(
             try
             {
                 _graphics.Initialize(window);
+                DesktopTelemetry.OnGraphicsReady(_graphics.Info);
+                if (_graphics.Info is { } info)
+                {
+                    WriteLog(info.Describe());
+                }
+
                 if (_audio.Initialize() is { } audioError)
                 {
                     // Not an error report: a machine without a sound device is not a bug.
@@ -150,6 +156,8 @@ public sealed class DesktopPlatform(
     }
 
     private static void WriteError(string message) => Console.Error.WriteLine(message);
+
+    private static void WriteLog(string message) => Console.WriteLine(message);
 
     private void Run(nint window, IFrameSink frameSink)
     {

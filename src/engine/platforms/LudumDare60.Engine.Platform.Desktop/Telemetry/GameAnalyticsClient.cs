@@ -63,6 +63,7 @@ internal sealed class GameAnalyticsClient : IAnalytics
     /// <param name="api">The API root, <see cref="GameAnalyticsProtocol.ProductionApi"/> in the game.</param>
     /// <param name="device">The platform and OS version.</param>
     /// <param name="now">The clock.</param>
+    /// <param name="renderer">Custom dimension 02 of every event: the renderer, or null for none.</param>
     public GameAnalyticsClient(
         AnalyticsConfig config,
         AnalyticsState state,
@@ -70,7 +71,8 @@ internal sealed class GameAnalyticsClient : IAnalytics
         Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send,
         Uri api,
         AnalyticsDevice device,
-        Func<DateTimeOffset> now)
+        Func<DateTimeOffset> now,
+        string? renderer = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(state);
@@ -87,7 +89,8 @@ internal sealed class GameAnalyticsClient : IAnalytics
             state.StartSession(),
             config.Build,
             device,
-            AnalyticsDevice.Device);
+            AnalyticsDevice.Device,
+            renderer);
         saveState(state);
         _sessionStart = now();
         _queue.Add(new AnalyticsEvent("user", _sessionStart, null));

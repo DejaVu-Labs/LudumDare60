@@ -40,6 +40,7 @@ internal sealed unsafe class GlApi
     public const uint InfoLogLength = 0x8B84;
     public const uint TriangleStrip = 0x0005;
     public const uint Texture0 = 0x84C0;
+    public const uint Vendor = 0x1F00;
     public const uint Version = 0x1F02;
     public const uint Renderer = 0x1F01;
 

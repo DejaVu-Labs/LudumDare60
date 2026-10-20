@@ -1,3 +1,5 @@
+using LudumDare60.Engine.Platform.Desktop.Rendering;
+
 namespace LudumDare60.Engine.Platform.Desktop.Telemetry;
 
 /// <summary>
@@ -29,14 +31,25 @@ internal sealed class DesktopTelemetry
     public IAnalytics Analytics => _analytics ?? (IAnalytics)NullAnalytics.Instance;
 
     /// <summary>
-    /// Reads the config files in <paramref name="folder"/> and starts what they turn on. Sentry starts at once, so
-    /// errors before the first frame are reported too.
+    /// <paramref name="renderer"/> as reports and analytics name it: <c>vulkan</c> or <c>opengl</c>.
     /// </summary>
-    public static DesktopTelemetry Start(string folder)
+    public static string GetRendererName(DesktopRenderer renderer) => renderer switch
     {
+        DesktopRenderer.OpenGL => "opengl",
+        _ => "vulkan",
+    };
+
+    /// <summary>
+    /// Reads the config files in <paramref name="folder"/> and starts what they turn on. Sentry starts at once, so
+    /// errors before the first frame are reported too. Both name <paramref name="renderer"/> from the start: the
+    /// <c>game.renderer</c> tag in Sentry, custom dimension 02 in GameAnalytics.
+    /// </summary>
+    public static DesktopTelemetry Start(string folder, DesktopRenderer renderer)
+    {
+        var rendererName = GetRendererName(renderer);
         if (TelemetryConfig.ReadReporting(TelemetryConfig.ReadFile(folder, TelemetryConfig.ReportingFile)) is { } reporting)
         {
-            SentryReporting.Start(reporting, PlatformName);
+            SentryReporting.Start(reporting, PlatformName, rendererName);
         }
 
         GameAnalyticsClient? analytics = null;
@@ -50,7 +63,8 @@ internal sealed class DesktopTelemetry
                 static (request, cancellationToken) => s_http.SendAsync(request, cancellationToken),
                 GameAnalyticsProtocol.ProductionApi,
                 AnalyticsDevice.Current,
-                static () => DateTimeOffset.UtcNow);
+                static () => DateTimeOffset.UtcNow,
+                rendererName);
 
             // An error that ends the process: record it and send what is queued before the process is gone.
             AppDomain.CurrentDomain.UnhandledException += (_, e) =>
@@ -72,6 +86,17 @@ internal sealed class DesktopTelemetry
     /// Ends the analytics session and sends what is queued, waiting at most <see cref="ShutdownTimeout"/>.
     /// </summary>
     public void EndRun() => _analytics?.Stop(ShutdownTimeout);
+
+    /// <summary>
+    /// Adds the GPU and driver the renderer found to later error reports.
+    /// </summary>
+    public static void OnGraphicsReady(GraphicsInfo? info)
+    {
+        if (info is not null)
+        {
+            SentryReporting.SetGraphics(info);
+        }
+    }
 
     /// <summary>
     /// Records the pointer device of a press for the analytics' custom dimension.

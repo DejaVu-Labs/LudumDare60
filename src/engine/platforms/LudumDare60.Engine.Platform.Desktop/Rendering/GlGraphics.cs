@@ -39,10 +39,9 @@ internal sealed unsafe class GlGraphics : IDesktopGraphics, IRenderCommandTarget
     /// </summary>
     public int TextureCount => _textures.Count;
 
-    /// <summary>
-    /// The context's version and renderer, for the log.
-    /// </summary>
-    public string Description { get; private set; } = "";
+    /// <inheritdoc />
+    /// <remarks>From <c>glGetString</c>: the renderer, the vendor and the version string.</remarks>
+    public GraphicsInfo? Info { get; private set; }
 
     /// <inheritdoc />
     /// <remarks>Asks for an OpenGL 3.3 core context, double-buffered, without depth or stencil.</remarks>
@@ -84,7 +83,7 @@ internal sealed unsafe class GlGraphics : IDesktopGraphics, IRenderCommandTarget
 
         var gl = GlApi.Load(SDL.GLGetProcAddress);
         _gl = gl;
-        Description = $"{gl.Describe(GlApi.Version)} ({gl.Describe(GlApi.Renderer)})";
+        Info = new GraphicsInfo("OpenGL", gl.Describe(GlApi.Renderer), gl.Describe(GlApi.Vendor), gl.Describe(GlApi.Version));
         _program = CreateProgram(gl, GlShaders.SpriteVertex, GlShaders.SpriteFragment);
         gl.UseProgram(_program);
         _screenSizeLocation = Uniform(gl, _program, "u_screenSize"u8);

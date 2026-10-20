@@ -9,10 +9,12 @@ namespace LudumDare60.Engine.Platform.Desktop.Telemetry;
 /// <param name="Build">The build version.</param>
 /// <param name="Device">The platform and OS version.</param>
 /// <param name="DeviceName">The <c>device</c> field.</param>
+/// <param name="Renderer">Custom dimension 02, the renderer (<c>vulkan</c> or <c>opengl</c>), or null for none.</param>
 internal sealed record AnalyticsSession(
     string UserId,
     string SessionId,
     int SessionNumber,
     string Build,
     AnalyticsDevice Device,
-    string DeviceName);
+    string DeviceName,
+    string? Renderer = null);

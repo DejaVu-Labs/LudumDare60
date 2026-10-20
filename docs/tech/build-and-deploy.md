@@ -73,6 +73,7 @@ opens no console window next to it; run it from a terminal to see its standard e
 ```bash
 dotnet run --project src/game/LudumDare60.Game.Desktop             # add -- --debug for the debug keys
 dotnet run --project src/game/LudumDare60.Game.Desktop -- --renderer opengl   # OpenGL 3.3 instead of Vulkan
+# Prints the renderer it uses, for example: Renderer: OpenGL, virgl (Mesa ...) (Mesa), 4.3 (Core Profile) Mesa 25.0.7
 ```
 
 It needs no workload beyond the SDK, and a Vulkan driver to run (see
@@ -351,10 +352,10 @@ when `SENTRY_DSN` or both `GAMEANALYTICS_*` variables are set, the `publish-desk
 build sends nothing, which is also the case for every local build. See
 [Desktop error reports and analytics](architecture.md#desktop-error-reports-and-analytics) for how they are sent.
 
-- Sentry: events come from the Sentry .NET SDK, platform `csharp`, with `game.platform` `windows` or `linux`. To try
-  it locally, put a `reporting.json` next to the executable in `artifacts/bin/LudumDare60.Game.Desktop/debug/`.
+- Sentry: events come from the Sentry .NET SDK, platform `csharp`, with `game.platform` `windows` or `linux` and
+  `game.renderer` `vulkan` or `opengl`; the GPU context names the graphics card and driver. To try it locally, put a `reporting.json` next to the executable in `artifacts/bin/LudumDare60.Game.Desktop/debug/`.
 - GameAnalytics: events come through the REST API with `platform` `windows` or `linux`; filter by platform to tell
-  them from the browser's. A local `analytics.json` works the same way, and GameAnalytics' *Realtime* view shows the
+  them from the browser's, and by custom dimension 02 (`vulkan`, `opengl`) to split them by renderer. A local `analytics.json` works the same way, and GameAnalytics' *Realtime* view shows the
   events within a minute; keys the API rejects turn analytics off with a message on standard error.
 
 Privacy: the desktop build keeps a random user id, the session count and progression attempts in

@@ -42,6 +42,10 @@ internal sealed unsafe class GpuGraphics : IDesktopGraphics, IRenderCommandTarge
     /// <inheritdoc />
     public bool Presented { get; private set; }
 
+    /// <inheritdoc />
+    /// <remarks>From the SDL_GPU device's properties.</remarks>
+    public GraphicsInfo? Info { get; private set; }
+
     /// <summary>
     /// Number of live textures.
     /// </summary>
@@ -93,6 +97,16 @@ internal sealed unsafe class GpuGraphics : IDesktopGraphics, IRenderCommandTarge
         };
         _sampler = Check(SDL.CreateGPUSampler(_device, in samplerInfo), "Creating the sampler");
         _uploads = new GpuUploadBuffer(_device);
+        var properties = SDL.GetGPUDeviceProperties(_device);
+        string? Property(string name) => SDL.GetStringProperty(properties, name, "") is { Length: > 0 } value ? value : null;
+        // Vulkan names the driver (venus, radv, NVIDIA), not the vendor: it goes into the version.
+        var driverName = Property(SDL.Props.GPUDeviceDriverNameString);
+        var driverVersion = Property(SDL.Props.GPUDeviceDriverVersionString) ?? Property(SDL.Props.GPUDeviceDriverInfoString);
+        Info = new GraphicsInfo(
+            "Vulkan",
+            Property(SDL.Props.GPUDeviceNameString),
+            null,
+            driverName is null ? driverVersion : driverVersion is null ? driverName : $"{driverName} {driverVersion}");
         _instanceUploads = new GpuUploadBuffer(_device);
     }
 

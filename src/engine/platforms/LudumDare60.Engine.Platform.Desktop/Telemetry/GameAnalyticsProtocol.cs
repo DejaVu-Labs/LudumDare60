@@ -114,6 +114,11 @@ internal static class GameAnalyticsProtocol
                     writer.WriteString("custom_01", dimension);
                 }
 
+                if (session.Renderer is { } renderer)
+                {
+                    writer.WriteString("custom_02", renderer);
+                }
+
                 if (e.EventId is { } eventId)
                 {
                     writer.WriteString("event_id", eventId);

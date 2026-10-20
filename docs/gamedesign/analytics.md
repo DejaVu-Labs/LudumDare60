@@ -24,8 +24,8 @@ about retention or money:
 
 ## Events
 
-Every id is built by `Analytics/ShopAnalytics` in the game, except the session, the error and the dimension, which
-the browser platform adds. `<order>` is the order's `id` from `orders.json` (`hoodie`, `robe`, `dog-walker`,
+Every id is built by `Analytics/ShopAnalytics` in the game, except the session, the error and the dimensions, which
+the platform adds. `<order>` is the order's `id` from `orders.json` (`hoodie`, `robe`, `dog-walker`,
 `clown`, `parcel`). Seconds are rounded to hundredths.
 
 ### Session
@@ -102,10 +102,16 @@ since the player left the title screen (question 8).
 | `Phone:Off` | The click after the last track turns the music off. |
 | `Elephant:Trumpet` | The elephant statuette on the shelf trumpets (a press while it still plays sends nothing). |
 
-### Custom dimension
+### Custom dimensions
 
 Custom dimension 01 is the kind of pointer the player last pressed with: `mouse`, `touch` or `pen`. Every event
 after the first press carries it, so each question above can be split by input device (question 7).
+
+Custom dimension 02 is the renderer of the desktop builds: `vulkan` (the default) or `opengl` (started with
+`--renderer opengl`). Every event of a desktop session carries it, from the session start on, so a renderer that
+loses players during loading or in an order shows up when the questions are split by it. Browser events do not carry
+it: the browser has one renderer, WebGL2, and its events are told apart by their platform. Sentry tags the same value
+as `game.renderer`.
 
 ## Reading the results
 

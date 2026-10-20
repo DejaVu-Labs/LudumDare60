@@ -23,7 +23,8 @@ public sealed class GameAnalyticsClientTests
         SendAsync,
         GameAnalyticsProtocol.SandboxApi,
         new AnalyticsDevice("linux", "linux 6.6.0"),
-        () => _now);
+        () => _now,
+        "vulkan");
 
     private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
@@ -61,7 +62,9 @@ public sealed class GameAnalyticsClientTests
         Assert.Equal([$"/v2/{GameKey}/init", $"/v2/{GameKey}/events"], _requests.Select(static r => r.Path), StringComparer.Ordinal);
         Assert.Equal(GameAnalyticsProtocol.Sign(Encoding.UTF8.GetBytes(_requests[0].Body), SecretKey), _requests[0].Authorization);
         Assert.Equal(GameAnalyticsProtocol.Sign(Encoding.UTF8.GetBytes(_requests[1].Body), SecretKey), _requests[1].Authorization);
-        Assert.Equal("user", Assert.Single(SentEvents()).GetProperty("category").GetString());
+        var start = Assert.Single(SentEvents());
+        Assert.Equal("user", start.GetProperty("category").GetString());
+        Assert.Equal("vulkan", start.GetProperty("custom_02").GetString());
         Assert.Equal(0, client.QueuedCount);
     }
 
