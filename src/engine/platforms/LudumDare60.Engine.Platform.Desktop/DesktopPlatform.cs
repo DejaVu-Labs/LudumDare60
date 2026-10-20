@@ -6,16 +6,23 @@ using SDL3;
 namespace LudumDare60.Engine.Platform.Desktop;
 
 /// <summary>
-/// <see cref="IPlatform"/> for Windows, Linux and macOS on SDL3: one window drawn with Vulkan through SDL_GPU, frames
+/// <see cref="IPlatform"/> for Windows, Linux and macOS on SDL3: one window drawn with Vulkan through SDL_GPU or with
+/// OpenGL 3.3 (see <see cref="DesktopRenderer"/>), frames
 /// from a loop on the calling thread, sound mixed in managed code and played through SDL audio, keyboard, mouse, touch
 /// and gamepad input, real asset files, and error reports and analytics when the build is configured for them.
 /// </summary>
 /// <param name="title">Window title.</param>
 /// <param name="width">Window width in logical pixels when not fullscreen.</param>
 /// <param name="height">Window height in logical pixels when not fullscreen.</param>
+/// <param name="renderer">The graphics API to draw with.</param>
 /// <param name="assetRoot">Folder of the asset files. <see langword="null"/> for <c>assets/</c> next to the
 /// executable.</param>
-public sealed class DesktopPlatform(string title, int width, int height, string? assetRoot = null) : IPlatform
+public sealed class DesktopPlatform(
+    string title,
+    int width,
+    int height,
+    DesktopRenderer renderer = DesktopRenderer.Vulkan,
+    string? assetRoot = null) : IPlatform
 {
     /// <summary>
     /// Asset folder next to the executable, used unless the game says otherwise.
@@ -32,7 +39,11 @@ public sealed class DesktopPlatform(string title, int width, int height, string?
 
     private readonly Dictionary<uint, nint> _gamepads = [];
 
-    private readonly GpuGraphics _graphics = new();
+    private readonly IDesktopGraphics _graphics = renderer switch
+    {
+        DesktopRenderer.OpenGL => new GlGraphics(),
+        _ => new GpuGraphics(),
+    };
 
     private readonly SdlAudio _audio = new();
 
@@ -43,8 +54,9 @@ public sealed class DesktopPlatform(string title, int width, int height, string?
     public IAssetSource Assets => _assets;
 
     /// <inheritdoc />
-    /// <remarks>Vulkan through SDL_GPU, with vsync. <see cref="RunAsync"/> creates the device on the window before the
-    /// first frame.</remarks>
+    /// <remarks>Vulkan through SDL_GPU (<see cref="GpuGraphics"/>) or OpenGL 3.3 (<see cref="GlGraphics"/>), as the
+    /// constructor's renderer says, with vsync. <see cref="RunAsync"/> sets it up on the window before the first
+    /// frame.</remarks>
     public IGraphicsBackend Graphics => _graphics;
 
     /// <inheritdoc />
@@ -62,11 +74,11 @@ public sealed class DesktopPlatform(string title, int width, int height, string?
     /// <inheritdoc />
     /// <remarks>Runs the frame loop on the calling thread, which must be the process's main thread (macOS needs that
     /// for windows), and returns once the player closes the window: the returned task is always complete. Exceptions,
-    /// including a failure to create the window or the Vulkan device, are thrown from this call. Presenting waits for
+    /// including a failure to create the window or the renderer, are thrown from this call. Presenting waits for
     /// vsync; while the window shows nothing (minimized), the loop waits between frames to match the display's
     /// refresh rate instead.</remarks>
-    /// <exception cref="InvalidOperationException">SDL could not start, or could not create the window or the Vulkan
-    /// device.</exception>
+    /// <exception cref="InvalidOperationException">SDL could not start, or could not create the window or the
+    /// renderer.</exception>
     public Task RunAsync(IFrameSink frameSink)
     {
         ArgumentNullException.ThrowIfNull(frameSink);
@@ -85,7 +97,8 @@ public sealed class DesktopPlatform(string title, int width, int height, string?
         {
             // Fullscreen on the desktop, without a mode change: the game has no window frame to depend on, and Crostini
             // shows no frame for SDL's windows (see SdlHints). F11 or Alt+Enter switches to a window of the given size.
-            var flags = SDL.WindowFlags.Resizable | SDL.WindowFlags.HighPixelDensity | SDL.WindowFlags.Fullscreen;
+            _graphics.PrepareWindow();
+            var flags = SDL.WindowFlags.Resizable | SDL.WindowFlags.HighPixelDensity | SDL.WindowFlags.Fullscreen | _graphics.WindowFlags;
             var window = SDL.CreateWindow(title, width, height, flags);
             if (window == 0)
             {

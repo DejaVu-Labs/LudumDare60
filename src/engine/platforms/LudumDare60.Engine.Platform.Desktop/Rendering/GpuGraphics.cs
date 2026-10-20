@@ -9,7 +9,7 @@ namespace LudumDare60.Engine.Platform.Desktop.Rendering;
 /// scales onto the window with nearest filtering. Texture uploads and the frame's drawing go into one command buffer,
 /// submitted at the end of <see cref="Submit"/>.
 /// </summary>
-internal sealed unsafe class GpuGraphics : IGraphicsBackend, IRenderCommandTarget
+internal sealed unsafe class GpuGraphics : IDesktopGraphics, IRenderCommandTarget
 {
     /// <summary>
     /// The SDL_GPU driver: Vulkan, on every desktop OS (MoltenVK on macOS).
@@ -35,16 +35,22 @@ internal sealed unsafe class GpuGraphics : IGraphicsBackend, IRenderCommandTarge
     private nint _renderPass;
     private bool _pipelineBound;
 
-    /// <summary>
-    /// Whether the last <see cref="Submit"/> showed a frame. False while the window is minimized: then nothing waits
-    /// for vsync, and the platform paces the loop itself.
-    /// </summary>
+    /// <inheritdoc />
+    /// <remarks>None: SDL_GPU sets the window up for Vulkan when it claims it.</remarks>
+    public SDL.WindowFlags WindowFlags => default;
+
+    /// <inheritdoc />
     public bool Presented { get; private set; }
 
     /// <summary>
     /// Number of live textures.
     /// </summary>
     public int TextureCount => _textures.Count;
+
+    /// <inheritdoc />
+    public void PrepareWindow()
+    {
+    }
 
     /// <summary>
     /// Creates the GPU device on <paramref name="window"/>, with vsync, and the sprite pipeline.

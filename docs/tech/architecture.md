@@ -17,7 +17,7 @@ desktop one.
 | `src/engine/LudumDare60.Engine.Platform` | `Microsoft.NET.Sdk` | Platform contracts: `IPlatform` (with `ReportError`, a no-op by default), `IFrameSink`, raw input (`RawInputEvent`, `RawInputEventKind`, `Key`, `PointerType`), asset reads (`IAssetSource`, `AssetLoadException`), the GPU (`IGraphicsBackend`, `RenderCommandKind`, `SpriteInstance`, `Color`), sound output (`IAudioBackend`, `AudioCommandKind`, `AudioBus`, `AudioEvent`, `AudioEventKind`, `AudioLimits`), product analytics (`IAnalytics`, `ProgressionStatus`, `NullAnalytics`). No dependencies. |
 | `src/engine/LudumDare60.Engine` | `Microsoft.NET.Sdk` | `GameEngine`, `IGame`, `FrameContext`, `Input/` (`InputState`, `PointerButton`), `Assets/` (`AssetManager` and loaders), `Rendering/` (`PixelViewport`, `Graphics`, `Texture`, `SpriteBatch`, `SpriteOptions`, `IntRect`), `Sounds/` (`Audio`, `Sound`, `SoundState`, `Voice`, `SoundOptions`). Depends only on the platform contracts and the managed `StbImageSharp` package (image decoding). |
 | `src/engine/platforms/LudumDare60.Engine.Platform.Browser` | `Microsoft.NET.Sdk.StaticWebAssets` | `BrowserPlatform : IPlatform` and its JS: `wwwroot/boot.js` (runtime start), `wwwroot/load-log.js` (load timing), `wwwroot/reporting.js` (errors and load timing to Sentry), `wwwroot/frame-loop.js`, `wwwroot/input.js`, `wwwroot/assets.js`, `wwwroot/webgl2.js` (renderer, shaders in `wwwroot/shaders/`), `wwwroot/webaudio.js` (sound) and `wwwroot/analytics.js` (product analytics, on the GameAnalytics SDK in `wwwroot/vendor/gameanalytics.js`). Its `wwwroot/` ships with the app under `_content/LudumDare60.Engine.Platform.Browser/`. |
-| `src/engine/platforms/LudumDare60.Engine.Platform.Desktop` | `Microsoft.NET.Sdk` | `DesktopPlatform : IPlatform` on SDL3 (the `SDL3-CS` wrapper and its native packages for Windows, Linux and macOS): window, frame loop, input, asset files, and a Vulkan renderer on SDL_GPU (`Rendering/`, shaders in `Shaders/`). Sound in `Sounds/` (`SdlAudio`, a managed `Mixer`, WAV and Ogg decoding). See [Desktop platform](#desktop-platform), [Desktop renderer](#desktop-renderer) and [Desktop audio](#desktop-audio). |
+| `src/engine/platforms/LudumDare60.Engine.Platform.Desktop` | `Microsoft.NET.Sdk` | `DesktopPlatform : IPlatform` on SDL3 (the `SDL3-CS` wrapper and its native packages for Windows, Linux and macOS): window, frame loop, input, asset files, and Vulkan (SDL_GPU) and OpenGL 3.3 renderers (`Rendering/`, shaders in `Shaders/`). Sound in `Sounds/` (`SdlAudio`, a managed `Mixer`, WAV and Ogg decoding). See [Desktop platform](#desktop-platform), [Desktop renderer](#desktop-renderer) and [Desktop audio](#desktop-audio). |
 | `src/game/LudumDare60.Game` | `Microsoft.NET.Sdk` | `LudumDare60Game : IGame`, `Parts/` (the touch loop: `PartDrag` moves a part along a `PartPath` (a `LinePath`, or a screw turned by circling it) with the `DragFeel` it is given, fed one `PointerSample` per fixed step, and with a `FreeMove` lets it lie anywhere on the work surface once out and stick back to its rail, or drop straight into its seat; `PartAssembly` steps the parts of a gun and enforces which part blocks which), `Cleaning/` (`DirtLayer`: dirt pixels scrubbed off a part and counted; `BrushTool`: a tool the player picks up and puts down anywhere, the brush that scrubs and the oil can that oils), `Orders/` (the order data of `orders.json`, its loader and validation, and `RevolverParts`), `Bench/` (`OrderBench`: one order on the bench with its parts, dirt, oil, spares and tools; `ActionTest`: the hammer at half cock to take the revolver apart, then full cock and the trigger to test it; `BenchLayout`: where the revolver, its parts, the tools and the tray of spares lie), `Customers/` (`Shop`: customers coming in, the repair, the hand-back, the next customer), `Analytics/` (`ShopAnalytics`: the shop's moments as analytics events), the parts sheet (`PlaceholderParts`: the revolver and the tools from `EmbeddedSheet`, their sprites embedded in the assembly, and the pieces still generated in code) and placeholder sounds generated in code. No platform dependency. |
 | `src/game/LudumDare60.Game.Browser` | `Microsoft.NET.Sdk.WebAssembly` | Entry point, host page and `main.js`. Only wires the game and the browser platform together. |
 | `src/game/LudumDare60.Game.Desktop` | `Microsoft.NET.Sdk` | Desktop entry point: wires the game and the desktop platform together, and copies the browser project's `wwwroot/assets/` to `assets/` next to the executable. |
@@ -163,8 +163,13 @@ the browser platform, so the engine and the game cannot tell them apart.
   gives `dt` (0 for the first frame, as in the browser). Presenting waits for vsync. In a frame that showed nothing
   (the window is minimized), the loop sleeps (`SDL_DelayPrecise`) until one display refresh
   (`SDL_GetCurrentDisplayMode`, 60 Hz when unknown) after the frame started instead.
-- `Graphics` is `GpuGraphics`, Vulkan through SDL_GPU (see [Desktop renderer](#desktop-renderer)). `RunAsync`
-  creates its device on the window before the first frame and releases it before the window is destroyed.
+- `Graphics` is the renderer the constructor names (`DesktopRenderer`): `GpuGraphics`, Vulkan through SDL_GPU, by
+  default, or `GlGraphics`, OpenGL 3.3 (see [Desktop renderer](#desktop-renderer)). Both are `IDesktopGraphics`:
+  `RunAsync` calls `PrepareWindow` before it creates the window (OpenGL sets its context attributes there), adds the
+  renderer's `WindowFlags`, calls `Initialize(window)` before the first frame and `Shutdown` before the window is
+  destroyed. The game's entry point picks the renderer from `--renderer vulkan` or `--renderer opengl`
+  (`DesktopArguments.TryGetRenderer`; also `--renderer=opengl` and `gl`, in any case); an unknown value prints the
+  error and exits with code 2.
 - `Audio` is `SdlAudio` (see [Desktop audio](#desktop-audio)). `RunAsync` opens the default playback device before
   the first frame and closes it before the GPU; without a device the game runs silent and says so on standard error.
 - `Assets` is `FileAssetSource` on `assets/` next to the executable (`AppContext.BaseDirectory`). Reads use
@@ -563,6 +568,26 @@ command for command:
 - **Failures.** Without a Vulkan driver, or when the window cannot get a swapchain, `RunAsync` throws with SDL's
   error. On ChromeOS (Crostini), the Venus driver gets no swapchain on XWayland, where SDL goes when the compositor
   lacks `fifo-v1`, so the platform picks Wayland there (see below).
+
+### OpenGL renderer
+
+`GlGraphics` draws the same command stream with OpenGL 3.3 core, for machines whose Vulkan driver is missing or
+broken (`--renderer opengl`). It is `webgl2.js` ported to the desktop, call for call, with the shared
+`RenderCommandReader` and `TextureTable`:
+
+- `PrepareWindow` asks SDL for a 3.3 core, double-buffered context without depth or stencil, and the window gets
+  `SDL_WINDOW_OPENGL`. `Initialize` creates the context, turns on adaptive vsync (plain vsync where the driver has
+  none), loads the functions and builds the program, the vertex array and the instance buffer.
+- The functions are unmanaged function pointers loaded with `SDL_GL_GetProcAddress` (`GlApi`): the 50 or so the
+  renderer calls, and no binding library. A missing one fails `Initialize` with "OpenGL 3.3 is required".
+- The shaders are GLSL 3.30 strings in `GlShaders`, the twins of `sprite.glsl.js` and of the Vulkan shaders; OpenGL
+  compiles them at startup. `SpriteShaderTests` compiles them with shaderc for an OpenGL target, so a syntax error
+  fails the tests rather than a player's start.
+- Rendering is what `webgl2.js` does: a render target of the virtual size, instanced triangle strips with the
+  attribute pointers moved to each run's first instance (OpenGL 3.3 has no base instance), and `Present` clears the
+  window to black, blits the target into the viewport with `NEAREST` (rows counted from the bottom) and swaps. The
+  viewport is clamped to the drawable, like the Vulkan renderer's. A minimized, hidden or occluded window is not
+  swapped, because the swap would not wait for vsync, and `Presented` then tells the platform to pace the loop.
 
 ### SDL hints
 

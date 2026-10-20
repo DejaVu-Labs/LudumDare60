@@ -133,7 +133,8 @@ draws "frame 3 of `cylinder-spin`" instead of rectangles.
 `DesktopPlatform` (see [architecture.md](tech/architecture.md#desktop-platform)) draws with Vulkan and plays sound.
 
 - Other GPU drivers: Metal and D3D12 through the same `GpuGraphics`, with MSL and DXIL shaders (SDL_shadercross can
-  translate the SPIR-V), and a fallback when Vulkan fails.
+  translate the SPIR-V), and falling back to OpenGL by itself when Vulkan fails, instead of only on
+  `--renderer opengl`.
 - GPU smoke test: run `GpuGraphics` on lavapipe (`VK_ICD_FILENAMES`) without a window and compare a frame read back
   from the render target with the fixture's expected pixels.
 - Gamepads: send the pad's current buttons and axes after `GamepadConnected`, as the browser does.

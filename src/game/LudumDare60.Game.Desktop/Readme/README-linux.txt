@@ -26,7 +26,8 @@ Requirements
 
 - 64-bit x86 Linux with glibc 2.28 or newer (Ubuntu 20.04, Debian 10, Fedora 29 and later).
 - Wayland or X11.
-- A Vulkan driver: Mesa (RADV for AMD, ANV for Intel) or the NVIDIA driver. On Debian and Ubuntu:
+- A Vulkan driver (or OpenGL 3.3, see Troubleshooting): Mesa (RADV for AMD, ANV for Intel) or the NVIDIA
+  driver. On Debian and Ubuntu:
 
        sudo apt install libvulkan1 mesa-vulkan-drivers
 
@@ -60,7 +61,9 @@ Errors are printed to the terminal the game was started from.
 
 "Creating the Vulkan GPU device failed" or "Claiming the window for the GPU failed":
   Install a Vulkan driver (see Requirements). "vulkaninfo --summary" (package vulkan-tools) shows whether
-  Vulkan works.
+  Vulkan works. If it still fails, draw with OpenGL 3.3 instead:
+
+      ./LudumDare60.Game.Desktop --renderer opengl
 
 The window opens in the wrong place or on X11 instead of Wayland:
   Pick the video driver by hand:

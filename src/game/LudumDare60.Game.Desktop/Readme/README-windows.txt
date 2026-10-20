@@ -21,7 +21,8 @@ Requirements
 ------------
 
 - Windows 10 or 11, 64-bit.
-- A graphics card with Vulkan support and an up-to-date driver (most cards from 2016 on).
+- A graphics card with Vulkan support and an up-to-date driver (most cards from 2016 on), or OpenGL 3.3 (see
+  Troubleshooting).
 - Sound is optional: without an audio device the game runs silent.
 
 
@@ -50,5 +51,11 @@ The game closes at once or shows nothing:
   Update the graphics driver from the card maker's site (NVIDIA, AMD or Intel); the driver that comes with
   Windows often has no Vulkan. To see the error, open a command prompt in the game folder and run
   LudumDare60.Game.Desktop.exe from there: errors are printed to the window.
+
+  If Vulkan still does not work, draw with OpenGL instead. In a command prompt in the game folder:
+
+      LudumDare60.Game.Desktop.exe --renderer opengl
+
+  Or make a shortcut to the .exe and add " --renderer opengl" after the path in its Target field.
 
 The browser version is on the same itch.io page, if the desktop one does not run.

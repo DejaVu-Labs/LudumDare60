@@ -54,6 +54,39 @@ public sealed unsafe class SpriteShaderTests
         Assert.Equal(File.ReadAllBytes(Path.Combine(s_shaderFolder, name + ".spv")), embedded);
     }
 
+    [Theory]
+    [InlineData(GlShaders.SpriteVertex, (int)ShaderKind.VertexShader)]
+    [InlineData(GlShaders.SpriteFragment, (int)ShaderKind.FragmentShader)]
+    public void OpenGlShaders_CompileAsGlsl330(string source, int kind)
+    {
+        var shaderc = Shaderc.GetApi();
+        var compiler = shaderc.CompilerInitialize();
+        var options = shaderc.CompileOptionsInitialize();
+        try
+        {
+            shaderc.CompileOptionsSetTargetEnv(options, TargetEnv.Opengl, 450);
+            shaderc.CompileOptionsSetAutoMapLocations(options, true);
+            shaderc.CompileOptionsSetAutoBindUniforms(options, true);
+            var length = (nuint)Encoding.UTF8.GetByteCount(source);
+            var result = shaderc.CompileIntoSpv(compiler, source, length, (ShaderKind)kind, "sprite", "main", options);
+            try
+            {
+                Assert.True(
+                    shaderc.ResultGetCompilationStatus(result) == CompilationStatus.Success,
+                    shaderc.ResultGetErrorMessageS(result));
+            }
+            finally
+            {
+                shaderc.ResultRelease(result);
+            }
+        }
+        finally
+        {
+            shaderc.CompileOptionsRelease(options);
+            shaderc.CompilerRelease(compiler);
+        }
+    }
+
     [Fact]
     public void Load_MissingShader_Throws()
         => Assert.Throws<InvalidOperationException>(() => SpriteShaders.Load("missing.spv"));

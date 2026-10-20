@@ -72,10 +72,12 @@ opens no console window next to it; run it from a terminal to see its standard e
 
 ```bash
 dotnet run --project src/game/LudumDare60.Game.Desktop             # add -- --debug for the debug keys
+dotnet run --project src/game/LudumDare60.Game.Desktop -- --renderer opengl   # OpenGL 3.3 instead of Vulkan
 ```
 
 It needs no workload beyond the SDK, and a Vulkan driver to run (see
-[Desktop renderer](architecture.md#desktop-renderer)). On ChromeOS (Crostini) it picks the settings it needs by itself
+[Desktop renderer](architecture.md#desktop-renderer)), or OpenGL 3.3 with `--renderer opengl` (see
+[OpenGL renderer](architecture.md#opengl-renderer)). On ChromeOS (Crostini) it picks the settings it needs by itself
 (see [SDL hints](architecture.md#sdl-hints)). The native SDL3 libraries come from the `SDL3-CS.Windows`,
 `SDL3-CS.Linux` and `SDL3-CS.MacOS` packages and are copied to `runtimes/<rid>/native/`; the runtime picks the one for
 the current OS. The build copies the browser project's `wwwroot/assets/` to `assets/` next to the executable.
