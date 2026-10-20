@@ -712,14 +712,20 @@ public sealed class LudumDare60GameTests
     }
 
     [Fact]
-    public void FirstFrame_ScrubSoundFails_StopsTheGameNamingIt()
+    public void FirstFrame_OptionalSoundsAndPhoneFail_GameGoesOnWithoutThem()
     {
-        var platform = new ManualPlatform { Assets = new ShippedAssets(withBackground: true, failing: AssetPaths.ScrubSound) };
-        _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(new LudumDare60Game { WaitsForPlayer = false }, platform);
+        foreach (var path in new[] { AssetPaths.ScrubSound, AssetPaths.ElephantSound, AssetPaths.RainAmbience, AssetPaths.Phone, AssetPaths.MusicTracks[0] })
+        {
+            var platform = new ManualPlatform { Assets = new ShippedAssets(withBackground: true, failing: path) };
+            var game = new LudumDare60Game { WaitsForPlayer = false };
+            _ = new GameEngine(LudumDare60Game.VirtualWidth, LudumDare60Game.VirtualHeight).RunAsync(game, platform);
 
-        var error = Assert.Throws<InvalidOperationException>(() => platform.Frame(0));
+            platform.Frame(0);
+            platform.Frame(0.1);
 
-        Assert.Equal($"{AssetPaths.ScrubSound} did not load.", error.Message);
+            Assert.False(game.IsLoading, path);
+            Assert.NotNull(game.Shop);
+        }
     }
 
     [Fact]

@@ -190,6 +190,13 @@ public sealed class LudumDare60Game : IGame
     private AssetHandle<byte[]> _rainFile;
     private bool _hasRain;
 
+    // Optional files that did not load: the game goes on without them (see GiveUpOnFailedOptionalAssets).
+    private bool _phoneFailed;
+    private bool _scrubFailed;
+    private bool _elephantFailed;
+    private bool _rainFailed;
+    private readonly bool[] _trackFailed = new bool[AssetPaths.MusicTracks.Count];
+
     // How long the elephant's trumpet still plays, in seconds.
     private float _elephantLeft;
     private Sound _doorBell;
@@ -297,7 +304,9 @@ public sealed class LudumDare60Game : IGame
     {
         get
         {
-            var count = (HasBackground ? 1 : 0) + (HasStreet ? 1 : 0) + (HasPhone ? 1 : 0) + (_hasScrubSound ? 1 : 0) + (_hasElephantSound ? 1 : 0) + (_hasRain ? 1 : 0);
+            // An optional file that failed counts as done: the loading screen does not wait for it.
+            var count = (HasBackground ? 1 : 0) + (HasStreet ? 1 : 0) + (HasPhone || _phoneFailed ? 1 : 0)
+                + (_hasScrubSound || _scrubFailed ? 1 : 0) + (_hasElephantSound || _elephantFailed ? 1 : 0) + (_hasRain || _rainFailed ? 1 : 0);
             foreach (var loaded in _hasCustomerSheet)
             {
                 count += loaded ? 1 : 0;
@@ -985,11 +994,6 @@ public sealed class LudumDare60Game : IGame
             ThrowIfFailed(_streetImage);
         }
 
-        if (!HasPhone)
-        {
-            ThrowIfFailed(_phoneImage);
-        }
-
         for (var i = 0; i < _customerImages.Length; i++)
         {
             if (!_hasCustomerSheet[i])
@@ -1003,29 +1007,34 @@ public sealed class LudumDare60Game : IGame
             ThrowIfFailed(_ordersHandle);
         }
 
-        if (!_hasScrubSound)
-        {
-            ThrowIfFailed(_scrubSound);
-        }
+        GiveUpOnFailedOptionalAssets();
+    }
 
-        if (!_hasElephantSound)
-        {
-            ThrowIfFailed(_elephantFile);
-        }
-
-        if (!_hasRain)
-        {
-            ThrowIfFailed(_rainFile);
-        }
-
+    /// <summary>
+    /// Drops the optional files that did not load: the phone, the scrub loop, the elephant, the rain and the music. A
+    /// stuck download on one of them (a CDN serving a broken copy) must not stop the game or hold the loading screen;
+    /// the game goes on without that picture or sound. The room, the street, the customers and the orders are required:
+    /// <see cref="ThrowIfAnyAssetFailed"/> stops the game on those.
+    /// </summary>
+    private void GiveUpOnFailedOptionalAssets()
+    {
+        _phoneFailed |= !HasPhone && !_phoneFailed && GaveUp(_phoneImage);
+        _scrubFailed |= !_hasScrubSound && !_scrubFailed && GaveUp(_scrubSound);
+        _elephantFailed |= !_hasElephantSound && !_elephantFailed && GaveUp(_elephantFile);
+        _rainFailed |= !_hasRain && !_rainFailed && GaveUp(_rainFile);
         for (var i = 0; i < _trackFiles.Length; i++)
         {
-            if (!_hasTrack[i])
-            {
-                ThrowIfFailed(_trackFiles[i]);
-            }
+            _trackFailed[i] |= !_hasTrack[i] && !_trackFailed[i] && GaveUp(_trackFiles[i]);
         }
     }
+
+    /// <summary>
+    /// Whether <paramref name="handle"/>'s file failed to load. The handle stays valid: a failed file is never loaded,
+    /// so the code that waits for it simply never gets it.
+    /// </summary>
+    private bool GaveUp<T>(AssetHandle<T> handle)
+        where T : class
+        => _assets!.GetError(handle) is not null;
 
     private void ThrowIfFailed<T>(AssetHandle<T> handle)
         where T : class
