@@ -75,10 +75,12 @@ dotnet run --project src/game/LudumDare60.Game.Desktop             # add -- --de
 ```
 
 It needs no workload beyond the SDK, and a Vulkan driver to run (see
-[Desktop renderer](architecture.md#desktop-renderer)). On ChromeOS (Crostini) run it with `SDL_VIDEO_DRIVER=wayland`. The native SDL3 libraries come from the `SDL3-CS.Windows`, `SDL3-CS.Linux` and
-`SDL3-CS.MacOS` packages and are copied to `runtimes/<rid>/native/`; the runtime picks the one for the current OS.
-The build copies the browser project's `wwwroot/assets/` to `assets/` next to the executable. `--debug` turns on the
-same debug keys as `?debug` in the browser. Without an audio device (no sound server), the game runs silent.
+[Desktop renderer](architecture.md#desktop-renderer)). On ChromeOS (Crostini) it picks the settings it needs by itself
+(see [SDL hints](architecture.md#sdl-hints)). The native SDL3 libraries come from the `SDL3-CS.Windows`,
+`SDL3-CS.Linux` and `SDL3-CS.MacOS` packages and are copied to `runtimes/<rid>/native/`; the runtime picks the one for
+the current OS. The build copies the browser project's `wwwroot/assets/` to `assets/` next to the executable.
+`--debug` turns on the same debug keys as `?debug` in the browser. It starts fullscreen: F11 or Alt+Enter switches to a
+window and back, Alt+F4 quits. Without an audio device (no sound server), the game runs silent.
 
 Release builds for players are self-contained, so they need no .NET install:
 
@@ -92,9 +94,11 @@ dotnet publish src/game/LudumDare60.Game.Desktop -c Release -p:DesktopRuntime=wi
   the executable only; its lock file covers `win-x64` and `linux-x64` (`RuntimeIdentifiers`). To add a RID, add it
   there and run `dotnet restore --force-evaluate`.
 - The output is one executable (`LudumDare60.Game.Desktop.exe` or `LudumDare60.Game.Desktop`, single-file and
-  compressed) with SDL3 (`SDL3.dll` or `libSDL3.so`), the symbol files (for line numbers in stack traces) and
-  `assets/`: about 40 MB. The Linux SDL package ships `libSDL3.so` three times under its soname names; the copies are
-  left out (`DropSdlSonameCopies`). Nothing is trimmed: SDL3-CS and NVorbis are not checked for trimming.
+  compressed) with SDL3 (`SDL3.dll` or `libSDL3.so`), the symbol files (for line numbers in stack traces),
+  `assets/` and `README.txt`: about 40 MB. `README.txt` is the player's guide for that OS (how to start the game,
+  requirements, controls, troubleshooting), from `Readme/README-windows.txt` or `Readme/README-linux.txt` in the
+  desktop game project. Keep both in step with the game: controls, requirements and error messages. The Linux SDL
+  package ships `libSDL3.so` three times under its soname names; the copies are left out (`DropSdlSonameCopies`). Nothing is trimmed: SDL3-CS and NVorbis are not checked for trimming.
 - Both are cross-published on Linux. The Windows build is not run in CI: start it on Windows before a release (see
   the [pre-release checklist](#pre-release-checklist)).
 - Players need a Vulkan driver. Say so on the itch.io page.

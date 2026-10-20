@@ -152,8 +152,9 @@ to Sentry when reporting is configured (see
 a native debugger and profiler work) and as the base of a later desktop release. It implements the same contracts as
 the browser platform, so the engine and the game cannot tell them apart.
 
-- `RunAsync(sink)` sets the `SDL_HINT_TOUCH_MOUSE_EVENTS` hint to `0`, initializes SDL (video and gamepads), creates
-  a resizable high-density window and runs the frame loop on the calling thread, which must be the main thread
+- `RunAsync(sink)` sets the SDL hints of `SdlHints` (environment variables of the same name still win), initializes
+  SDL (video, audio and gamepads), creates
+  a resizable high-density window, fullscreen on the desktop (no mode change), and runs the frame loop on the calling thread, which must be the main thread
   (macOS creates windows only there). It returns once the player closes the window (`SDL_EVENT_QUIT`); the returned
   task is always complete, and failures are thrown from the call. The window, the gamepads and SDL are shut down on
   the way out either way.
@@ -559,7 +560,28 @@ command for command:
   `LD60_UPDATE_SHADERS=1` to write them.
 - **Failures.** Without a Vulkan driver, or when the window cannot get a swapchain, `RunAsync` throws with SDL's
   error. On ChromeOS (Crostini), the Venus driver gets no swapchain on XWayland, where SDL goes when the compositor
-  lacks `fifo-v1`: run with `SDL_VIDEO_DRIVER=wayland`.
+  lacks `fifo-v1`, so the platform picks Wayland there (see below).
+
+### SDL hints
+
+`SdlHints.Get` decides the hints from the environment, so tests check it without SDL:
+
+- Always `SDL_HINT_TOUCH_MOUSE_EVENTS=0`: touches arrive as finger events, and SDL's mouse copies of them would report
+  each touch twice.
+- Under sommelier, the Wayland proxy of ChromeOS's Linux container (`SOMMELIER_VERSION` is set):
+  `SDL_VIDEO_DRIVER=wayland`, because Venus gets no swapchain on XWayland, and
+  `SDL_VIDEO_WAYLAND_ALLOW_LIBDECOR=0`. With libdecor, SDL draws its own title bar above the window; sommelier then
+  shows the picture lower by the bar's height while pointer positions stay relative to the picture's top, so every
+  click lands too high and parts can be grabbed only by their lower part. Without libdecor the window has no frame
+  there at all, so it cannot be moved or closed with the mouse; the game starts fullscreen for that reason.
+  Elsewhere libdecor stays on: GNOME has no server-side decorations, and the window would lose its title bar.
+
+### Window shortcuts
+
+The game starts fullscreen on every desktop, so the platform handles two keys itself (`WindowShortcuts`), before the
+game sees them as usual: F11 or Alt+Enter switches between fullscreen and a window of the size given to
+`DesktopPlatform` (Alt+Enter for keyboards without F11, such as the Pixelbook's), and Alt+F4 quits, also where the window has no frame (Crostini) or the compositor does not handle Alt+F4. The game must not give
+these keys a meaning of their own.
 
 ## Audio
 

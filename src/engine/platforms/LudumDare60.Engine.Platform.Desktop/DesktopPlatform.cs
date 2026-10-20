@@ -10,8 +10,8 @@ namespace LudumDare60.Engine.Platform.Desktop;
 /// and gamepad input, and real asset files.
 /// </summary>
 /// <param name="title">Window title.</param>
-/// <param name="width">Initial window width in logical pixels.</param>
-/// <param name="height">Initial window height in logical pixels.</param>
+/// <param name="width">Window width in logical pixels when not fullscreen.</param>
+/// <param name="height">Window height in logical pixels when not fullscreen.</param>
 /// <param name="assetRoot">Folder of the asset files. <see langword="null"/> for <c>assets/</c> next to the
 /// executable.</param>
 public sealed class DesktopPlatform(string title, int width, int height, string? assetRoot = null) : IPlatform
@@ -62,8 +62,11 @@ public sealed class DesktopPlatform(string title, int width, int height, string?
     {
         ArgumentNullException.ThrowIfNull(frameSink);
 
-        // Touches arrive as finger events; SDL's mouse copies of them would report each touch twice.
-        SDL.SetHint(SDL.Hints.TouchMouseEvents, "0");
+        foreach (var (name, value) in SdlHints.Get(Environment.GetEnvironmentVariable))
+        {
+            SDL.SetHint(name, value);
+        }
+
         if (!SDL.Init(SDL.InitFlags.Video | SDL.InitFlags.Audio | SDL.InitFlags.Gamepad))
         {
             throw new InvalidOperationException($"SDL_Init failed: {SDL.GetError()}");
@@ -71,7 +74,10 @@ public sealed class DesktopPlatform(string title, int width, int height, string?
 
         try
         {
-            var window = SDL.CreateWindow(title, width, height, SDL.WindowFlags.Resizable | SDL.WindowFlags.HighPixelDensity);
+            // Fullscreen on the desktop, without a mode change: the game has no window frame to depend on, and Crostini
+            // shows no frame for SDL's windows (see SdlHints). F11 or Alt+Enter switches to a window of the given size.
+            var flags = SDL.WindowFlags.Resizable | SDL.WindowFlags.HighPixelDensity | SDL.WindowFlags.Fullscreen;
+            var window = SDL.CreateWindow(title, width, height, flags);
             if (window == 0)
             {
                 throw new InvalidOperationException($"SDL_CreateWindow failed: {SDL.GetError()}");
@@ -139,6 +145,21 @@ public sealed class DesktopPlatform(string title, int width, int height, string?
                 {
                     case SDL.EventType.Quit:
                         return;
+                    case SDL.EventType.KeyDown:
+                        switch (WindowShortcuts.Get(in e.Key))
+                        {
+                            case WindowShortcuts.Action.Quit:
+                                return;
+                            case WindowShortcuts.Action.ToggleFullscreen:
+                                var fullscreen = SDL.GetWindowFlags(window).HasFlag(SDL.WindowFlags.Fullscreen);
+                                SDL.SetWindowFullscreen(window, !fullscreen);
+                                break;
+                            default:
+                                break;
+                        }
+
+                        input.Handle(in e);
+                        break;
                     case SDL.EventType.WindowPixelSizeChanged:
                     case SDL.EventType.WindowDisplayScaleChanged:
                         SDL.GetWindowSizeInPixels(window, out pixelWidth, out pixelHeight);

@@ -188,6 +188,7 @@ jobs:
         run: |
           test -f "$DESKTOP_PUBLISH_DIR/$EXECUTABLE" || { echo "::error::$EXECUTABLE is missing from $DESKTOP_PUBLISH_DIR"; exit 1; }
           test -d "$DESKTOP_PUBLISH_DIR/assets" || { echo "::error::assets/ is missing from $DESKTOP_PUBLISH_DIR"; exit 1; }
+          test -f "$DESKTOP_PUBLISH_DIR/README.txt" || { echo "::error::README.txt is missing from $DESKTOP_PUBLISH_DIR"; exit 1; }
           files=$(find "$DESKTOP_PUBLISH_DIR" -type f | wc -l)
           size=$(du -sh "$DESKTOP_PUBLISH_DIR" | cut -f1)
           echo "${{ matrix.channel }}: $files files, $size" >> "$GITHUB_STEP_SUMMARY"

@@ -37,6 +37,14 @@
     <ProjectReference Include="..\..\engine\platforms\LudumDare60.Engine.Platform.Desktop\LudumDare60.Engine.Platform.Desktop.csproj" />
   </ItemGroup>
 
+  <!-- The player's README for the published OS, as README.txt next to the executable. -->
+  <ItemGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <None Include="Readme\README-windows.txt" Link="README.txt" CopyToPublishDirectory="PreserveNewest"
+          Condition="$(RuntimeIdentifier.StartsWith('win'))" />
+    <None Include="Readme\README-linux.txt" Link="README.txt" CopyToPublishDirectory="PreserveNewest"
+          Condition="$(RuntimeIdentifier.StartsWith('linux'))" />
+  </ItemGroup>
+
   <ItemGroup>
     <!-- The browser project owns the asset files; the desktop build copies them to assets/ next to the executable. -->
     <Content Include="..\LudumDare60.Game.Browser\wwwroot\assets\**\*" LinkBase="assets" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
