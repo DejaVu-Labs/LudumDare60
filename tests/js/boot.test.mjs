@@ -9,6 +9,7 @@ import {
   createRetryingFetch,
   createWatchedFetch,
   STALL_MS,
+  FIRST_BYTE_MS,
   ERROR_TEXT,
   fetchWithRetry,
   getErrorText,
@@ -19,8 +20,6 @@ import {
   repairOnce,
   resolveRuntimeUrl,
   RETRY_DELAYS_MS,
-  RETRY_PARAM,
-  retryUrl,
   runtimeModuleUrls,
   runWithStatus,
   setErrorText,
@@ -277,7 +276,7 @@ test('fetchWithRetry_NetworkErrorsThenOk_RetriesWithDelays', async () => {
     { integrity: 'sha256-x', cache: 'no-store' },
     { integrity: 'sha256-x', cache: 'no-store' },
   ]);
-  assert.deepEqual(requests.map((r) => r.url), ['a.wasm', `a.wasm?${RETRY_PARAM}=1`, `a.wasm?${RETRY_PARAM}=2`]);
+  assert.deepEqual(requests.map((r) => r.url), ['a.wasm', 'a.wasm', 'a.wasm']);
 });
 
 test('fetchWithRetry_TransientStatusThenOk_Retries', async () => {
@@ -598,14 +597,15 @@ function hangingFetch(chunks) {
     });
 }
 
-test('watchedFetch_NoResponse_RejectsAfterStall', async () => {
+test('watchedFetch_NoResponse_RejectsAfterTheFirstByteWait', async () => {
   const timers = manualTimers();
   const download = createWatchedFetch(hangingFetch(null), { digest, ...timers })('https://x/a.wasm', {});
   await settle();
 
   timers.fire();
 
-  await assert.rejects(download, (error) => error instanceof TypeError && error.message === `no data for ${STALL_MS / 1000} s`);
+  await assert.rejects(download, (error) => error instanceof TypeError && error.message === `no data for ${FIRST_BYTE_MS / 1000} s`);
+  assert.ok(FIRST_BYTE_MS > STALL_MS, 'the CDN gets longer for the first byte than for a gap in the body');
 });
 
 test('watchedFetch_BodyStopsMidway_RejectsAfterStall', async () => {
@@ -659,7 +659,7 @@ test('createRetryingFetch_FailsThenOk_RetriesAndReportsUrl', async () => {
 
   assert.equal(response.status, 200);
   assert.deepEqual(requests.map((r) => r.init), [{ cache: 'default' }, { cache: 'no-store' }]);
-  assert.equal(requests[1].url, `https://x/assets/bench.png?v=1&${RETRY_PARAM}=1`);
+  assert.equal(requests[1].url, 'https://x/assets/bench.png?v=1');
   assert.deepEqual(waits, [RETRY_DELAYS_MS[0]]);
   assert.deepEqual(retries, [['https://x/assets/bench.png?v=1', 1, RETRY_DELAYS_MS[0], 'TypeError: no data for 10 s']]);
 });
@@ -796,10 +796,4 @@ test('freshPageUrl_AlreadyFresh_ReplacesTheStamp', () => {
   const fresh = new URL(freshPageUrl(freshPageUrl(page, 1), 2));
 
   assert.deepEqual(fresh.searchParams.getAll(FRESH_PARAM), ['2']);
-});
-
-test('retryUrl_PlainQueriedRelativeOrHashed_AddsTheAttemptOnce', () => {
-  assert.equal(retryUrl('./_framework/a.wasm', 1), `./_framework/a.wasm?${RETRY_PARAM}=1`);
-  assert.equal(retryUrl('https://x/bench.png?v=abc', 2), `https://x/bench.png?v=abc&${RETRY_PARAM}=2`);
-  assert.equal(retryUrl('https://x/a.js#top', 3), `https://x/a.js?${RETRY_PARAM}=3`);
 });

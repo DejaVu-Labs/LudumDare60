@@ -92,6 +92,13 @@ export const RETRY_DELAYS_MS = Object.freeze([1000, 2000, 4000, 8000, 8000, 8000
  */
 export const STALL_MS = 10_000;
 
+/**
+ * How long a download may wait for its first byte, in milliseconds. Longer than `STALL_MS`: right after a deploy, every
+ * asset has a new address (`?v=`) and the CDN in front of itch.io fetches it from itch.io first, which took more than
+ * 10 s for every asset on 2026-10-20, so a 10 s limit aborted answers that were on their way.
+ */
+export const FIRST_BYTE_MS = 30_000;
+
 /** Web Crypto names of the hash algorithms that `integrity` values use. */
 const INTEGRITY_ALGORITHMS = Object.freeze({ sha256: 'SHA-256', sha384: 'SHA-384', sha512: 'SHA-512' });
 
@@ -101,6 +108,7 @@ const INTEGRITY_ALGORITHMS = Object.freeze({ sha256: 'SHA-256', sha384: 'SHA-384
  * @property {(callback: () => void, ms: number) => unknown} setTimer Usually `setTimeout`.
  * @property {(timer: unknown) => void} clearTimer Usually `clearTimeout`.
  * @property {number} [stallMs] Defaults to `STALL_MS`.
+ * @property {number} [firstByteMs] Defaults to `FIRST_BYTE_MS`.
  */
 
 /**
@@ -116,8 +124,8 @@ function toBase64(bytes) {
 }
 
 /**
- * Wraps `fetchLike` so a request fails when no bytes arrive for `stallMs`, before the headers or between two chunks of
- * the body. The body is read to the end here, and `init.integrity` (SHA-256, -384 or -512) is checked against it here
+ * Wraps `fetchLike` so a request fails when no bytes arrive: for `firstByteMs` before the first chunk of the body, or
+ * for `stallMs` between two chunks. The body is read to the end here, and `init.integrity` (SHA-256, -384 or -512) is checked against it here
  * too: with `integrity` on the request, `fetch` resolves only once the whole body is in, so a stall could not be seen.
  *
  * @param {FetchLike} fetchLike Usually `fetch`. Gets `init` without `integrity`, plus an abort `signal`.
@@ -127,18 +135,22 @@ function toBase64(bytes) {
  */
 export function createWatchedFetch(fetchLike, deps) {
   const stallMs = deps.stallMs ?? STALL_MS;
+  const firstByteMs = deps.firstByteMs ?? FIRST_BYTE_MS;
   return async (url, init) => {
     const { integrity, ...rest } = init;
     const controller = new AbortController();
-    let stalled = false;
+    /** @type {number | null} How long the wait was that stalled. */
+    let stalledAfter = null;
+    let started = false;
     /** @type {unknown} */
     let timer;
     const arm = () => {
+      const limit = started ? stallMs : firstByteMs;
       deps.clearTimer(timer);
       timer = deps.setTimer(() => {
-        stalled = true;
+        stalledAfter = limit;
         controller.abort();
-      }, stallMs);
+      }, limit);
     };
 
     arm();
@@ -159,6 +171,7 @@ export function createWatchedFetch(fetchLike, deps) {
         }
         chunks.push(value);
         length += value.byteLength;
+        started = true;
       }
       const bytes = new Uint8Array(length);
       let offset = 0;
@@ -186,8 +199,8 @@ export function createWatchedFetch(fetchLike, deps) {
       }
       return new Response(bytes, { status: response.status, statusText: response.statusText, headers });
     } catch (error) {
-      if (stalled) {
-        throw new TypeError(`no data for ${stallMs / 1000} s`);
+      if (stalledAfter !== null) {
+        throw new TypeError(`no data for ${stalledAfter / 1000} s`);
       }
       throw error;
     } finally {
@@ -208,13 +221,11 @@ function isTransient(status) {
  * Fetches `url`, and again after each delay in `delaysMs` while the request fails with a network error or a
  * transient status (408, 429, 5xx). Other responses, including 404, are returned at once.
  *
- * Retries go past the HTTP cache entirely: `cache: 'no-store'` at an address the cache has never seen (`retryUrl`).
- * A failed integrity check is a network error, and the corrupt body that failed it stays in the cache: a retry that
- * read the cache would fail the same way (seen on itch.io from Chrome on Android, 2026-10-19). And a download aborted
- * for stalling can keep holding its cache entry, so a retry of the same address that only bypasses reading
- * (`cache: 'reload'`) waits on that entry and stalls too: a returning player's Chrome stalled on
- * `System.Private.CoreLib` six times in a row after a deploy, while a private window, with its own cache, loaded
- * (Sentry load traces, 2026-10-20).
+ * Retries go past the browser's HTTP cache entirely (`cache: 'no-store'`), at the same address. A failed integrity check
+ * is a network error, and the corrupt body that failed it stays in the cache: a retry that read the cache would fail
+ * the same way (seen on itch.io from Chrome on Android, 2026-10-19). The address stays the same so the CDN in front of
+ * itch.io can answer a retry from what it fetched for the first try; a new address per retry made every retry wait
+ * for itch.io again (2026-10-20).
  *
  * @param {string} url
  * @param {RequestInit} init
@@ -240,10 +251,7 @@ export async function fetchWithRetry(
     const last = attempt >= delaysMs.length;
     let reason = '';
     try {
-      const response = await fetchLike(
-        attempt === 0 ? url : retryUrl(url, attempt),
-        attempt === 0 ? init : { ...init, cache: 'no-store' },
-      );
+      const response = await fetchLike(url, attempt === 0 ? init : { ...init, cache: 'no-store' });
       if (response.ok || last || !retryStatus(response.status)) {
         return response;
       }
@@ -257,22 +265,6 @@ export async function fetchWithRetry(
     onRetry(attempt + 1, delaysMs[attempt], reason);
     await sleep(delaysMs[attempt]);
   }
-}
-
-/** Query parameter that `retryUrl` sets: the static hosts ignore it, but every cache keys on it. */
-export const RETRY_PARAM = 'ld60retry';
-
-/**
- * `url` with `RETRY_PARAM` set to `attempt`, so a retry has a cache entry of its own. Works on relative URLs, keeps
- * the query (`?v=` on assets) and drops any hash.
- *
- * @param {string} url
- * @param {number} attempt 1 for the first retry.
- * @returns {string}
- */
-export function retryUrl(url, attempt) {
-  const [path] = url.split('#', 1);
-  return `${path}${path.includes('?') ? '&' : '?'}${RETRY_PARAM}=${attempt}`;
 }
 
 /**
